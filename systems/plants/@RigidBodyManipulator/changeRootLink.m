@@ -103,7 +103,8 @@ while (true)
     current_body.coulomb_window = old_child_new_parent_body.coulomb_window;
     current_body.joint_limit_min = old_child_new_parent_body.joint_limit_min;
     current_body.joint_limit_max = old_child_new_parent_body.joint_limit_max;
-    current_body.effort_limit = old_child_new_parent_body.effort_limit;
+    current_body.effort_max = old_child_new_parent_body.effort_max;
+    current_body.effort_min = old_child_new_parent_body.effort_min;
     current_body.velocity_limit = old_child_new_parent_body.velocity_limit;
     current_body.has_position_sensor = old_child_new_parent_body.has_position_sensor;
   end

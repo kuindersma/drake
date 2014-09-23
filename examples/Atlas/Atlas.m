@@ -30,9 +30,9 @@ classdef Atlas < TimeSteppingRigidBodyManipulator & Biped
         obj = obj.setInitialState(obj.resolveConstraints(zeros(obj.getNumStates(),1)));
       else
         % TEMP HACK to get by resolveConstraints
-        for i=1:length(obj.manip.body), obj.manip.body(i).contact_pts=[]; end
-        obj.manip = compile(obj.manip);
-        obj = obj.setInitialState(zeros(obj.getNumStates(),1));
+%         for i=1:length(obj.manip.body), obj.manip.body(i).contact_pts=[]; end
+%         obj.manip = compile(obj.manip);
+%         obj = obj.setInitialState(zeros(obj.getNumStates(),1));
       end
     end
 
@@ -94,18 +94,18 @@ classdef Atlas < TimeSteppingRigidBodyManipulator & Biped
                        'goal', [100;100;0;0;0;10]);
     end
 
-    function [xstar,ustar,zstar] = getFixedPoint(obj,options)
+    function [xstar,ustar,zstar] = findFixedPoint(obj,options)
       if nargin < 2 || ~isfield(options,'visualize')
         options.visualize = false;
       end
 
-      x0 = Point(obj.getStateFrame());
+      x0 = obj.getInitialState();
       x0 = resolveConstraints(obj,x0);
       u0 = zeros(obj.getNumInputs(),1);
 
       nq = obj.getNumPositions();
       nu = obj.getNumInputs();
-      nz = obj.getNumContacts()*3;
+      nz = obj.getNumContactPairs()*3;
       z0 = zeros(nz,1);
       q0 = x0(1:nq);
 
@@ -152,8 +152,8 @@ classdef Atlas < TimeSteppingRigidBodyManipulator & Biped
         z=quz(nq+nu+(1:nz));
 
         [~,C,B,~,dC,~] = obj.manip.manipulatorDynamics(q,zeros(nq,1));
-        [phiC,JC] = obj.contactConstraints(q);
-        [~,J,dJ] = obj.contactPositions(q);
+        [phiC,~,~,~,~,~,~,~,JC] = obj.contactConstraints(q);
+        [~,J,dJ] = obj.terrainContactPositions(q);
 
         % ignore friction constraints for now
         c = 0;
@@ -166,6 +166,7 @@ classdef Atlas < TimeSteppingRigidBodyManipulator & Biped
 
         ceq = [C-B*u-J'*z; phiC];
         GCeq = [[dC(1:nq,1:nq)-dJz,-B,-J']',[JC'; zeros(nu+nz,length(phiC))]];
+        
       end
     end
 

@@ -59,9 +59,9 @@ if isfield(options,'Qy')
   options.N = options.N + C'*options.Qy*D;
 end
 
-if getNumUnilateralConstraints(obj)>0,
-  error('no unilateral constraints allowed');
-end
+% if getNumUnilateralConstraints(obj)>0,
+%   error('no unilateral constraints allowed');
+% end
 
 if getNumStateConstraints(obj)>0
   % if there are state constraints, the system will be uncontrollable
