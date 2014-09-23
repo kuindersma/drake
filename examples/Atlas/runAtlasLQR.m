@@ -41,7 +41,7 @@ R = 0.001*eye(nu);
 
 [c,V] = tilqr(r,x0,u0,Q,R,options);
 
-[A,B2] = linearize(r,0,x0,u0);
+[A,B] = linearize(r,0,x0,u0);
 
 
 
@@ -60,13 +60,14 @@ end
 sys = feedback(r,c);
 
 x0(2) = x0(2) + 0; 
-x0(nq+2) = 0.55; 
+x0(nq+1) = 0.1; 
+x0(nq+2) = -0.35; 
 
 tic;
 traj = simulate(sys,[0 3],x0);
 toc;
 
 v.playback(traj,struct('slider',true));
-save('traj_lqr_with_lims.mat','traj');
+save('traj_lqr_with_lims2.mat','traj');
 
 end
