@@ -48,48 +48,24 @@
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.082 0.0624435 -0.081119"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="heel">
       <origin rpy="0 0 0" xyz="-0.082 -0.0624435 -0.081119"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.082 -0.0624435 -0.081119"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="toe">
       <origin rpy="0 0 0" xyz="0.178 0.0624435 -0.081119"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.178 0.0624435 -0.081119"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="toe">
       <origin rpy="0 0 0" xyz="0.178 -0.0624435 -0.081119"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.178 -0.0624435 -0.081119"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
   </link>
   <frame link="l_foot" name="l_foot_sole" rpy="0 0 0" xyz="0.0480 0 -0.081119"/>
   <link name="l_hand">
@@ -110,24 +86,12 @@
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.0 0.115 0.0"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="knuckle">
       <origin rpy="0 0 0" xyz="0 0.26 0.0"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0.26 0.0"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
   </link>
   <link name="l_larm">
     <inertial>
@@ -173,12 +137,6 @@
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.1096 0.0029 0.012"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
   </link>
   <link name="l_scap">
     <inertial>
@@ -250,24 +208,12 @@
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.1179 0.02085 -0.18"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="hamstring">
       <origin rpy="0 0 0" xyz="-0.1179 0.02085 -0.08"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.1179 0.02085 -0.08"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
   </link>
   <link name="ltorso">
     <inertial>
@@ -313,120 +259,60 @@
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.17 0.042 0.115"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="front">
       <origin rpy="0 0 0" xyz="0.17 -0.042 0.115"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.17 -0.042 0.115"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="front">
       <origin rpy="0 0 0" xyz="0.17 0.042 0.065"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.17 0.042 0.065"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="front">
       <origin rpy="0 0 0" xyz="0.17 -0.042 0.065"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.17 -0.042 0.065"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="back">
       <origin rpy="0 0 0" xyz="-0.15 0.042 0.115"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.15 0.042 0.115"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="back">
       <origin rpy="0 0 0" xyz="-0.15 -0.042 0.115"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.15 -0.042 0.115"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="back">
       <origin rpy="0 0 0" xyz="-0.15 0.042 0.065"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.15 0.042 0.065"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="back">
       <origin rpy="0 0 0" xyz="-0.15 -0.042 0.065"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.15 -0.042 0.065"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="butt">
       <origin rpy="0 0 0" xyz="-0.15 0.075 -0.15"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.15 0.075 -0.15"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="butt">
       <origin rpy="0 0 0" xyz="-0.15 -0.075 -0.15"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.15 -0.075 -0.15"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
   </link>
   <link name="r_clav">
     <inertial>
@@ -472,48 +358,24 @@
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.082 0.0624435 -0.081119"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="heel">
       <origin rpy="0 0 0" xyz="-0.082 -0.0624435 -0.081119"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.082 -0.0624435 -0.081119"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="toe">
       <origin rpy="0 0 0" xyz="0.178 0.0624435 -0.081119"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.178 0.0624435 -0.081119"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="toe">
       <origin rpy="0 0 0" xyz="0.178 -0.0624435 -0.081119"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.178 -0.0624435 -0.081119"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <!--<xacro:collision_point group="heel_mid" xyz="-0.082 0 -0.081119" visualize="1"/>-->
     <!--<xacro:collision_point group="toe_mid" xyz="0.178 0 -0.081119" visualize="1"/>-->
     <!--    <xacro:collision_point group="inner" xyz="-0.08 0.055 -0.081119" visualize="1"/>-->
@@ -540,24 +402,12 @@
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.0 -0.115 0.0"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="knuckle">
       <origin rpy="0 0 0" xyz="0 -0.26 0.0"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 -0.26 0.0"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
   </link>
   <link name="r_larm">
     <inertial>
@@ -603,12 +453,6 @@
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.1096 0.0029 0.012"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
   </link>
   <link name="r_scap">
     <inertial>
@@ -680,24 +524,12 @@
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.1179 -0.02085 -0.18"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="hamstring">
       <origin rpy="0 0 0" xyz="-0.1179 -0.02085 -0.08"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.1179 -0.02085 -0.08"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
   </link>
   <link name="utorso">
     <inertial>
@@ -723,96 +555,48 @@
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.2040 0.12 0.3471"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="front">
       <origin rpy="0 0 0" xyz="0.2040 -0.12 0.3471"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.2040 -0.12 0.3471"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="front">
       <origin rpy="0 0 0" xyz="0.2040 0.12 0.0309"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.2040 0.12 0.0309"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="front">
       <origin rpy="0 0 0" xyz="0.2040 -0.12 0.0309"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="0.2040 -0.12 0.0309"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="back">
       <origin rpy="0 0 0" xyz="-0.1148 0.12 0.3471"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.1148 0.12 0.3471"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="back">
       <origin rpy="0 0 0" xyz="-0.1148 -0.12 0.3471"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.1148 -0.12 0.3471"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="back">
       <origin rpy="0 0 0" xyz="-0.1148 0.12 0.0309"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.1148 0.12 0.0309"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
     <collision group="back">
       <origin rpy="0 0 0" xyz="-0.1148 -0.12 0.0309"/>
       <geometry>
         <sphere radius="0"/>
       </geometry>
     </collision>
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.1148 -0.12 0.0309"/>
-      <geometry>
-        <sphere radius="0.01"/>
-      </geometry>
-    </visual>
   </link>
   <joint name="back_bkx" type="revolute">
     <origin rpy="0 -0 0" xyz="0 0 0.05"/>
