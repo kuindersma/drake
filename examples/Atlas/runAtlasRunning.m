@@ -28,8 +28,8 @@ v.display_dt = 0.005;
 % load in running trajectory
 load('data/results_2m_2mps_midstrike.mat');
 
-ts = unique(sol.xtraj_three.getBreaks);
 xtraj = sol.xtraj_three;
+ts = unique(xtraj.getBreaks);
 r.setInitialState(xtraj.eval(0));
 x_knots = xtraj.eval(ts);
 
@@ -43,13 +43,33 @@ for j=1:length(link_indices)
 end
 
 nq = getNumPositions(r);
+A_knots = zeros(nq,nq,length(ts));
+B_knots = zeros(nq,nq,length(ts));
+C_knots = zeros(6,nq,length(ts));
+x0_knots = zeros(nq,length(ts));
+u0_knots = zeros(nq,length(ts));
+y0_knots = zeros(6,length(ts));
 for i=1:length(ts)
   qi = x_knots(1:nq,i);
-  kinsol = doKinematics(r,qi);
+  vi = x_knots(nq+(1:nq),i);
+  kinsol = doKinematics(r,qi,true,true,vi);
   for j=1:length(link_indices)
     body_knots{j}(:,i) = forwardKin(r,kinsol,link_indices(j),[0;0;0],1);
   end
+  [H,~,~,dH] = manipulatorDynamics(r,qi,vi,true);
+  Hdot = matGradMult(dH(:,1:nq),vi);
+  Hinv = inv(H);
+  A_knots(:,:,i) = Hdot*Hinv;
+  B_knots(:,:,i) = H;
+  Ag = getCMM(r,kinsol,vi);
+  C_knots(:,:,i) = Ag*Hinv;
+  x0_knots(:,i) = H*vi;
+  y0_knots(:,i) = Ag*vi;  
 end
+
+Atraj = PPTrajectory(foh(ts,A_knots));
+Btraj = PPTrajectory(foh(ts,B_knots));
+Ctraj = PPTrajectory(foh(ts,C_knots));
 
 for j=1:length(link_indices)
   link_con = struct();
@@ -59,26 +79,6 @@ for j=1:length(link_indices)
   link_con.dtraj = fnder(link_con.traj);
   link_con.ddtraj = fnder(link_con.traj,2);
   link_constraints(j) = link_con;
-end
-
-com = sol.com;
-comdot = sol.comdot;
-comddot = sol.comddot;
-ts = sol.t;
-for i=1:5 % three strides
-  comi = sol.com;
-  comdoti = sol.comdot;
-  comddoti = sol.comddot;
-  if mod(i,2)
-    comi(2,:) = -comi(2,:);
-    comdoti(2,:) = -comdoti(2,:);
-    comddoti(2,:) = -comddoti(2,:);
-  end
-  comi(1,:) = comi(1,:) + com(1,end);
-  com = [com,comi];
-  comdot = [comdot,comdoti];
-  comddot = [comddot,comddoti];
-  ts = [ts,sol.t+ts(end)+1e-6];
 end
 
 % for i=0:0.01:ts(end)
@@ -109,37 +109,41 @@ supports = [left_phase; right_phase; left_phase; right_phase; left_phase; right_
 r = r.setInitialState(x_knots(:,1));
 
 % build TV-LQR controller on COM dynamics
-x0traj = PPTrajectory(foh(ts,[com;comdot]));
-x0traj = x0traj.setOutputFrame(COMState);
-u0traj = PPTrajectory(foh(ts,comddot));
-u0traj = u0traj.setOutputFrame(COMAcceleration);
+x0traj = PPTrajectory(foh(ts,x0_knots));
+u0traj = PPTrajectory(foh(ts,u0_knots));
+y0traj = PPTrajectory(foh(ts,y0_knots));
 
-Q = diag([10 10 10 1 1 1]);
-R = 0.0001*eye(3);
-A = [zeros(3),eye(3); zeros(3,6)];
-B = [zeros(3); eye(3)];
-options.tspan = ts;
-options.sqrtmethod = false;
-ti_sys = LinearSystem(A,B,[],[],eye(6),[]);
-ti_sys = ti_sys.setStateFrame(COMState);
-ti_sys = ti_sys.setOutputFrame(COMState);
-ti_sys = ti_sys.setInputFrame(COMAcceleration);
-[~,V] = tvlqr(ti_sys,x0traj,u0traj,Q,R,Q,options);
+Qeps = 1e-8*eye(nq);
+Qf = 1e-8*eye(nq);
+options.Qy = diag([0.25 0.25 0.25 1 1 1]);
+R = 0.001*eye(nq);
+% options.tspan = ts;
+% options.sqrtmethod = true;
+% tv_sys = LinearSystem(Atraj,Btraj,[],[],Ctraj,[]);
+% x0traj = x0traj.setOutputFrame(tv_sys.getStateFrame);
+% u0traj = u0traj.setOutputFrame(tv_sys.getInputFrame);
+% tic;
+% [c,V] = tvlqr(tv_sys,x0traj,u0traj,Qeps,R,Qf,options);
+% toc
+% 
+% save('c_and_V.mat','c','V');
+
+load('c_and_V.mat');
 
 ctrl_data = QPControllerData(true,struct(...
   'acceleration_input_frame',AtlasCoordinates(r),...
-  'A',A,...
-  'B',B,...
-  'C',eye(6),...
-  'D',zeros(6,3),...
-  'Qy',0*Q,...
+  'A',Atraj,...
+  'B',Btraj,...
+  'C',Ctraj,...
+  'D',zeros(6,nq),...
+  'Qy',options.Qy,...
   'R',R,...
   'S',V.S,...
   's1',V.s1,...
   's2',V.s2,...
   'x0',x0traj,...
   'u0',u0traj,...
-  'y0',x0traj,...
+  'y0',y0traj,...
   'qtraj',xtraj(1:nq),...
   'support_times',ts,...
   'supports',supports,...
@@ -149,39 +153,31 @@ ctrl_data = QPControllerData(true,struct(...
   'constrained_dofs',[]));
 
 % instantiate QP controller
-options.slack_limit = 1000;
+options.slack_limit = 100;
 options.w_qdd = 0.1*ones(nq,1);
 options.w_grf = 0;
-options.w_slack = 3;
+options.w_slack = 100;
 options.debug = false;
 options.use_mex = use_mex;
 options.contact_threshold = 0.0005;
 
-if use_angular_momentum
-  options.Kp_ang = 1.0; % angular momentum proportunal feedback gain
-  options.W_kdot = 1e-5*eye(3); % angular momentum weight
-else
-  options.W_kdot = zeros(3);
-end
-
-boptions.Kp =250*ones(6,1);
+boptions.Kp = 250*ones(6,1);
 boptions.Kd = 2*sqrt(boptions.Kp);
 lfoot_motion = BodyMotionControlBlock(r,'l_foot',ctrl_data,boptions);
 rfoot_motion = BodyMotionControlBlock(r,'r_foot',ctrl_data,boptions);
 pelvis_motion = BodyMotionControlBlock(r,'pelvis',ctrl_data,boptions);
 lhand_motion = BodyMotionControlBlock(r,'l_hand',ctrl_data,boptions);
 rhand_motion = BodyMotionControlBlock(r,'r_hand',ctrl_data,boptions);
-boptions.Kp(4:6) = NaN; % don't constrain orientation
-boptions.Kd(4:6) = NaN;
+% boptions.Kp(4:6) = NaN; % don't constrain orientation
+% boptions.Kd(4:6) = NaN;
 torso_motion = BodyMotionControlBlock(r,'utorso',ctrl_data,boptions);
-
 
 motion_frames = {lfoot_motion.getOutputFrame,rfoot_motion.getOutputFrame,...
   lhand_motion.getOutputFrame,rhand_motion.getOutputFrame,...
 	pelvis_motion.getOutputFrame,torso_motion.getOutputFrame};
 
 options.body_accel_input_weights = [100 100 10 10 100 10];
-qp = QPController(r,motion_frames,ctrl_data,options);
+qp = MomentumQPController(r,motion_frames,ctrl_data,options);
 
 % feedback QP controller with atlas
 ins(1).system = 1;
