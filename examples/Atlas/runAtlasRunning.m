@@ -34,6 +34,11 @@ ts = unique(xtraj.getBreaks);
 r.setInitialState(xtraj.eval(0));
 x_knots = xtraj.eval(ts);
 
+nq = getNumPositions(r);
+
+qtraj_pchip = PPTrajectory(pchipDeriv(ts,x_knots(1:nq,:),x_knots(nq+(1:nq),:),x_knots(nq+(1:nq),:)));
+qddtraj = fnder(qtraj_pchip);
+
 link_indices = [findLinkInd(r,'l_foot'), findLinkInd(r,'r_foot'),...
     findLinkInd(r,'l_hand'), findLinkInd(r,'r_hand'), ...
     findLinkInd(r,'pelvis'), findLinkInd(r,'utorso')];
@@ -43,7 +48,6 @@ for j=1:length(link_indices)
   body_knots{j} = zeros(6,length(ts));
 end
 
-nq = getNumPositions(r);
 A_knots = zeros(nq,nq,length(ts));
 B_knots = zeros(nq,nq,length(ts));
 C_knots = zeros(6,nq,length(ts));
@@ -66,6 +70,7 @@ for i=1:length(ts)
   C_knots(:,:,i) = Ag*Hinv;
   x0_knots(:,i) = H*vi;
   y0_knots(:,i) = Ag*vi;  
+  u0_knots(:,i) = qddtraj.eval(ts(i));
 end
 
 Atraj = PPTrajectory(foh(ts,A_knots));
@@ -109,27 +114,29 @@ supports = [left_phase; right_phase; left_phase; right_phase; left_phase; right_
 
 r = r.setInitialState(x_knots(:,1));
 
-% build TV-LQR controller on COM dynamics
-x0traj = PPTrajectory(foh(ts,x0_knots));
-u0traj = PPTrajectory(foh(ts,u0_knots));
-y0traj = PPTrajectory(foh(ts,y0_knots));
+x0traj = PPTrajectory(pchip(ts,x0_knots));
+u0traj = PPTrajectory(pchip(ts,u0_knots));
+y0traj = PPTrajectory(pchip(ts,y0_knots));
 
-Qeps = 1e-8*eye(nq);
-Qf = 1e-8*eye(nq);
-options.Qy = diag([0.25 0.25 0.25 1 1 1]);
-R = 0.001*eye(nq);
-% options.tspan = ts;
-% options.sqrtmethod = true;
-% tv_sys = LinearSystem(Atraj,Btraj,[],[],Ctraj,[]);
-% x0traj = x0traj.setOutputFrame(tv_sys.getStateFrame);
-% u0traj = u0traj.setOutputFrame(tv_sys.getInputFrame);
-% tic;
-% [c,V] = tvlqr(tv_sys,x0traj,u0traj,Qeps,R,Qf,options);
-% toc
-% 
-% save('c_and_V.mat','c','V');
-
-load('c_and_V.mat');
+if 1
+  Qeps = 0*eye(nq);
+  Qf = 10*eye(nq);
+  Qy = diag([0 0 0 1 1 1]);
+  R = 1e-3*eye(nq);
+  options.Qy = Qy;
+  options.tspan = ts;
+  options.sqrtmethod = true;
+  tv_sys = LinearSystem(Atraj,Btraj,[],[],Ctraj,[]);
+  x0traj = x0traj.setOutputFrame(tv_sys.getStateFrame);
+  u0traj = u0traj.setOutputFrame(tv_sys.getInputFrame);
+  tic;
+  [c,V] = tvlqr(tv_sys,x0traj,u0traj,Qeps,R,Qf,options);
+  toc
+  
+  save('V.mat','c','V','R','Qy');
+else
+  load('V.mat');
+end
 
 ctrl_data = QPControllerData(true,struct(...
   'acceleration_input_frame',AtlasCoordinates(r),...
@@ -137,7 +144,7 @@ ctrl_data = QPControllerData(true,struct(...
   'B',Btraj,...
   'C',Ctraj,...
   'D',zeros(6,nq),...
-  'Qy',options.Qy,...
+  'Qy',Qy,...
   'R',R,...
   'S',V.S,...
   's1',V.s1,...
@@ -155,9 +162,9 @@ ctrl_data = QPControllerData(true,struct(...
 
 % instantiate QP controller
 options.slack_limit = 100;
-options.w_qdd = 0.1*ones(nq,1);
+options.w_qdd = ones(nq,1);
 options.w_grf = 0;
-options.w_slack = 100;
+options.w_slack = 10;
 options.debug = false;
 options.use_mex = use_mex;
 options.contact_threshold = 0.0005;
@@ -166,11 +173,11 @@ boptions.Kp = 250*ones(6,1);
 boptions.Kd = 2*sqrt(boptions.Kp);
 lfoot_motion = BodyMotionControlBlock(r,'l_foot',ctrl_data,boptions);
 rfoot_motion = BodyMotionControlBlock(r,'r_foot',ctrl_data,boptions);
-pelvis_motion = BodyMotionControlBlock(r,'pelvis',ctrl_data,boptions);
 lhand_motion = BodyMotionControlBlock(r,'l_hand',ctrl_data,boptions);
 rhand_motion = BodyMotionControlBlock(r,'r_hand',ctrl_data,boptions);
-% boptions.Kp(4:6) = NaN; % don't constrain orientation
-% boptions.Kd(4:6) = NaN;
+pelvis_motion = BodyMotionControlBlock(r,'pelvis',ctrl_data,boptions);
+boptions.Kp(4:6) = NaN; % don't constrain orientation
+boptions.Kd(4:6) = NaN;
 torso_motion = BodyMotionControlBlock(r,'utorso',ctrl_data,boptions);
 
 motion_frames = {lfoot_motion.getOutputFrame,rfoot_motion.getOutputFrame,...
