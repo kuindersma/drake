@@ -247,6 +247,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         nContactPairs = obj.manip.getNumContactPairs;
         nP = obj.manip.num_position_constraints;  % number of position constraints
         nV = obj.manip.num_velocity_constraints;
+        Big = 1e20;
 
         if (nContactPairs+nL+nP+nV==0)
           z = [];
@@ -285,6 +286,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           end
           J = zeros(nL + nP + (mC+2)*nC,num_q)*q(1); % *q(1) is for taylorvar
           lb = zeros(nL+nP+(mC+2)*nC,1);
+          ub = Big*ones(nL+nP+(mC+2)*nC,1);
           D = vertcat(D{:});
           J(nL+nP+(1:nC),:) = n;
           J(nL+nP+nC+(1:mC*nC),:) = D;
@@ -334,7 +336,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
             [phiP,JP,dJP] = obj.manip.positionConstraints(q);
           end
           J(nL+(1:nP),:) = JP;
-          lb(nL+(1:nP),1) = -inf;
+          lb(nL+(1:nP),1) = -Big;
         end
 
         %% Bilateral velocity constraints
@@ -344,8 +346,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 
         M = zeros(nL+nP+(mC+2)*nC)*q(1);
         w = zeros(nL+nP+(mC+2)*nC,1)*q(1);
-        activeset_conservative_guess = true(nL+nP+(mC+2)*nC,1);
-        activeset_conservative_guess_tol = .01;
+        z_inactive_conservative_guess = true(nL+nP+(mC+2)*nC,1);
+        z_inactive_conservative_guess_tol = .01;
 
         Hinv = inv(H);
         wqdn = qd + h*Hinv*tau;
@@ -376,7 +378,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         if (nL > 0)
           w(1:nL) = phiL + h*JL*wqdn;
           M(1:nL,:) = h*JL*Mqdn;
-          activeset_conservative_guess(1:nL) = (phiL + h*JL*qd) < activeset_conservative_guess_tol;
+          z_inactive_conservative_guess(1:nL) = (phiL + h*JL*qd) < z_inactive_conservative_guess_tol;
           if (nargout>4)
             dJL = [zeros(prod(size(JL)),1),reshape(dJL,numel(JL),[]),zeros(numel(JL),num_q+obj.num_u)];
             if (obj.position_control)
@@ -394,7 +396,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         if (nP > 0)
           w(nL+(1:nP)) = phiP + h*JP*wqdn;
           M(nL+(1:nP),:) = h*JP*Mqdn;
-          active(nL+(1:nP)) = true;
+          z_inactive_conservative_guess(nL+(1:nP)) = true;
           if (nargout>4)
             dJP = [zeros(numel(JP),1),reshape(dJP,numel(JP),[]),zeros(numel(JP),num_q+obj.num_u)];
             dw(nL+(1:nP),:) = [zeros(size(JP,1),1),JP,zeros(size(JP,1),num_q+obj.num_u)] + h*matGradMultMat(JP,wqdn,dJP,dwqdn);
@@ -461,8 +463,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
             dM(nL+nP+nC+(1:mC*nC),1:size(Mqdn,2),:) = reshape(matGradMultMat(D,Mqdn,dD,dMqdn),mC*nC,size(Mqdn,2),[]);
           end
 
-          a = (phiC+h*n*qd) < activeset_conservative_guess_tol;
-          activeset_conservative_guess(nL+nP+(1:(mC+2)*nC),:) = repmat(a,mC+2,1);
+          a = (phiC+h*n*qd) < z_inactive_conservative_guess_tol;
+          z_inactive_conservative_guess(nL+nP+(1:(mC+2)*nC),:) = repmat(a,mC+2,1);
         end
 
         % check gradients
@@ -473,7 +475,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         %      return;
 
         if isempty(obj.LCP_cache.data.z_inactive)
-          z_inactive = false(nL+nP+(mC+2)*nC,1);
+          z_inactive = z_inactive_conservative_guess;
           M_active = false(nL+nP+(mC+2)*nC,1);
         else
           z_inactive = obj.LCP_cache.data.z_inactive;
@@ -483,62 +485,54 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         % try doing the linear solve using the same active set as the
         % previous solve
         z = zeros(nL+nP+(mC+2)*nC,1);
+        z_inactive(z_inactive) = any(M(M_active,z_inactive));  % if M has all zeros for some z, then just set z to zero.
+%        M_active(M_active) = any(M(M_active,z_inactive),2); % zap all-zero rows in M
+%        Ma = M(M_active,z_inactive); z(z_inactive) = (Ma'/(Ma*Ma'))*(-w(M_active));
         z(z_inactive) = M(M_active, z_inactive)\(-w(M_active));
+% Note : pinv is 2x slower than the \ above, and avoids throwing rank
+% warnings and outputting NaNs, but also outputs negative numbers near zero
+% so trips the conditions below.  I suspect I can do better here by
+% exploiting the structure in M:
+% see http://www.mathworks.com/help/matlab/ref/mldivide.html
+         
         if (any(z<lb-1e-8) || any(isnan(z)) || any(M(~M_active,z_inactive)*z(z_inactive)+w(~M_active)<-1e-8))
           % then the active set has changed, call pathlcp
-          disp('calling path');
-          min(z-lb) 
-          find(z<lb-1e-8)
-          find(isnan(z))
-          find(M(~M_active,z_inactive)*z(z_inactive)+w(~M_active)<1e-8)
-          min(M(~M_active,z_inactive)*z(z_inactive)+w(~M_active))
-          beta = reshape(z(nL+nP+nC+(1:mC*nC)),mC,[]);
-
-          z = pathlcp(M,w,lb);
+          
+          while 1
+            if any(z_inactive_conservative_guess)
+              if isempty(obj.LCP_cache.data.z)
+                z(z_inactive_conservative_guess) = pathlcp(M(z_inactive_conservative_guess,z_inactive_conservative_guess),w(z_inactive_conservative_guess),lb(z_inactive_conservative_guess),ub(z_inactive_conservative_guess));
+              else
+                % still hand in the old solution; should be better than z=0
+                z(z_inactive_conservative_guess) = pathlcp(M(z_inactive_conservative_guess,z_inactive_conservative_guess),w(z_inactive_conservative_guess),lb(z_inactive_conservative_guess),ub(z_inactive_conservative_guess),obj.LCP_cache.data.z(z_inactive_conservative_guess));
+              end
+              if all(z_inactive_conservative_guess), break; end
+              active = ~z_inactive_conservative_guess(1:(nL+nP+nC));  % only worry about the constraints that really matter.
+              missed = (M(active,z_inactive_conservative_guess)*z(z_inactive_conservative_guess)+w(active) < 0);
+            else
+              active=true(nL+nP+nC,1);
+              missed = (w(active)<0);
+            end
+            if ~any(missed), break; end
+            
+            % otherwise add the missed indices to the active set and repeat
+            warning('Drake:TimeSteppingRigidBodyManipulator:ResolvingLCP',['t=',num2str(t),': missed ',num2str(sum(missed)),' constraints.  resolving lcp.']);
+            ind = find(active);
+            active(ind(missed)) = false;
+            % add back in the related contact terms:
+            active = [active; repmat(active(nL+nP+(1:nC)),mC+1,1)];
+            z_inactive_conservative_guess = ~active;
+          end
+          % for debuggins:
+%          if ~isempty(obj.LCP_cache.data.z_inactive)
+%            find(obj.LCP_cache.data.z_inactive ~= (z>lb+1e-8))'
+%            find(obj.LCP_cache.data.M_active ~= (M*z+w<1e-8))'
+%          end
+%          z(nL+nP+(1:nC))'
           obj.LCP_cache.data.z_inactive = z>lb+1e-8;
           obj.LCP_cache.data.M_active = M*z+w<1e-8;
-        else
-          disp('active set worked');
-        end
-        while 0 %(1)
-          z = zeros(nL+nP+(mC+2)*nC,1);
-%          active = true(nL+nP+(mC+2)*nC,1);
-          if any(active)
-            tic
-            z(active) = pathlcp(M(active,active),w(active),lb(active));
-            toc
-            Big = 1e20;
-            ub = inf(nL+nP+(mC+2)*nC,1);
-            tic 
-            z_warmstart = pathlcp(M(active,active),w(active),lb(active),ub(active),z(active));
-            toc
-%            valuecheck(z_warmstart,z);
- 
-            z_active = abs(z)<1e-8;  z_inactive = ~z_active;
-            M_active = abs(M*z+w)<1e-8;
-            z_fast = zeros(nL+nP+(mC+2)*nC,1);
-            tic
-            z_fast(z_inactive) = M(M_active,z_inactive)\(-w(M_active));
-%            z_fast(z_inactive) = pinv(M(M_active,z_inactive))*(-w(M_active));
-            toc;
-%            valuecheck(z_fast,z,1e-6);
-            
-            if all(active), break; end
-            inactive = ~active(1:(nL+nP+nC));  % only worry about the constraints that really matter.
-            missed = (M(inactive,active)*z(active)+w(inactive) < 0);
-          else
-            inactive=true(nL+nP+nC,1);
-            missed = (w(inactive)<0);
-          end
-          if ~any(missed), break; end
-          
-          % otherwise add the missed indices to the active set and repeat
-          warning('Drake:TimeSteppingRigidBodyManipulator:ResolvingLCP',['t=',num2str(t),': missed ',num2str(sum(missed)),' constraints.  resolving lcp.']);
-          ind = find(inactive);
-          inactive(ind(missed)) = false;
-          % add back in the related contact terms:
-          inactive = [inactive; repmat(inactive(nL+nP+(1:nC)),mC+1,1)];
-          activeset_conservative_guess = ~inactive;
+%        else
+%          disp('active set worked');
         end
 
         % for debugging
