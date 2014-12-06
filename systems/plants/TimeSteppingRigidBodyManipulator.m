@@ -498,37 +498,45 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         if (any(z<lb-1e-8) || any(isnan(z)) || any(M(~M_active,z_inactive)*z(z_inactive)+w(~M_active)<-1e-8))
           % then the active set has changed, call pathlcp
           
-          while 1
-            if any(z_inactive_conservative_guess)
-              if isempty(obj.LCP_cache.data.z)
-                z(z_inactive_conservative_guess) = pathlcp(M(z_inactive_conservative_guess,z_inactive_conservative_guess),w(z_inactive_conservative_guess),lb(z_inactive_conservative_guess),ub(z_inactive_conservative_guess));
-              else
-                % still hand in the old solution; should be better than z=0
-                z(z_inactive_conservative_guess) = pathlcp(M(z_inactive_conservative_guess,z_inactive_conservative_guess),w(z_inactive_conservative_guess),lb(z_inactive_conservative_guess),ub(z_inactive_conservative_guess),obj.LCP_cache.data.z(z_inactive_conservative_guess));
-              end
-              if all(z_inactive_conservative_guess), break; end
-              active = ~z_inactive_conservative_guess(1:(nL+nP+nC));  % only worry about the constraints that really matter.
-              missed = (M(active,z_inactive_conservative_guess)*z(z_inactive_conservative_guess)+w(active) < 0);
-            else
-              active=true(nL+nP+nC,1);
-              missed = (w(active)<0);
-            end
-            if ~any(missed), break; end
-            
-            % otherwise add the missed indices to the active set and repeat
-            warning('Drake:TimeSteppingRigidBodyManipulator:ResolvingLCP',['t=',num2str(t),': missed ',num2str(sum(missed)),' constraints.  resolving lcp.']);
-            ind = find(active);
-            active(ind(missed)) = false;
-            % add back in the related contact terms:
-            active = [active; repmat(active(nL+nP+(1:nC)),mC+1,1)];
-            z_inactive_conservative_guess = ~active;
+          if isempty(obj.LCP_cache.data.z)
+            z = pathlcp(M,w,lb,ub);
+          else
+            % still hand in the old solution; should be better than z=0
+            z = pathlcp(M,w,lb,ub,obj.LCP_cache.data.z);
           end
-          % for debuggins:
+              
+%           while 1
+%             if any(z_inactive_conservative_guess)
+%               if isempty(obj.LCP_cache.data.z)
+%                 z(z_inactive_conservative_guess) = pathlcp(M(z_inactive_conservative_guess,z_inactive_conservative_guess),w(z_inactive_conservative_guess),lb(z_inactive_conservative_guess),ub(z_inactive_conservative_guess));
+%               else
+%                 % still hand in the old solution; should be better than z=0
+%                 z(z_inactive_conservative_guess) = pathlcp(M(z_inactive_conservative_guess,z_inactive_conservative_guess),w(z_inactive_conservative_guess),lb(z_inactive_conservative_guess),ub(z_inactive_conservative_guess),obj.LCP_cache.data.z(z_inactive_conservative_guess));
+%               end
+%               if all(z_inactive_conservative_guess), break; end
+%               active = ~z_inactive_conservative_guess(1:(nL+nP+nC));  % only worry about the constraints that really matter.
+%               missed = (M(active,z_inactive_conservative_guess)*z(z_inactive_conservative_guess)+w(active) < 0);
+%             else
+%               active=true(nL+nP+nC,1);
+%               missed = (w(active)<0);
+%             end
+%             if ~any(missed), break; end
+%             
+%             % otherwise add the missed indices to the active set and repeat
+%             warning('Drake:TimeSteppingRigidBodyManipulator:ResolvingLCP',['t=',num2str(t),': missed ',num2str(sum(missed)),' constraints.  resolving lcp.']);
+%             ind = find(active);
+%             active(ind(missed)) = false;
+%             % add back in the related contact terms:
+%             active = [active; repmat(active(nL+nP+(1:nC)),mC+1,1)];
+%             z_inactive_conservative_guess = ~active;
+%           end
+          % for debugging:
 %          if ~isempty(obj.LCP_cache.data.z_inactive)
-%            find(obj.LCP_cache.data.z_inactive ~= (z>lb+1e-8))'
-%            find(obj.LCP_cache.data.M_active ~= (M*z+w<1e-8))'
+%            if all([obj.LCP_cache.data.z_inactive == (z>lb+1e-8); ...
+%              obj.LCP_cache.data.M_active == (M*z+w<1e-8)])
+%              keyboard;  % shouldn't get here: the active set didn't actually change
+%            end
 %          end
-%          z(nL+nP+(1:nC))'
           obj.LCP_cache.data.z_inactive = z>lb+1e-8;
           obj.LCP_cache.data.M_active = M*z+w<1e-8;
 %        else
