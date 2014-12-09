@@ -485,8 +485,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         % try doing the linear solve using the same active set as the
         % previous solve
         z = zeros(nL+nP+(mC+2)*nC,1);
-        z_inactive(z_inactive) = any(M(M_active,z_inactive));  % if M has all zeros for some z, then just set z to zero.
-%        M_active(M_active) = any(M(M_active,z_inactive),2); % zap all-zero rows in M
+        %z_inactive(z_inactive) = any(M(M_active,z_inactive));  % if M has all zeros for some z, then just set z to zero.
+        M_active(M_active) = any(M(M_active,z_inactive),2); % zap all-zero rows in M
 %        Ma = M(M_active,z_inactive); z(z_inactive) = (Ma'/(Ma*Ma'))*(-w(M_active));
         z(z_inactive) = M(M_active, z_inactive)\(-w(M_active));
 % Note : pinv is 2x slower than the \ above, and avoids throwing rank
@@ -537,10 +537,17 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %              keyboard;  % shouldn't get here: the active set didn't actually change
 %            end
 %          end
+          if ~isempty( obj.LCP_cache.data.z_inactive) && all(z>lb+1e-8 == obj.LCP_cache.data.z_inactive)
+            disp('z_inactive didnt change');
+          end
+          if ~isempty( obj.LCP_cache.data.M_active) && all(obj.LCP_cache.data.M_active == M*z+w<1e-8)
+            disp('M_active didnt change');
+          end
+          
           obj.LCP_cache.data.z_inactive = z>lb+1e-8;
           obj.LCP_cache.data.M_active = M*z+w<1e-8;
-%        else
-%          disp('active set worked');
+        else
+          disp('active set worked');
         end
 
         % for debugging
@@ -602,6 +609,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           obj.LCP_cache.data.dwqdn = [];
         end
       end
+      z
     end
 
     function obj = addSensor(obj,sensor)

@@ -1,27 +1,29 @@
-function fallingBrickLCP
+function fallingBrickLCP(planar)
 
+dt = 0.001;
 options.floating = true;
 options.terrain = RigidBodyFlatTerrain();
-p = TimeSteppingRigidBodyManipulator('FallingBrickBetterCollisionGeometry.urdf',.01,options);
-x0 = p.resolveConstraints([0;1+rand;randn(10,1)]);
 
-if 0 
-  v = p.constructVisualizer();
-  sys = cascade(p,v);
-  sys.simulate([0 8],x0);
-  return;
+if planar
+  options.twoD = true;
+  options.view = 'right';
+  x0 = [0;1.5;2;1;0;0];
+  p = TimeSteppingRigidBodyManipulator('PlanarFallingBrickContactPoints.urdf',dt,options);
+else
+  x0 = [0;1;randn(10,1)];
+  p = TimeSteppingRigidBodyManipulator('FallingBrickContactPoints.urdf',dt,options);
 end
+
+x0 = p.resolveConstraints(x0);
 
 v = p.constructVisualizer();
-v.drawWrapper(0,x0);
-xtraj = p.simulate([0 4],x0);
-v.playback(xtraj);
-
-for t=xtraj.getBreaks()
-  x=xtraj.eval(t);
-  phi = p.contactConstraints(x(1:6));
-  if any(phi<-0.05)
-    phi
-    error('penetration');
-  end
+v.display_dt = dt*2;
+if 1 
+  sys = cascade(p,v);
+  sys.simulate([0 3],x0);
+else
+  v.drawWrapper(0,x0);
+  xtraj = p.simulate([0 3],x0); 
+  v.playback(xtraj,struct('slider',true));
 end
+
