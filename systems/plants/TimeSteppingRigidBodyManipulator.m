@@ -46,7 +46,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       obj.timestep = timestep;
       obj.LCP_cache = SharedDataHandle(struct('t',[],'x',[],'u',[],'nargout',[], ...
         'z',[],'Mqdn',[],'wqdn',[], 'z_inactive', [], 'M_active', [], ...
-        'dz',[],'dMqdn',[],'dwqdn',[],'contact_data',[]));
+        'dz',[],'dMqdn',[],'dwqdn',[],'contact_data',[],'gurobi_cbasis',[],'gurobi_vbasis',[]));
 
       obj = setSampleTime(obj,[timestep;0]);
 
@@ -482,11 +482,11 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           M_active = obj.LCP_cache.data.M_active;
         end
 
-% %         if isempty(obj.LCP_cache.data.z)
+        if isempty(obj.LCP_cache.data.z)
            z = zeros(nL+nP+(mC+2)*nC,1); 
-% %         else
-% %           z = obj.LCP_cache.data.z; 
-% %         end
+        else
+          z = obj.LCP_cache.data.z; 
+        end
         % try doing the linear solve using the same active set as the
         % previous solve
 %         dz = zeros(nL+nP+(mC+2)*nC,1);
@@ -503,32 +503,62 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         I = eye(nL+nP+(mC+2)*nC);
         Aeq = [M(M_active,:); I(~z_inactive,:)]; 
         beq = [-w(M_active); zeros(sum(~z_inactive),1)];
-        A = -M(~M_active,:); 
-        b = w(~M_active);
-        lp_lb = zeros(nL+nP+(mC+2)*nC,1);
+        Ain = -M(~M_active,:); 
+        bin = w(~M_active);
+        %lp_lb = zeros(nL+nP+(mC+2)*nC,1);
         
 %         z = linprog([],A,b,Aeq,beq,lp_lb);
+        
+        if 1
+          model.obj = 0*z;
+          model.A = sparse([Aeq;Ain]);
+          model.rhs = [beq;bin];
+          model.sense = [repmat('=',length(beq),1);repmat('<',length(bin),1)];
+          model.lb = lb;
+          if length(obj.LCP_cache.data.gurobi_cbasis)==length(model.rhs)
+            model.cbasis = obj.LCP_cache.data.gurobi_cbasis;
+          end         
+          if length(obj.LCP_cache.data.gurobi_vbasis)==length(z)
+            model.vbasis = obj.LCP_cache.data.gurobi_vbasis;
+          end         
+          gurobi_options.outputflag = 0;
+          result = gurobi(model,gurobi_options);
+          if isfield(result,'x')
+            z=result.x;
+            obj.LCP_cache.data.gurobi_cbasis = result.cbasis;
+            obj.LCP_cache.data.gurobi_vbasis = result.vbasis;
+          else
+            obj.LCP_cache.data.gurobi_cbasis = [];
+            obj.LCP_cache.data.gurobi_vbasis = [];
+          end
+          info_fqp=1;
+%           lp_active_set = find(abs(Ain*z - bin)<1e-6)
 
-        model.obj = 0*z;
-        model.A = sparse([Aeq;A]);
-        model.rhs = [beq;b];
-        model.sense = [repmat('=',length(beq),1);repmat('<',length(b),1)];
-        model.lb = lp_lb;
-        gurobi_options.outputflag = 0;
-        result = gurobi(model,gurobi_options);
-        try
-          z=result.x;
-        catch err
-%           err
+        else
+          Ain_fqp = [Ain; -I];
+          bin_fqp = [bin; -lb];
+          % call fastQPmex first
+          QblkDiag = {I};
+          fqp = -z;
+          % NOTE: model.obj is 2* f for fastQP!!!
+          tic;
+          [z_,info_fqp] = fastQPmex(QblkDiag,fqp,Ain_fqp,bin_fqp,Aeq,beq,[]);
+          toc;
+          if info_fqp>=0
+            z = z_; 
+            qp_active_set = find(abs(Ain_fqp*z - bin_fqp)<1e-6);
+          end
         end
-        if (any(z<lb-1e-8) || any(isnan(z)) || any(M*z+w<-1e-8) || any(z'*(M*z+w)>1e8))
+        if (info_fqp<0 || any(z<lb-1e-10) || any(isnan(z)) || any(M*z+w<-1e-6) || any(abs(z'*(M*z+w))>1e-10))
+%         if (any(z<lb-1e-10) || any(isnan(z)) || any(M*z+w<-1e-10) || any(abs(z'*(M*z+w))>1e-10))
           % then the active set has changed, call pathlcp
-          
           if isempty(obj.LCP_cache.data.z)
             z = pathlcp(M,w,lb,ub);
           else
             % still hand in the old solution; should be better than z=0
-           z = pathlcp(M,w,lb,ub,obj.LCP_cache.data.z);
+%            tic;
+            z = pathlcp(M,w,lb,ub,obj.LCP_cache.data.z);
+%            toc;
           end
               
 %           while 1
@@ -571,13 +601,24 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %             disp('M_active didnt change');
 %           end
 
-%           global count
-%           if isempty(count)
-%              count = 1;
+%           global active_set_fail_count beta_change_count
+%           if isempty(active_set_fail_count)
+%              active_set_fail_count = 1;
 %           else
-%              count = count + 1;
+%              active_set_fail_count = active_set_fail_count + 1;
 %           end
-%           count
+%           if ~isempty(obj.LCP_cache.data.z) && ...
+%               any((z(nL+nP+nC+(1:mC*nC))>1e-8) ~= (obj.LCP_cache.data.z(nL+nP+nC+(1:mC*nC))>1e-8)) && ...
+%               all((z(nL+nP+(1:nC))>1e-8) == (obj.LCP_cache.data.z(nL+nP+(1:nC))>1e-8))
+%               
+%             if isempty(beta_change_count)
+%                beta_change_count = 1;
+%             else
+%                beta_change_count = beta_change_count + 1;
+%             end
+%           end
+          
+          
           obj.LCP_cache.data.z_inactive = z>lb+1e-8;
           obj.LCP_cache.data.M_active = M*z+w<1e-8;
         else

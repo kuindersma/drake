@@ -11,6 +11,7 @@ if planar
   p = TimeSteppingRigidBodyManipulator('PlanarFallingBrickContactPoints.urdf',dt,options);
 else
   x0 = [0;1;randn(10,1)];
+%   p = TimeSteppingRigidBodyManipulator('FallingBrickBetterCollisionGeometry.urdf',dt,options);
   p = TimeSteppingRigidBodyManipulator('FallingBrickContactPoints.urdf',dt,options);
 end
 

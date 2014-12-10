@@ -3,10 +3,11 @@ function runAtlasDynamics
 
 % Load the model with a floating base
 options.floating = true;
-options.dt = 0.002;
+options.dt = 0.005;
 options.terrain = RigidBodyFlatTerrain;
-r = Atlas('urdf/atlas_convex_hull.urdf',options);
-%r = r.removeCollisionGroupsExcept({'heel','toe','back','front','knee','butt'});
+options.ignore_self_collisions = true;
+r = Atlas('urdf/atlas_minimal_contact.urdf',options);
+r = r.removeCollisionGroupsExcept({'heel','toe','back','front','knee','butt'});
 r = compile(r);
 
 % Initialize the viewer
@@ -16,6 +17,8 @@ v.display_dt = 0.02;
 % Compute a feasible set of initial conditions for the simulation (e.g. no
 % penetration)
 x0 = Point(r.getStateFrame);
+x0(5) = pi/2;
+x0(3) = 0.1;
 x0 = resolveConstraints(r,x0);
 % 
 % % Forward simulate dynamics with visulazation, then playback at realtime
