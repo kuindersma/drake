@@ -481,28 +481,54 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           z_inactive = obj.LCP_cache.data.z_inactive;
           M_active = obj.LCP_cache.data.M_active;
         end
-        
+
+% %         if isempty(obj.LCP_cache.data.z)
+           z = zeros(nL+nP+(mC+2)*nC,1); 
+% %         else
+% %           z = obj.LCP_cache.data.z; 
+% %         end
         % try doing the linear solve using the same active set as the
         % previous solve
-        z = zeros(nL+nP+(mC+2)*nC,1);
-        %z_inactive(z_inactive) = any(M(M_active,z_inactive));  % if M has all zeros for some z, then just set z to zero.
-        M_active(M_active) = any(M(M_active,z_inactive),2); % zap all-zero rows in M
-%        Ma = M(M_active,z_inactive); z(z_inactive) = (Ma'/(Ma*Ma'))*(-w(M_active));
-        z(z_inactive) = M(M_active, z_inactive)\(-w(M_active));
-% Note : pinv is 2x slower than the \ above, and avoids throwing rank
-% warnings and outputting NaNs, but also outputs negative numbers near zero
-% so trips the conditions below.  I suspect I can do better here by
-% exploiting the structure in M:
-% see http://www.mathworks.com/help/matlab/ref/mldivide.html
-         
-        if (any(z<lb-1e-8) || any(isnan(z)) || any(M(~M_active,z_inactive)*z(z_inactive)+w(~M_active)<-1e-8))
+%         dz = zeros(nL+nP+(mC+2)*nC,1);
+%         z_inactive(z_inactive) = any(M(M_active,z_inactive));  % if M has all zeros for some z, then just set z to zero.
+%         M_active(M_active) = any(M(M_active,z_inactive),2); % zap all-zero rows in M
+% %        Ma = M(M_active,z_inactive); z(z_inactive) = (Ma'/(Ma*Ma'))*(-w(M_active));
+%         dz(z_inactive) = M(M_active, z_inactive)\(-M(M_active, z_inactive)*z(z_inactive)-w(M_active));
+% % Note : pinv is 2x slower than the \ above, and avoids throwing rank
+% % warnings and outputting NaNs, but also outputs negative numbers near zero
+% % so trips the conditions below.  I suspect I can do better here by
+% % exploiting the structure in M:
+% % see http://www.mathworks.com/help/matlab/ref/mldivide.html
+%         z=z+dz;
+        I = eye(nL+nP+(mC+2)*nC);
+        Aeq = [M(M_active,:); I(~z_inactive,:)]; 
+        beq = [-w(M_active); zeros(sum(~z_inactive),1)];
+        A = -M(~M_active,:); 
+        b = w(~M_active);
+        lp_lb = zeros(nL+nP+(mC+2)*nC,1);
+        
+%         z = linprog([],A,b,Aeq,beq,lp_lb);
+
+        model.obj = 0*z;
+        model.A = sparse([Aeq;A]);
+        model.rhs = [beq;b];
+        model.sense = [repmat('=',length(beq),1);repmat('<',length(b),1)];
+        model.lb = lp_lb;
+        gurobi_options.outputflag = 0;
+        result = gurobi(model,gurobi_options);
+        try
+          z=result.x;
+        catch err
+%           err
+        end
+        if (any(z<lb-1e-8) || any(isnan(z)) || any(M*z+w<-1e-8) || any(z'*(M*z+w)>1e8))
           % then the active set has changed, call pathlcp
           
           if isempty(obj.LCP_cache.data.z)
             z = pathlcp(M,w,lb,ub);
           else
             % still hand in the old solution; should be better than z=0
-            z = pathlcp(M,w,lb,ub,obj.LCP_cache.data.z);
+           z = pathlcp(M,w,lb,ub,obj.LCP_cache.data.z);
           end
               
 %           while 1
@@ -537,17 +563,25 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %              keyboard;  % shouldn't get here: the active set didn't actually change
 %            end
 %          end
-          if ~isempty( obj.LCP_cache.data.z_inactive) && all(z>lb+1e-8 == obj.LCP_cache.data.z_inactive)
-            disp('z_inactive didnt change');
-          end
-          if ~isempty( obj.LCP_cache.data.M_active) && all(obj.LCP_cache.data.M_active == M*z+w<1e-8)
-            disp('M_active didnt change');
-          end
-          
+
+%           if ~isempty( obj.LCP_cache.data.z_inactive) && all(z>lb+1e-8 == obj.LCP_cache.data.z_inactive)
+%             disp('z_inactive didnt change');
+%           end
+%           if ~isempty( obj.LCP_cache.data.M_active) && all(obj.LCP_cache.data.M_active == M*z+w<1e-8)
+%             disp('M_active didnt change');
+%           end
+
+%           global count
+%           if isempty(count)
+%              count = 1;
+%           else
+%              count = count + 1;
+%           end
+%           count
           obj.LCP_cache.data.z_inactive = z>lb+1e-8;
           obj.LCP_cache.data.M_active = M*z+w<1e-8;
         else
-          disp('active set worked');
+          %disp('active set worked');
         end
 
         % for debugging
@@ -609,7 +643,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           obj.LCP_cache.data.dwqdn = [];
         end
       end
-      z
+      
     end
 
     function obj = addSensor(obj,sensor)

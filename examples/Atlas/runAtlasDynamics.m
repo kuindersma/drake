@@ -3,7 +3,7 @@ function runAtlasDynamics
 
 % Load the model with a floating base
 options.floating = true;
-options.dt = 0.001;
+options.dt = 0.002;
 options.terrain = RigidBodyFlatTerrain;
 r = Atlas('urdf/atlas_convex_hull.urdf',options);
 %r = r.removeCollisionGroupsExcept({'heel','toe','back','front','knee','butt'});
@@ -17,14 +17,20 @@ v.display_dt = 0.02;
 % penetration)
 x0 = Point(r.getStateFrame);
 x0 = resolveConstraints(r,x0);
+% 
+% % Forward simulate dynamics with visulazation, then playback at realtime
+% S=warning('off','Drake:DrakeSystem:UnsupportedSampleTime');
+% output_select(1).system=1;
+% output_select(1).output=1;
+% sys = mimoCascade(r,v,[],[],output_select);
+% warning(S);
+% traj = simulate(sys,[0 2],x0);
+% playback(v,traj,struct('slider',true));
 
-% Forward simulate dynamics with visulazation, then playback at realtime
-S=warning('off','Drake:DrakeSystem:UnsupportedSampleTime');
-output_select(1).system=1;
-output_select(1).output=1;
-sys = mimoCascade(r,v,[],[],output_select);
-warning(S);
-traj = simulate(sys,[0 2],x0);
-playback(v,traj,struct('slider',true));
+v.drawWrapper(0,x0);
+tic;
+xtraj = r.simulate([0 2],x0); 
+toc;
+v.playback(xtraj,struct('slider',true));
 
 end
