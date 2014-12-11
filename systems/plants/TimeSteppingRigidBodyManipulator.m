@@ -201,6 +201,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     end
 
     function [obj,z,Mqdn,wqdn,dz,dMqdn,dwqdn] = solveLCP(obj,t,x,u)
+%       global active_set_fail_count beta_change_count nbeta_prev nbeta_inactive_change_count
       % do LCP time-stepping
 
       % todo: implement some basic caching here
@@ -510,6 +511,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %         z = linprog([],A,b,Aeq,beq,lp_lb);
         
         if 1
+%           model.Q = sparse(I);
           model.obj = 0*z;
           model.A = sparse([Aeq;Ain]);
           model.rhs = [beq;bin];
@@ -520,9 +522,13 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           end         
           if length(obj.LCP_cache.data.gurobi_vbasis)==length(z)
             model.vbasis = obj.LCP_cache.data.gurobi_vbasis;
-          end         
+          end
+%           gurobi_options.method = 1;
           gurobi_options.outputflag = 0;
+%           gurobi_tic = tic;
           result = gurobi(model,gurobi_options);
+%           gurobi_time = toc(gurobi_tic);
+%           fprintf('Gurobi solve time: %2.5f\n',gurobi_time);
           if isfield(result,'x')
             z=result.x;
             obj.LCP_cache.data.gurobi_cbasis = result.cbasis;
@@ -531,7 +537,6 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
             obj.LCP_cache.data.gurobi_cbasis = [];
             obj.LCP_cache.data.gurobi_vbasis = [];
           end
-          info_fqp=1;
 %           lp_active_set = find(abs(Ain*z - bin)<1e-6)
 
         else
@@ -549,16 +554,26 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
             qp_active_set = find(abs(Ain_fqp*z - bin_fqp)<1e-6);
           end
         end
-        if (info_fqp<0 || any(z<lb-1e-10) || any(isnan(z)) || any(M*z+w<-1e-6) || any(abs(z'*(M*z+w))>1e-10))
-%         if (any(z<lb-1e-10) || any(isnan(z)) || any(M*z+w<-1e-10) || any(abs(z'*(M*z+w))>1e-10))
+        eps = 1e-6;
+%         z_ = z;
+%         z_(z>eps) = z(z>eps) + eps;
+%         z(nL+nP+nC+nC*mC+(1:nC)) = z_(nL+nP+nC+nC*mC+(1:nC));
+        if ~isfield(result,'x') ||  any(abs(z'*(M*z+w))>eps)
+
+%         if (any(z<lb-eps) || any(isnan(z)) || any(M*z+w<-eps) || any(abs(z'*(M*z+w))>eps))
+%           any(z<lb-1e-10) 
+%           any(isnan(z))
+%           any(M*z+w<-1e-6)
+%           any(abs(z'*(M*z+w))>1e-6)
           % then the active set has changed, call pathlcp
           if isempty(obj.LCP_cache.data.z)
             z = pathlcp(M,w,lb,ub);
           else
             % still hand in the old solution; should be better than z=0
-%            tic;
+%             path_tic = tic;
             z = pathlcp(M,w,lb,ub,obj.LCP_cache.data.z);
-%            toc;
+%             path_time = toc(path_tic);
+%             fprintf('Path solve time: %2.5f\n',path_time);
           end
               
 %           while 1
@@ -600,8 +615,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %           if ~isempty( obj.LCP_cache.data.M_active) && all(obj.LCP_cache.data.M_active == M*z+w<1e-8)
 %             disp('M_active didnt change');
 %           end
-
-%           global active_set_fail_count beta_change_count
+% 
 %           if isempty(active_set_fail_count)
 %              active_set_fail_count = 1;
 %           else
@@ -613,8 +627,12 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %               
 %             if isempty(beta_change_count)
 %                beta_change_count = 1;
+%                nbeta_inactive_change_count = 1;
 %             else
 %                beta_change_count = beta_change_count + 1;
+%                if sum(z(nL+nP+nC+(1:mC*nC))>1e-8) ~= nbeta_prev
+%                  nbeta_inactive_change_count = nbeta_inactive_change_count + 1;
+%                end
 %             end
 %           end
           
@@ -624,6 +642,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         else
           %disp('active set worked');
         end
+%         nbeta_prev = sum(z(nL+nP+nC+(1:mC*nC))>1e-8);
 
         % for debugging
         %cN = z(nL+nP+(1:nC))

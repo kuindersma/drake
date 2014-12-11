@@ -11,7 +11,7 @@ s = 'urdf/atlas_minimal_contact.urdf';
 dt = 0.005;
 w = warning('off','Drake:RigidBodyManipulator:UnsupportedVelocityLimits');
 r = TimeSteppingRigidBodyManipulator(s,dt,options);
-r = r.removeCollisionGroupsExcept({'heel','toe'});
+% r = r.removeCollisionGroupsExcept({'heel','toe'});
 r = compile(r);
 warning(w);
 

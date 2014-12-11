@@ -3,7 +3,7 @@ function runAtlasDynamics
 
 % Load the model with a floating base
 options.floating = true;
-options.dt = 0.005;
+options.dt = 0.002;
 options.terrain = RigidBodyFlatTerrain;
 options.ignore_self_collisions = true;
 r = Atlas('urdf/atlas_minimal_contact.urdf',options);
@@ -12,13 +12,13 @@ r = compile(r);
 
 % Initialize the viewer
 v = r.constructVisualizer;
-v.display_dt = 0.02;
+v.display_dt = 0.01;
 
 % Compute a feasible set of initial conditions for the simulation (e.g. no
 % penetration)
 x0 = Point(r.getStateFrame);
 x0(5) = pi/2;
-x0(3) = 0.1;
+x0(3) = 0.2;
 x0 = resolveConstraints(r,x0);
 % 
 % % Forward simulate dynamics with visulazation, then playback at realtime
