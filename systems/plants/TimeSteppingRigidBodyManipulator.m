@@ -523,13 +523,14 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           if length(obj.LCP_cache.data.gurobi_vbasis)==length(z)
             model.vbasis = obj.LCP_cache.data.gurobi_vbasis;
           end
-%           gurobi_options.method = 1;
+          gurobi_options.method = 1;
           gurobi_options.outputflag = 0;
-%           gurobi_tic = tic;
+          gurobi_tic = tic;
           result = gurobi(model,gurobi_options);
-%           gurobi_time = toc(gurobi_tic);
-%           fprintf('Gurobi solve time: %2.5f\n',gurobi_time);
-          if isfield(result,'x')
+          gurobi_time = toc(gurobi_tic);
+          fprintf('Gurobi solve time: %2.5f\n',gurobi_time);
+          LP_FAILED = ~isfield(result,'x');
+          if ~LP_FAILED
             z=result.x;
             obj.LCP_cache.data.gurobi_cbasis = result.cbasis;
             obj.LCP_cache.data.gurobi_vbasis = result.vbasis;
@@ -537,45 +538,69 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
             obj.LCP_cache.data.gurobi_cbasis = [];
             obj.LCP_cache.data.gurobi_vbasis = [];
           end
-%           lp_active_set = find(abs(Ain*z - bin)<1e-6)
-
+  
         else
-          Ain_fqp = [Ain; -I];
-          bin_fqp = [bin; -lb];
-          % call fastQPmex first
-          QblkDiag = {I};
-          fqp = -z;
-          % NOTE: model.obj is 2* f for fastQP!!!
-          tic;
-          [z_,info_fqp] = fastQPmex(QblkDiag,fqp,Ain_fqp,bin_fqp,Aeq,beq,[]);
-          toc;
-          if info_fqp>=0
-            z = z_; 
-            qp_active_set = find(abs(Ain_fqp*z - bin_fqp)<1e-6);
+
+          param.MSK_IPAR_BI_CLEAN_OPTIMIZER = 'MSK_OPTIMIZER_INTPNT'; % Use just the interior point algorithm to clean up
+          param.MSK_IPAR_INTPNT_BASIS = 'MSK_BI_NEVER'; % Don't use basis identification (it's slow)
+          param.MSK_IPAR_LOG = 0;
+          param.MSK_IPAR_CACHE_LICENSE = 1;
+%           param.MSK_DPAR_INTPNT_TOL_PFEAS = 1e-10;
+          c = 0*z;
+          Aeq = M(M_active,:);
+          Ain = -M(~M_active,:);
+          a = sparse([Aeq;Ain]);
+          blc = [-w(M_active); -inf*ones(size(Ain,1),1)];
+          buc = [-w(M_active); w(~M_active)];
+          blx = 0*z;
+          bux = 0*z;
+          bux(z_inactive) = inf;
+          mosek_tic = tic;
+          res = msklpopt(c,a,blc,buc,blx,bux,param,'minimize echo(0)');
+          
+          mosek_time = toc(mosek_tic);
+          fprintf('Mosek solve time: %2.5f\n',mosek_time);
+          LP_FAILED = res.sol.itr.solsta(1) ~= 'O';
+          if ~LP_FAILED
+            z=res.sol.itr.xx;
           end
+%           Ain_fqp = [Ain; -I];
+%           bin_fqp = [bin; -lb];
+%           % call fastQPmex first
+%           QblkDiag = {I};
+%           fqp = -z;
+%           % NOTE: model.obj is 2* f for fastQP!!!
+%           tic;
+%           [z_,info_fqp] = fastQPmex(QblkDiag,fqp,Ain_fqp,bin_fqp,Aeq,beq,[]);
+%           toc;
+%           if info_fqp>=0
+%             z = z_; 
+%             qp_active_set = find(abs(Ain_fqp*z - bin_fqp)<1e-6);
+%           end
         end
         eps = 1e-6;
 %         z_ = z;
 %         z_(z>eps) = z(z>eps) + eps;
 %         z(nL+nP+nC+nC*mC+(1:nC)) = z_(nL+nP+nC+nC*mC+(1:nC));
-        if ~isfield(result,'x') ||  any(abs(z'*(M*z+w))>eps)
-
+        
+        if LP_FAILED ||  any(abs(z'*(M*z+w))>eps)
+%         if ~isfield(result,'x') ||  any(abs(z'*(M*z+w))>eps)
+         % ~isfield(result,'x')
 %         if (any(z<lb-eps) || any(isnan(z)) || any(M*z+w<-eps) || any(abs(z'*(M*z+w))>eps))
-%           any(z<lb-1e-10) 
-%           any(isnan(z))
-%           any(M*z+w<-1e-6)
-%           any(abs(z'*(M*z+w))>1e-6)
+%           res.sol.itr.solsta
+
           % then the active set has changed, call pathlcp
           if isempty(obj.LCP_cache.data.z)
             z = pathlcp(M,w,lb,ub);
           else
             % still hand in the old solution; should be better than z=0
-%             path_tic = tic;
+            path_tic = tic;
             z = pathlcp(M,w,lb,ub,obj.LCP_cache.data.z);
-%             path_time = toc(path_tic);
-%             fprintf('Path solve time: %2.5f\n',path_time);
+            path_time = toc(path_tic);
+            fprintf('Path solve time: %2.5f\n',path_time);
           end
-              
+           
+%           path_tic = tic;
 %           while 1
 %             if any(z_inactive_conservative_guess)
 %               if isempty(obj.LCP_cache.data.z)
@@ -594,13 +619,16 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %             if ~any(missed), break; end
 %             
 %             % otherwise add the missed indices to the active set and repeat
-%             warning('Drake:TimeSteppingRigidBodyManipulator:ResolvingLCP',['t=',num2str(t),': missed ',num2str(sum(missed)),' constraints.  resolving lcp.']);
+% %             warning('Drake:TimeSteppingRigidBodyManipulator:ResolvingLCP',['t=',num2str(t),': missed ',num2str(sum(missed)),' constraints.  resolving lcp.']);
 %             ind = find(active);
 %             active(ind(missed)) = false;
 %             % add back in the related contact terms:
 %             active = [active; repmat(active(nL+nP+(1:nC)),mC+1,1)];
 %             z_inactive_conservative_guess = ~active;
 %           end
+%           path_time = toc(path_tic);
+%           fprintf('Path solve time: %2.5f\n',path_time);          
+
           % for debugging:
 %          if ~isempty(obj.LCP_cache.data.z_inactive)
 %            if all([obj.LCP_cache.data.z_inactive == (z>lb+1e-8); ...
