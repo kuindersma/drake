@@ -14,6 +14,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     twoD=false
     position_control=false;
     LCP_cache;
+    enable_gurobi;
   end
 
   methods
@@ -43,6 +44,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         obj.twoD = true;
       end
 
+      obj.enable_gurobi = checkDependency('gurobi');
       obj.timestep = timestep;
       obj.LCP_cache = SharedDataHandle(struct('t',[],'x',[],'u',[],'nargout',[], ...
         'z',[],'Mqdn',[],'wqdn',[], 'z_inactive', [], 'M_active', [], ...
@@ -201,7 +203,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     end
 
     function [obj,z,Mqdn,wqdn,dz,dMqdn,dwqdn] = solveLCP(obj,t,x,u)
-%       global active_set_fail_count beta_change_count nbeta_prev nbeta_inactive_change_count
+%       global active_set_fail_count 
       % do LCP time-stepping
 
       % todo: implement some basic caching here
@@ -501,26 +503,21 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 % % exploiting the structure in M:
 % % see http://www.mathworks.com/help/matlab/ref/mldivide.html
 %         z=z+dz;
-        I = eye(nL+nP+(mC+2)*nC);
-        Aeq = [M(M_active,:); I(~z_inactive,:)]; 
-        beq = [-w(M_active); zeros(sum(~z_inactive),1)];
-        Ain = -M(~M_active,:); 
-        bin = w(~M_active);
-        %lp_lb = zeros(nL+nP+(mC+2)*nC,1);
         
-%         z = linprog([],A,b,Aeq,beq,lp_lb);
-        
-        if 1
-%           model.Q = sparse(I);
-          model.obj = 0*z;
+        if obj.enable_gurobi
+          Aeq = M(M_active,z_inactive); 
+          beq = -w(M_active);
+          Ain = -M(~M_active,z_inactive); 
+          bin = w(~M_active);
+          model.obj = 0*z(z_inactive);
           model.A = sparse([Aeq;Ain]);
           model.rhs = [beq;bin];
           model.sense = [repmat('=',length(beq),1);repmat('<',length(bin),1)];
-          model.lb = lb;
+          model.lb = lb(z_inactive);
           if length(obj.LCP_cache.data.gurobi_cbasis)==length(model.rhs)
             model.cbasis = obj.LCP_cache.data.gurobi_cbasis;
           end         
-          if length(obj.LCP_cache.data.gurobi_vbasis)==length(z)
+          if length(obj.LCP_cache.data.gurobi_vbasis)==sum(z_inactive)
             model.vbasis = obj.LCP_cache.data.gurobi_vbasis;
           end
           gurobi_options.method = 1;
@@ -531,64 +528,17 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           fprintf('Gurobi solve time: %2.5f\n',gurobi_time);
           LP_FAILED = ~isfield(result,'x');
           if ~LP_FAILED
-            z=result.x;
+            z(z_inactive)=result.x;
             obj.LCP_cache.data.gurobi_cbasis = result.cbasis;
             obj.LCP_cache.data.gurobi_vbasis = result.vbasis;
           else
             obj.LCP_cache.data.gurobi_cbasis = [];
             obj.LCP_cache.data.gurobi_vbasis = [];
           end
-  
-        else
-
-          param.MSK_IPAR_BI_CLEAN_OPTIMIZER = 'MSK_OPTIMIZER_INTPNT'; % Use just the interior point algorithm to clean up
-          param.MSK_IPAR_INTPNT_BASIS = 'MSK_BI_NEVER'; % Don't use basis identification (it's slow)
-          param.MSK_IPAR_LOG = 0;
-          param.MSK_IPAR_CACHE_LICENSE = 1;
-%           param.MSK_DPAR_INTPNT_TOL_PFEAS = 1e-10;
-          c = 0*z;
-          Aeq = M(M_active,:);
-          Ain = -M(~M_active,:);
-          a = sparse([Aeq;Ain]);
-          blc = [-w(M_active); -inf*ones(size(Ain,1),1)];
-          buc = [-w(M_active); w(~M_active)];
-          blx = 0*z;
-          bux = 0*z;
-          bux(z_inactive) = inf;
-          mosek_tic = tic;
-          res = msklpopt(c,a,blc,buc,blx,bux,param,'minimize echo(0)');
-          
-          mosek_time = toc(mosek_tic);
-          fprintf('Mosek solve time: %2.5f\n',mosek_time);
-          LP_FAILED = res.sol.itr.solsta(1) ~= 'O';
-          if ~LP_FAILED
-            z=res.sol.itr.xx;
-          end
-%           Ain_fqp = [Ain; -I];
-%           bin_fqp = [bin; -lb];
-%           % call fastQPmex first
-%           QblkDiag = {I};
-%           fqp = -z;
-%           % NOTE: model.obj is 2* f for fastQP!!!
-%           tic;
-%           [z_,info_fqp] = fastQPmex(QblkDiag,fqp,Ain_fqp,bin_fqp,Aeq,beq,[]);
-%           toc;
-%           if info_fqp>=0
-%             z = z_; 
-%             qp_active_set = find(abs(Ain_fqp*z - bin_fqp)<1e-6);
-%           end
         end
-        eps = 1e-6;
-%         z_ = z;
-%         z_(z>eps) = z(z>eps) + eps;
-%         z(nL+nP+nC+nC*mC+(1:nC)) = z_(nL+nP+nC+nC*mC+(1:nC));
         
+        eps = 1e-6;
         if LP_FAILED ||  any(abs(z'*(M*z+w))>eps)
-%         if ~isfield(result,'x') ||  any(abs(z'*(M*z+w))>eps)
-         % ~isfield(result,'x')
-%         if (any(z<lb-eps) || any(isnan(z)) || any(M*z+w<-eps) || any(abs(z'*(M*z+w))>eps))
-%           res.sol.itr.solsta
-
           % then the active set has changed, call pathlcp
           if isempty(obj.LCP_cache.data.z)
             z = pathlcp(M,w,lb,ub);
@@ -648,29 +598,13 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %              active_set_fail_count = 1;
 %           else
 %              active_set_fail_count = active_set_fail_count + 1;
-%           end
-%           if ~isempty(obj.LCP_cache.data.z) && ...
-%               any((z(nL+nP+nC+(1:mC*nC))>1e-8) ~= (obj.LCP_cache.data.z(nL+nP+nC+(1:mC*nC))>1e-8)) && ...
-%               all((z(nL+nP+(1:nC))>1e-8) == (obj.LCP_cache.data.z(nL+nP+(1:nC))>1e-8))
-%               
-%             if isempty(beta_change_count)
-%                beta_change_count = 1;
-%                nbeta_inactive_change_count = 1;
-%             else
-%                beta_change_count = beta_change_count + 1;
-%                if sum(z(nL+nP+nC+(1:mC*nC))>1e-8) ~= nbeta_prev
-%                  nbeta_inactive_change_count = nbeta_inactive_change_count + 1;
-%                end
-%             end
-%           end
-          
+%           end          
           
           obj.LCP_cache.data.z_inactive = z>lb+1e-8;
           obj.LCP_cache.data.M_active = M*z+w<1e-8;
         else
           %disp('active set worked');
         end
-%         nbeta_prev = sum(z(nL+nP+nC+(1:mC*nC))>1e-8);
 
         % for debugging
         %cN = z(nL+nP+(1:nC))
