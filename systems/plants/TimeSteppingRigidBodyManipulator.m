@@ -14,7 +14,14 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     twoD=false
     position_control=false;
     LCP_cache;
-    enable_fastqp = true;
+    enable_fastqp = true; % whether we use the active set LCP
+    
+    % solver type options: (with active set if enable_fastqp = true)
+    %  0 : solve the full LCP 
+    %  1 : solve the sub LCP using a guess as to what contacts
+    %      will be active. not accurate in general, but faster than 'full'
+    %  2 : solve the LCP with infinite friction (no sliding)
+    solver_type = 0; 
   end
 
   methods
@@ -43,12 +50,22 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       if isa(manip,'PlanarRigidBodyManipulator')
         obj.twoD = true;
       end
+      
+      if isfield(options,'solver_type') 
+        typecheck(options.solver_type,'double');
+        rangecheck(options.solver_type,0,2);
+        obj.solver_type = options.solver_type;
+      end
+
+      if isfield(options,'enable_fastqp') 
+        typecheck(options.enable_fastqp,'logical');
+        obj.enable_fastqp = options.enable_fastqp;
+      end
 
       obj.timestep = timestep;
       obj.LCP_cache = SharedDataHandle(struct('t',[],'x',[],'u',[],'nargout',[], ...
         'z',[],'Mqdn',[],'wqdn',[], 'z_inactive', [], 'M_active', [], ...
-        'dz',[],'dMqdn',[],'dwqdn',[],'contact_data',[],'gurobi_cbasis',[], ...
-        'gurobi_vbasis',[],'fastqp_active_set',[],'reduced_lcp_ind',[]));
+        'dz',[],'dMqdn',[],'dwqdn',[],'contact_data',[],'fastqp_active_set',[]));
 
       obj = setSampleTime(obj,[timestep;0]);
 
@@ -349,8 +366,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 
         M = zeros(nL+nP+(mC+2)*nC)*q(1);
         w = zeros(nL+nP+(mC+2)*nC,1)*q(1);
-        z_inactive_conservative_guess = true(nL+nP+(mC+2)*nC,1);
-        z_inactive_conservative_guess_tol = .01;
+        z_inactive_guess = true(nL+nP+(mC+2)*nC,1);
+        z_inactive_guess_tol = .01;
 
         Hinv = inv(H);
         wqdn = qd + h*Hinv*tau;
@@ -381,7 +398,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         if (nL > 0)
           w(1:nL) = phiL + h*JL*wqdn;
           M(1:nL,:) = h*JL*Mqdn;
-          z_inactive_conservative_guess(1:nL) = (phiL + h*JL*qd) < z_inactive_conservative_guess_tol;
+          z_inactive_guess(1:nL) = (phiL + h*JL*qd) < z_inactive_guess_tol;
           if (nargout>4)
             dJL = [zeros(prod(size(JL)),1),reshape(dJL,numel(JL),[]),zeros(numel(JL),num_q+obj.num_u)];
             if (obj.position_control)
@@ -399,7 +416,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         if (nP > 0)
           w(nL+(1:nP)) = phiP + h*JP*wqdn;
           M(nL+(1:nP),:) = h*JP*Mqdn;
-          z_inactive_conservative_guess(nL+(1:nP)) = true;
+          z_inactive_guess(nL+(1:nP)) = true;
           if (nargout>4)
             dJP = [zeros(numel(JP),1),reshape(dJP,numel(JP),[]),zeros(numel(JP),num_q+obj.num_u)];
             dw(nL+(1:nP),:) = [zeros(size(JP,1),1),JP,zeros(size(JP,1),num_q+obj.num_u)] + h*matGradMultMat(JP,wqdn,dJP,dwqdn);
@@ -466,8 +483,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
             dM(nL+nP+nC+(1:mC*nC),1:size(Mqdn,2),:) = reshape(matGradMultMat(D,Mqdn,dD,dMqdn),mC*nC,size(Mqdn,2),[]);
           end
 
-          a = (phiC+h*n*qd) < z_inactive_conservative_guess_tol;
-          z_inactive_conservative_guess(nL+nP+(1:(mC+2)*nC),:) = repmat(a,mC+2,1);
+          a = (phiC+h*n*qd) < z_inactive_guess_tol;
+          z_inactive_guess(nL+nP+(1:(mC+2)*nC),:) = repmat(a,mC+2,1);
         end
 
         % check gradients
@@ -478,7 +495,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         %      return;
 
         if isempty(obj.LCP_cache.data.z_inactive)
-          z_inactive = z_inactive_conservative_guess;
+          z_inactive = z_inactive_guess;
           M_active = false(nL+nP+(mC+2)*nC,1);
         else
           z_inactive = obj.LCP_cache.data.z_inactive;
@@ -529,55 +546,55 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         if QP_FAILED 
             % then the active set has changed, call pathlcp
             
-%           % should really be solving the full lcp, but it's very slow
-%           if isempty(obj.LCP_cache.data.z)
-%             z = pathlcp(M,w,lb,ub);
-%           else
-%             % still hand in the old solution; should be better than z=0
-%             z = pathlcp(M,w,lb,ub,obj.LCP_cache.data.z);
-%           end
-%           obj.LCP_cache.data.M_active = M*z+w<1e-8;
-%           obj.LCP_cache.data.z_inactive = z>lb+1e-8;            
-
-            
-%             path_tic = tic;
-            while 1
-              if any(z_inactive_conservative_guess)
-                if isempty(obj.LCP_cache.data.z)
-                  z(z_inactive_conservative_guess) = pathlcp(M(z_inactive_conservative_guess,z_inactive_conservative_guess),w(z_inactive_conservative_guess),lb(z_inactive_conservative_guess),ub(z_inactive_conservative_guess));
-                else
-                  % still hand in the old solution; should be better than z=0
-                  z(z_inactive_conservative_guess) = pathlcp(M(z_inactive_conservative_guess,z_inactive_conservative_guess),w(z_inactive_conservative_guess),lb(z_inactive_conservative_guess),ub(z_inactive_conservative_guess),obj.LCP_cache.data.z(z_inactive_conservative_guess));
-                end
-                if all(z_inactive_conservative_guess), break; end
-                z_active = ~z_inactive_conservative_guess(1:(nL+nP+nC));  % only worry about the constraints that really matter.
-                missed = (M(z_active,z_inactive_conservative_guess)*z(z_inactive_conservative_guess)+w(z_active) < 0);
+            if obj.solver_type == 0
+              % solve the full lcp
+              if isempty(obj.LCP_cache.data.z)
+                z = pathlcp(M,w,lb,ub);
               else
-                z_active=true(nL+nP+nC,1);
-                missed = (w(z_active)<0);
+                % still hand in the old solution; should be better than z=0
+                z = pathlcp(M,w,lb,ub,obj.LCP_cache.data.z);
               end
-              if ~any(missed), break; end
+              obj.LCP_cache.data.M_active = M*z+w<1e-8;
+              obj.LCP_cache.data.z_inactive = z>lb+1e-8;            
+            elseif obj.solver_type == 1
+            
+  %             path_tic = tic;
+              while 1
+                if any(z_inactive_guess)
+                  if isempty(obj.LCP_cache.data.z)
+                    z(z_inactive_guess) = pathlcp(M(z_inactive_guess,z_inactive_guess),w(z_inactive_guess),lb(z_inactive_guess),ub(z_inactive_guess));
+                  else
+                    % still hand in the old solution; should be better than z=0
+                    z(z_inactive_guess) = pathlcp(M(z_inactive_guess,z_inactive_guess),w(z_inactive_guess),lb(z_inactive_guess),ub(z_inactive_guess),obj.LCP_cache.data.z(z_inactive_guess));
+                  end
+                  if all(z_inactive_guess), break; end
+                  z_active = ~z_inactive_guess(1:(nL+nP+nC));  % only worry about the constraints that really matter.
+                  missed = (M(z_active,z_inactive_guess)*z(z_inactive_guess)+w(z_active) < 0);
+                else
+                  z_active=true(nL+nP+nC,1);
+                  missed = (w(z_active)<0);
+                end
+                if ~any(missed), break; end
 
-              % otherwise add the missed indices to the active set and repeat
-  %             warning('Drake:TimeSteppingRigidBodyManipulator:ResolvingLCP',['t=',num2str(t),': missed ',num2str(sum(missed)),' constraints.  resolving lcp.']);
-              ind = find(z_active);
-              z_active(ind(missed)) = false;
-              % add back in the related contact terms:
-              z_active = [z_active; repmat(z_active(nL+nP+(1:nC)),mC+1,1)];
-              z_inactive_conservative_guess = ~z_active;
+                % otherwise add the missed indices to the active set and repeat
+    %             warning('Drake:TimeSteppingRigidBodyManipulator:ResolvingLCP',['t=',num2str(t),': missed ',num2str(sum(missed)),' constraints.  resolving lcp.']);
+                ind = find(z_active);
+                z_active(ind(missed)) = false;
+                % add back in the related contact terms:
+                z_active = [z_active; repmat(z_active(nL+nP+(1:nC)),mC+1,1)];
+                z_inactive_guess = ~z_active;
+              end
+  %             path_time = toc(path_tic);
+  %             fprintf('Path solve time: %2.5f\n',path_time);
+              obj.LCP_cache.data.fastqp_active_set = [];
+
+              % take M_active, z_inactive on reduced LCP
+              obj.LCP_cache.data.M_active = false(nL+nP+(2+mC)*nC,1);
+              obj.LCP_cache.data.M_active(z_inactive_guess) = ...
+                M(z_inactive_guess,z_inactive_guess)*z(z_inactive_guess)+w(z_inactive_guess)<1e-8;
+              obj.LCP_cache.data.z_inactive = false(nL+nP+(2+mC)*nC,1);
+              obj.LCP_cache.data.z_inactive(z_inactive_guess) = z(z_inactive_guess)>lb(z_inactive_guess)+1e-8;            
             end
-%             path_time = toc(path_tic);
-%             fprintf('Path solve time: %2.5f\n',path_time);
-            obj.LCP_cache.data.fastqp_active_set = [];
-
-            % take M_active, z_inactive on reduced LCP
-            obj.LCP_cache.data.M_active = false(nL+nP+(2+mC)*nC,1);% M*z+w<1e-8;
-            obj.LCP_cache.data.M_active(z_inactive_conservative_guess) = ...
-              M(z_inactive_conservative_guess,z_inactive_conservative_guess)*z(z_inactive_conservative_guess)+w(z_inactive_conservative_guess)<1e-8;
-            obj.LCP_cache.data.z_inactive = false(nL+nP+(2+mC)*nC,1);
-            obj.LCP_cache.data.z_inactive(z_inactive_conservative_guess) = z(z_inactive_conservative_guess)>lb(z_inactive_conservative_guess)+1e-8;            
-            obj.LCP_cache.data.reduced_lcp_ind = z_inactive_conservative_guess;
-
 %             if isempty(active_set_fail_count)
 %                active_set_fail_count = 1;
 %             else
