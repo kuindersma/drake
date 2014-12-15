@@ -6,6 +6,9 @@ options.floating = true;
 options.dt = 0.001;
 options.terrain = RigidBodyFlatTerrain;
 options.ignore_self_collisions = true;
+options.enable_fastqp = true;
+options.solver_type = 1;
+
 r = Atlas('urdf/atlas_minimal_contact.urdf',options);
 r = r.removeCollisionGroupsExcept({'heel','toe','back','front','knee','butt'});
 r = compile(r);
@@ -32,7 +35,7 @@ x0 = resolveConstraints(r,x0);
 
 v.drawWrapper(0,x0);
 tic;
-xtraj = r.simulate([0 2],x0); 
+xtraj = r.simulate([0 1],x0); 
 toc;
 v.playback(xtraj,struct('slider',true));
 

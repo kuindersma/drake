@@ -3,6 +3,9 @@ function fallingBrickLCP(planar)
 dt = 0.005;
 options.floating = true;
 options.terrain = RigidBodyFlatTerrain();
+options.enable_fastqp = true;
+options.solver_type = 1;
+options.use_bullet = false;
 
 if planar
   options.twoD = true;
@@ -30,4 +33,6 @@ else
   toc;
   v.playback(xtraj,struct('slider',true));
 end
+
+xtraj.eval(T)
 
