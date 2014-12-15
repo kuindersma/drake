@@ -491,7 +491,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           z = obj.LCP_cache.data.z; 
         end
         
-        LP_FAILED = true;
+        QP_FAILED = true;
         
         if obj.enable_fastqp
           n_z_inactive = sum(z_inactive);
@@ -507,8 +507,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
             [z_,info_fqp] = fastQPmex(QblkDiag,fqp,Ain_fqp,bin_fqp,Aeq,beq,[]);
 %             fastqp_time = toc(fastqp_tic);
 %             fprintf('FastQP solve time: %2.5f\n',fastqp_time);
-            LP_FAILED = info_fqp<0;
-            if ~LP_FAILED
+            QP_FAILED = info_fqp<0;
+            if ~QP_FAILED
               z(z_inactive) = z_; 
               obj.LCP_cache.data.fastqp_active_set = find(abs(Ain_fqp*z_ - bin_fqp)<1e-6);
               % we know:
@@ -519,14 +519,14 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
               % check:
               % z(z_inactive)'*(M(z_inactive, z_inactive)*z(z_inactive) + w(z_inactive)) == 0
               z_active = ~z_inactive(1:(nL+nP+nC));  % only worry about the constraints that really matter.
-              LP_FAILED = any(M(z_active,z_inactive)*z(z_inactive)+w(z_active) < 0) || (abs(z(z_inactive)'*(M(z_inactive, z_inactive)*z(z_inactive) + w(z_inactive)))>1e-8);
+              QP_FAILED = any(M(z_active,z_inactive)*z(z_inactive)+w(z_active) < 0) || (abs(z(z_inactive)'*(M(z_inactive, z_inactive)*z(z_inactive) + w(z_inactive)))>1e-8);
             else
               obj.LCP_cache.data.fastqp_active_set = [];
             end
           end
         end
 
-        if LP_FAILED 
+        if QP_FAILED 
             % then the active set has changed, call pathlcp
             
 %           % should really be solving the full lcp, but it's very slow
