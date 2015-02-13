@@ -1,0 +1,20 @@
+
+This is a simple kinematic walking appliation.  It shows
+how to use that minimal set of LittleDog calls from
+a UI based on the Qt UI framework.
+
+To build this application, use qmake and make.  The following
+environment variables must be set correctly for the build
+to work:
+
+	export QTDIR=/usr/lib/qt-3.3
+	export LITTLEDOG=(location of LittleDog software install)
+
+Then use the following commands:
+
+	$ qmake walk.pro
+	$ make
+
+The qmake command creates a Makefile.  Edit the file
+walk.pro to add or remove files, add additional include
+directories, etc.

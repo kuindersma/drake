@@ -1,0 +1,31 @@
+<?xml version="1.0" standalone="yes"?>
+	<KinematicModel>
+		<Parameters>
+			<Parameter NAME="NewMarkerx" VALUE="91.9747"/>
+			<Parameter NAME="NewMarkery" VALUE="78.5326"/>
+			<Parameter NAME="NewMarkerz" VALUE="0"/>
+			<Parameter NAME="TMBA1x" VALUE="49.5307"/>
+			<Parameter NAME="TMBA1y" VALUE="78.8718"/>
+			<Parameter NAME="TMBA1z" VALUE="0"/>
+			<Parameter NAME="TMBXx" VALUE="599.22"/>
+			<Parameter NAME="TMBXy" VALUE="79.2504"/>
+			<Parameter NAME="TMBXz" VALUE="6.44977"/>
+			<Parameter NAME="TMBYx" VALUE="63.7809"/>
+			<Parameter NAME="TMBYy" VALUE="601.124"/>
+			<Parameter NAME="TMBYz" VALUE="0"/>
+		</Parameters>
+		<Skeleton>
+			<Segment NAME="terrainA" POSITION="0 0 0" COVARIANCE="1 0 0 0 1 0 0 0 1" BOUNDS="0 0 -50 609.6 609.6 0" RGB="60 179 113">
+				<JointFree/>
+			</Segment>
+		</Skeleton>
+		<MarkerSet NAME="">
+			<Markers>
+				<Marker NAME="TMBO" SEGMENT="terrainA" RGB="255 255 255" POSITION="10 10 6.4" COVARIANCE="0.0188161 -0.0285315 -0.0566565 -0.0285315 0.0433778 0.0859949 -0.0566565 0.0859949 0.170852" RADIUS="7"/>
+				<Marker NAME="TMBA1" SEGMENT="terrainA" RGB="0 0 255" POSITION="TMBA1x 10 6.4" COVARIANCE="0.0357892 0.0120204 0.0868815 0.0120204 0.00410913 0.0292622 0.0868815 0.0292622 0.211548" RADIUS="7"/>
+				<Marker NAME="TMBX" SEGMENT="terrainA" RGB="255 0 0" POSITION="TMBXx 10 6.4" COVARIANCE="0.0367115 0.0557963 -0.00658979 0.0557963 0.0849814 -0.0100209 -0.00658979 -0.0100209 0.00121029" RADIUS="7"/>
+				<Marker NAME="TMBY" SEGMENT="terrainA" RGB="0 255 0" POSITION="10 TMBYy 6.4" COVARIANCE="0.152517 0.0373512 0.00329977 0.0373512 0.0092088 0.000805613 0.00329977 0.000805613 0.000114795" RADIUS="7"/>
+			</Markers>
+			<Sticks/>
+		</MarkerSet>
+	</KinematicModel>

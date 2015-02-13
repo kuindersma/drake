@@ -1,0 +1,1 @@
+.mat files contain x, y, Z for creating mesh

@@ -1,0 +1,1867 @@
+<!DOCTYPE UI><UI version="3.3" stdsetdef="1">
+<class>LittleDogUI_uic</class>
+<widget class="QMainWindow">
+    <property name="name">
+        <cstring>LittleDogUI_uic</cstring>
+    </property>
+    <property name="geometry">
+        <rect>
+            <x>0</x>
+            <y>0</y>
+            <width>997</width>
+            <height>518</height>
+        </rect>
+    </property>
+    <property name="caption">
+        <string>LittleDog Reference UI</string>
+    </property>
+    <grid>
+        <property name="name">
+            <cstring>unnamed</cstring>
+        </property>
+        <property name="margin">
+            <number>0</number>
+        </property>
+        <property name="spacing">
+            <number>0</number>
+        </property>
+        <widget class="QSplitter" row="0" column="0">
+            <property name="name">
+                <cstring>splitter6</cstring>
+            </property>
+            <property name="orientation">
+                <enum>Horizontal</enum>
+            </property>
+            <widget class="QSplitter">
+                <property name="name">
+                    <cstring>splitter5</cstring>
+                </property>
+                <property name="orientation">
+                    <enum>Vertical</enum>
+                </property>
+                <widget class="QFrame">
+                    <property name="name">
+                        <cstring>frame3</cstring>
+                    </property>
+                    <property name="sizePolicy">
+                        <sizepolicy>
+                            <hsizetype>7</hsizetype>
+                            <vsizetype>5</vsizetype>
+                            <horstretch>0</horstretch>
+                            <verstretch>1</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="frameShape">
+                        <enum>StyledPanel</enum>
+                    </property>
+                    <property name="frameShadow">
+                        <enum>Raised</enum>
+                    </property>
+                    <grid>
+                        <property name="name">
+                            <cstring>unnamed</cstring>
+                        </property>
+                        <property name="margin">
+                            <number>4</number>
+                        </property>
+                        <widget class="QGroupBox" row="0" column="1">
+                            <property name="name">
+                                <cstring>groupBox2</cstring>
+                            </property>
+                            <property name="sizePolicy">
+                                <sizepolicy>
+                                    <hsizetype>7</hsizetype>
+                                    <vsizetype>5</vsizetype>
+                                    <horstretch>10</horstretch>
+                                    <verstretch>1</verstretch>
+                                </sizepolicy>
+                            </property>
+                            <property name="frameShape">
+                                <enum>Panel</enum>
+                            </property>
+                            <property name="frameShadow">
+                                <enum>Raised</enum>
+                            </property>
+                            <property name="title">
+                                <string>Current System State</string>
+                            </property>
+                            <grid>
+                                <property name="name">
+                                    <cstring>unnamed</cstring>
+                                </property>
+                                <property name="spacing">
+                                    <number>4</number>
+                                </property>
+                                <widget class="QFrame" row="0" column="1">
+                                    <property name="name">
+                                        <cstring>frame6</cstring>
+                                    </property>
+                                    <property name="sizePolicy">
+                                        <sizepolicy>
+                                            <hsizetype>7</hsizetype>
+                                            <vsizetype>5</vsizetype>
+                                            <horstretch>10</horstretch>
+                                            <verstretch>1</verstretch>
+                                        </sizepolicy>
+                                    </property>
+                                    <property name="frameShape">
+                                        <enum>StyledPanel</enum>
+                                    </property>
+                                    <property name="frameShadow">
+                                        <enum>Sunken</enum>
+                                    </property>
+                                    <grid>
+                                        <property name="name">
+                                            <cstring>unnamed</cstring>
+                                        </property>
+                                        <widget class="QLabel" row="0" column="0">
+                                            <property name="name">
+                                                <cstring>textLabel3</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>0</hsizetype>
+                                                    <vsizetype>5</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>0</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="text">
+                                                <string>Battery Voltage (V)</string>
+                                            </property>
+                                        </widget>
+                                        <widget class="QLCDNumber" row="0" column="1">
+                                            <property name="name">
+                                                <cstring>m_lcd_battery_voltage</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>7</hsizetype>
+                                                    <vsizetype>1</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>0</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="minimumSize">
+                                                <size>
+                                                    <width>120</width>
+                                                    <height>0</height>
+                                                </size>
+                                            </property>
+                                            <property name="paletteForegroundColor">
+                                                <color>
+                                                    <red>85</red>
+                                                    <green>255</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="paletteBackgroundColor">
+                                                <color>
+                                                    <red>0</red>
+                                                    <green>0</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="numDigits">
+                                                <number>8</number>
+                                            </property>
+                                            <property name="segmentStyle">
+                                                <enum>Flat</enum>
+                                            </property>
+                                            <property name="value" stdset="0">
+                                                <number>0</number>
+                                            </property>
+                                        </widget>
+                                        <widget class="QLabel" row="1" column="0">
+                                            <property name="name">
+                                                <cstring>textLabel3_3</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>0</hsizetype>
+                                                    <vsizetype>5</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>0</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="text">
+                                                <string>Battery Current (A)</string>
+                                            </property>
+                                        </widget>
+                                        <widget class="QLabel" row="2" column="0">
+                                            <property name="name">
+                                                <cstring>textLabel3_2</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>0</hsizetype>
+                                                    <vsizetype>5</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>0</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="text">
+                                                <string>CPU Temp (C)</string>
+                                            </property>
+                                        </widget>
+                                        <widget class="QLabel" row="3" column="0">
+                                            <property name="name">
+                                                <cstring>textLabel3_2_2</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>0</hsizetype>
+                                                    <vsizetype>5</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>0</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="text">
+                                                <string>Timestamp (sec.)</string>
+                                            </property>
+                                        </widget>
+                                        <widget class="QLCDNumber" row="3" column="1">
+                                            <property name="name">
+                                                <cstring>m_lcd_data_timestamp</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>7</hsizetype>
+                                                    <vsizetype>1</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>0</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="paletteForegroundColor">
+                                                <color>
+                                                    <red>85</red>
+                                                    <green>255</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="paletteBackgroundColor">
+                                                <color>
+                                                    <red>0</red>
+                                                    <green>0</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="numDigits">
+                                                <number>8</number>
+                                            </property>
+                                            <property name="segmentStyle">
+                                                <enum>Flat</enum>
+                                            </property>
+                                            <property name="value" stdset="0">
+                                                <number>0</number>
+                                            </property>
+                                        </widget>
+                                        <widget class="QLabel" row="4" column="0">
+                                            <property name="name">
+                                                <cstring>textLabel_4</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>0</hsizetype>
+                                                    <vsizetype>5</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>0</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="text">
+                                                <string>Robot Loss (%)</string>
+                                            </property>
+                                        </widget>
+                                        <widget class="QLCDNumber" row="4" column="1">
+                                            <property name="name">
+                                                <cstring>m_lcd_packet_loss</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>7</hsizetype>
+                                                    <vsizetype>1</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>0</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="paletteForegroundColor">
+                                                <color>
+                                                    <red>85</red>
+                                                    <green>255</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="paletteBackgroundColor">
+                                                <color>
+                                                    <red>0</red>
+                                                    <green>0</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="numDigits">
+                                                <number>8</number>
+                                            </property>
+                                            <property name="segmentStyle">
+                                                <enum>Flat</enum>
+                                            </property>
+                                            <property name="value" stdset="0">
+                                                <number>0</number>
+                                            </property>
+                                        </widget>
+                                        <widget class="QLCDNumber" row="1" column="1">
+                                            <property name="name">
+                                                <cstring>m_lcd_battery_current</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>7</hsizetype>
+                                                    <vsizetype>1</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>0</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="paletteForegroundColor">
+                                                <color>
+                                                    <red>85</red>
+                                                    <green>255</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="paletteBackgroundColor">
+                                                <color>
+                                                    <red>0</red>
+                                                    <green>0</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="numDigits">
+                                                <number>8</number>
+                                            </property>
+                                            <property name="segmentStyle">
+                                                <enum>Flat</enum>
+                                            </property>
+                                            <property name="value" stdset="0">
+                                                <number>0</number>
+                                            </property>
+                                        </widget>
+                                        <widget class="QLCDNumber" row="2" column="1">
+                                            <property name="name">
+                                                <cstring>m_lcd_cpu_temp</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>7</hsizetype>
+                                                    <vsizetype>1</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>0</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="paletteForegroundColor">
+                                                <color>
+                                                    <red>85</red>
+                                                    <green>255</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="paletteBackgroundColor">
+                                                <color>
+                                                    <red>0</red>
+                                                    <green>0</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="numDigits">
+                                                <number>8</number>
+                                            </property>
+                                            <property name="segmentStyle">
+                                                <enum>Flat</enum>
+                                            </property>
+                                            <property name="value" stdset="0">
+                                                <number>0</number>
+                                            </property>
+                                        </widget>
+                                        <widget class="QLayoutWidget" row="5" column="0" rowspan="1" colspan="2">
+                                            <property name="name">
+                                                <cstring>layout45</cstring>
+                                            </property>
+                                            <hbox>
+                                                <property name="name">
+                                                    <cstring>unnamed</cstring>
+                                                </property>
+                                                <widget class="QCheckBox">
+                                                    <property name="name">
+                                                        <cstring>m_check_mocap_data</cstring>
+                                                    </property>
+                                                    <property name="enabled">
+                                                        <bool>false</bool>
+                                                    </property>
+                                                    <property name="sizePolicy">
+                                                        <sizepolicy>
+                                                            <hsizetype>0</hsizetype>
+                                                            <vsizetype>0</vsizetype>
+                                                            <horstretch>0</horstretch>
+                                                            <verstretch>0</verstretch>
+                                                        </sizepolicy>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string></string>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel">
+                                                    <property name="name">
+                                                        <cstring>textLabel4</cstring>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Receiving Mocap Data</string>
+                                                    </property>
+                                                </widget>
+                                            </hbox>
+                                        </widget>
+                                    </grid>
+                                </widget>
+                                <widget class="QLayoutWidget" row="0" column="0">
+                                    <property name="name">
+                                        <cstring>layout8</cstring>
+                                    </property>
+                                    <vbox>
+                                        <property name="name">
+                                            <cstring>unnamed</cstring>
+                                        </property>
+                                        <widget class="QFrame">
+                                            <property name="name">
+                                                <cstring>frame4</cstring>
+                                            </property>
+                                            <property name="sizePolicy">
+                                                <sizepolicy>
+                                                    <hsizetype>5</hsizetype>
+                                                    <vsizetype>5</vsizetype>
+                                                    <horstretch>0</horstretch>
+                                                    <verstretch>1</verstretch>
+                                                </sizepolicy>
+                                            </property>
+                                            <property name="frameShape">
+                                                <enum>StyledPanel</enum>
+                                            </property>
+                                            <property name="frameShadow">
+                                                <enum>Sunken</enum>
+                                            </property>
+                                            <vbox>
+                                                <property name="name">
+                                                    <cstring>unnamed</cstring>
+                                                </property>
+                                                <property name="margin">
+                                                    <number>2</number>
+                                                </property>
+                                                <property name="spacing">
+                                                    <number>1</number>
+                                                </property>
+                                                <widget class="QLabel">
+                                                    <property name="name">
+                                                        <cstring>m_label_STATE_UNINITIALIZED</cstring>
+                                                    </property>
+                                                    <property name="minimumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>0</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="maximumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>32767</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="paletteForegroundColor">
+                                                        <color>
+                                                            <red>255</red>
+                                                            <green>255</green>
+                                                            <blue>255</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="paletteBackgroundColor">
+                                                        <color>
+                                                            <red>96</red>
+                                                            <green>96</green>
+                                                            <blue>96</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="frameShape">
+                                                        <enum>Panel</enum>
+                                                    </property>
+                                                    <property name="frameShadow">
+                                                        <enum>Sunken</enum>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Uninitialized</string>
+                                                    </property>
+                                                    <property name="alignment">
+                                                        <set>AlignCenter</set>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel">
+                                                    <property name="name">
+                                                        <cstring>m_label_STATE_ROBOT_INITIALIZED</cstring>
+                                                    </property>
+                                                    <property name="minimumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>0</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="maximumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>32767</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="paletteForegroundColor">
+                                                        <color>
+                                                            <red>255</red>
+                                                            <green>255</green>
+                                                            <blue>255</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="paletteBackgroundColor">
+                                                        <color>
+                                                            <red>96</red>
+                                                            <green>96</green>
+                                                            <blue>96</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="frameShape">
+                                                        <enum>Panel</enum>
+                                                    </property>
+                                                    <property name="frameShadow">
+                                                        <enum>Sunken</enum>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Robot Initialized</string>
+                                                    </property>
+                                                    <property name="alignment">
+                                                        <set>AlignCenter</set>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel">
+                                                    <property name="name">
+                                                        <cstring>m_label_STATE_ROBOT_CALIBRATING</cstring>
+                                                    </property>
+                                                    <property name="minimumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>0</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="maximumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>32767</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="paletteForegroundColor">
+                                                        <color>
+                                                            <red>255</red>
+                                                            <green>255</green>
+                                                            <blue>255</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="paletteBackgroundColor">
+                                                        <color>
+                                                            <red>96</red>
+                                                            <green>96</green>
+                                                            <blue>96</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="frameShape">
+                                                        <enum>Panel</enum>
+                                                    </property>
+                                                    <property name="frameShadow">
+                                                        <enum>Sunken</enum>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Robot Calibrating</string>
+                                                    </property>
+                                                    <property name="alignment">
+                                                        <set>AlignCenter</set>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel">
+                                                    <property name="name">
+                                                        <cstring>m_label_STATE_ROBOT_CALIBRATED</cstring>
+                                                    </property>
+                                                    <property name="minimumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>0</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="maximumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>32767</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="paletteForegroundColor">
+                                                        <color>
+                                                            <red>255</red>
+                                                            <green>255</green>
+                                                            <blue>255</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="paletteBackgroundColor">
+                                                        <color>
+                                                            <red>96</red>
+                                                            <green>96</green>
+                                                            <blue>96</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="frameShape">
+                                                        <enum>Panel</enum>
+                                                    </property>
+                                                    <property name="frameShadow">
+                                                        <enum>Sunken</enum>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Robot Calibrated</string>
+                                                    </property>
+                                                    <property name="alignment">
+                                                        <set>AlignCenter</set>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel">
+                                                    <property name="name">
+                                                        <cstring>m_label_STATE_TRIAL_PLANNING</cstring>
+                                                    </property>
+                                                    <property name="minimumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>0</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="maximumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>32767</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="paletteForegroundColor">
+                                                        <color>
+                                                            <red>255</red>
+                                                            <green>255</green>
+                                                            <blue>255</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="paletteBackgroundColor">
+                                                        <color>
+                                                            <red>96</red>
+                                                            <green>96</green>
+                                                            <blue>96</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="frameShape">
+                                                        <enum>Panel</enum>
+                                                    </property>
+                                                    <property name="frameShadow">
+                                                        <enum>Sunken</enum>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Trial Planning</string>
+                                                    </property>
+                                                    <property name="alignment">
+                                                        <set>AlignCenter</set>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel">
+                                                    <property name="name">
+                                                        <cstring>m_label_STATE_TRIAL_RUNNING</cstring>
+                                                    </property>
+                                                    <property name="minimumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>0</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="maximumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>32767</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="paletteForegroundColor">
+                                                        <color>
+                                                            <red>255</red>
+                                                            <green>255</green>
+                                                            <blue>255</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="paletteBackgroundColor">
+                                                        <color>
+                                                            <red>96</red>
+                                                            <green>96</green>
+                                                            <blue>96</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="frameShape">
+                                                        <enum>Panel</enum>
+                                                    </property>
+                                                    <property name="frameShadow">
+                                                        <enum>Sunken</enum>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Trial Running</string>
+                                                    </property>
+                                                    <property name="alignment">
+                                                        <set>AlignCenter</set>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel">
+                                                    <property name="name">
+                                                        <cstring>m_label_STATE_STOPPING_ROBOT</cstring>
+                                                    </property>
+                                                    <property name="minimumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>0</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="maximumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>32767</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="paletteForegroundColor">
+                                                        <color>
+                                                            <red>255</red>
+                                                            <green>255</green>
+                                                            <blue>255</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="paletteBackgroundColor">
+                                                        <color>
+                                                            <red>96</red>
+                                                            <green>96</green>
+                                                            <blue>96</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="frameShape">
+                                                        <enum>Panel</enum>
+                                                    </property>
+                                                    <property name="frameShadow">
+                                                        <enum>Sunken</enum>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Stopping Robot</string>
+                                                    </property>
+                                                    <property name="alignment">
+                                                        <set>AlignCenter</set>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel">
+                                                    <property name="name">
+                                                        <cstring>m_label_STATE_ABORTING_CONNECTION</cstring>
+                                                    </property>
+                                                    <property name="minimumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>0</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="maximumSize">
+                                                        <size>
+                                                            <width>200</width>
+                                                            <height>32767</height>
+                                                        </size>
+                                                    </property>
+                                                    <property name="paletteForegroundColor">
+                                                        <color>
+                                                            <red>255</red>
+                                                            <green>255</green>
+                                                            <blue>255</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="paletteBackgroundColor">
+                                                        <color>
+                                                            <red>96</red>
+                                                            <green>96</green>
+                                                            <blue>96</blue>
+                                                        </color>
+                                                    </property>
+                                                    <property name="frameShape">
+                                                        <enum>Panel</enum>
+                                                    </property>
+                                                    <property name="frameShadow">
+                                                        <enum>Sunken</enum>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>ABORTING CONNECTION</string>
+                                                    </property>
+                                                    <property name="alignment">
+                                                        <set>AlignCenter</set>
+                                                    </property>
+                                                </widget>
+                                            </vbox>
+                                        </widget>
+                                        <spacer>
+                                            <property name="name">
+                                                <cstring>spacer6</cstring>
+                                            </property>
+                                            <property name="orientation">
+                                                <enum>Vertical</enum>
+                                            </property>
+                                            <property name="sizeType">
+                                                <enum>Fixed</enum>
+                                            </property>
+                                            <property name="sizeHint">
+                                                <size>
+                                                    <width>20</width>
+                                                    <height>16</height>
+                                                </size>
+                                            </property>
+                                        </spacer>
+                                        <widget class="QLayoutWidget">
+                                            <property name="name">
+                                                <cstring>m_checkbox_layout</cstring>
+                                            </property>
+                                            <grid>
+                                                <property name="name">
+                                                    <cstring>unnamed</cstring>
+                                                </property>
+                                                <widget class="QCheckBox" row="2" column="0">
+                                                    <property name="name">
+                                                        <cstring>m_check_trial_thread_running</cstring>
+                                                    </property>
+                                                    <property name="enabled">
+                                                        <bool>false</bool>
+                                                    </property>
+                                                    <property name="font">
+                                                        <font>
+                                                            <pointsize>9</pointsize>
+                                                        </font>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string></string>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel" row="0" column="1">
+                                                    <property name="name">
+                                                        <cstring>textLabel1</cstring>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Mocap Initialized</string>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel" row="1" column="1">
+                                                    <property name="name">
+                                                        <cstring>textLabel2</cstring>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Calibrate Thread Running</string>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QLabel" row="2" column="1">
+                                                    <property name="name">
+                                                        <cstring>textLabel3_4</cstring>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string>Trial Thread Running</string>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QCheckBox" row="1" column="0">
+                                                    <property name="name">
+                                                        <cstring>m_check_calibrate_thread_running</cstring>
+                                                    </property>
+                                                    <property name="enabled">
+                                                        <bool>false</bool>
+                                                    </property>
+                                                    <property name="font">
+                                                        <font>
+                                                            <pointsize>9</pointsize>
+                                                        </font>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string></string>
+                                                    </property>
+                                                </widget>
+                                                <widget class="QCheckBox" row="0" column="0">
+                                                    <property name="name">
+                                                        <cstring>m_check_mocap_thread_running</cstring>
+                                                    </property>
+                                                    <property name="enabled">
+                                                        <bool>false</bool>
+                                                    </property>
+                                                    <property name="sizePolicy">
+                                                        <sizepolicy>
+                                                            <hsizetype>0</hsizetype>
+                                                            <vsizetype>0</vsizetype>
+                                                            <horstretch>0</horstretch>
+                                                            <verstretch>0</verstretch>
+                                                        </sizepolicy>
+                                                    </property>
+                                                    <property name="font">
+                                                        <font>
+                                                            <pointsize>9</pointsize>
+                                                        </font>
+                                                    </property>
+                                                    <property name="text">
+                                                        <string></string>
+                                                    </property>
+                                                </widget>
+                                            </grid>
+                                        </widget>
+                                    </vbox>
+                                </widget>
+                            </grid>
+                        </widget>
+                        <widget class="QGroupBox" row="0" column="0">
+                            <property name="name">
+                                <cstring>groupBox3_2</cstring>
+                            </property>
+                            <property name="sizePolicy">
+                                <sizepolicy>
+                                    <hsizetype>5</hsizetype>
+                                    <vsizetype>5</vsizetype>
+                                    <horstretch>0</horstretch>
+                                    <verstretch>1</verstretch>
+                                </sizepolicy>
+                            </property>
+                            <property name="frameShape">
+                                <enum>Panel</enum>
+                            </property>
+                            <property name="frameShadow">
+                                <enum>Raised</enum>
+                            </property>
+                            <property name="title">
+                                <string>Commands</string>
+                            </property>
+                            <grid>
+                                <property name="name">
+                                    <cstring>unnamed</cstring>
+                                </property>
+                                <property name="spacing">
+                                    <number>2</number>
+                                </property>
+                                <widget class="QLCDNumber" row="8" column="1">
+                                    <property name="name">
+                                        <cstring>m_lcd_idle_time</cstring>
+                                    </property>
+                                    <property name="sizePolicy">
+                                        <sizepolicy>
+                                            <hsizetype>7</hsizetype>
+                                            <vsizetype>1</vsizetype>
+                                            <horstretch>0</horstretch>
+                                            <verstretch>0</verstretch>
+                                        </sizepolicy>
+                                    </property>
+                                    <property name="paletteForegroundColor">
+                                        <color>
+                                            <red>0</red>
+                                            <green>0</green>
+                                            <blue>0</blue>
+                                        </color>
+                                    </property>
+                                    <property name="paletteBackgroundColor">
+                                        <color>
+                                            <red>255</red>
+                                            <green>255</green>
+                                            <blue>255</blue>
+                                        </color>
+                                    </property>
+                                    <property name="numDigits">
+                                        <number>5</number>
+                                    </property>
+                                    <property name="segmentStyle">
+                                        <enum>Flat</enum>
+                                    </property>
+                                    <property name="value" stdset="0">
+                                        <number>0</number>
+                                    </property>
+                                </widget>
+                                <spacer row="5" column="0">
+                                    <property name="name">
+                                        <cstring>spacer11</cstring>
+                                    </property>
+                                    <property name="orientation">
+                                        <enum>Vertical</enum>
+                                    </property>
+                                    <property name="sizeType">
+                                        <enum>Expanding</enum>
+                                    </property>
+                                    <property name="sizeHint">
+                                        <size>
+                                            <width>20</width>
+                                            <height>20</height>
+                                        </size>
+                                    </property>
+                                </spacer>
+                                <widget class="QLabel" row="6" column="0">
+                                    <property name="name">
+                                        <cstring>textLabel1_2_3</cstring>
+                                    </property>
+                                    <property name="text">
+                                        <string>Planning Elapsed time (sec):</string>
+                                    </property>
+                                </widget>
+                                <widget class="QLabel" row="7" column="0">
+                                    <property name="name">
+                                        <cstring>textLabel1_2</cstring>
+                                    </property>
+                                    <property name="text">
+                                        <string>Running Elapsed time (sec):</string>
+                                    </property>
+                                </widget>
+                                <widget class="QLCDNumber" row="7" column="1">
+                                    <property name="name">
+                                        <cstring>m_lcd_trial_run_time</cstring>
+                                    </property>
+                                    <property name="sizePolicy">
+                                        <sizepolicy>
+                                            <hsizetype>7</hsizetype>
+                                            <vsizetype>1</vsizetype>
+                                            <horstretch>0</horstretch>
+                                            <verstretch>0</verstretch>
+                                        </sizepolicy>
+                                    </property>
+                                    <property name="paletteForegroundColor">
+                                        <color>
+                                            <red>0</red>
+                                            <green>0</green>
+                                            <blue>0</blue>
+                                        </color>
+                                    </property>
+                                    <property name="paletteBackgroundColor">
+                                        <color>
+                                            <red>255</red>
+                                            <green>255</green>
+                                            <blue>255</blue>
+                                        </color>
+                                    </property>
+                                    <property name="numDigits">
+                                        <number>5</number>
+                                    </property>
+                                    <property name="segmentStyle">
+                                        <enum>Flat</enum>
+                                    </property>
+                                    <property name="value" stdset="0">
+                                        <number>0</number>
+                                    </property>
+                                </widget>
+                                <widget class="QLCDNumber" row="6" column="1">
+                                    <property name="name">
+                                        <cstring>m_lcd_trial_plan_time</cstring>
+                                    </property>
+                                    <property name="sizePolicy">
+                                        <sizepolicy>
+                                            <hsizetype>7</hsizetype>
+                                            <vsizetype>1</vsizetype>
+                                            <horstretch>0</horstretch>
+                                            <verstretch>0</verstretch>
+                                        </sizepolicy>
+                                    </property>
+                                    <property name="paletteForegroundColor">
+                                        <color>
+                                            <red>0</red>
+                                            <green>0</green>
+                                            <blue>0</blue>
+                                        </color>
+                                    </property>
+                                    <property name="paletteBackgroundColor">
+                                        <color>
+                                            <red>255</red>
+                                            <green>255</green>
+                                            <blue>255</blue>
+                                        </color>
+                                    </property>
+                                    <property name="numDigits">
+                                        <number>5</number>
+                                    </property>
+                                    <property name="segmentStyle">
+                                        <enum>Flat</enum>
+                                    </property>
+                                    <property name="value" stdset="0">
+                                        <number>0</number>
+                                    </property>
+                                </widget>
+                                <widget class="QLabel" row="8" column="0">
+                                    <property name="name">
+                                        <cstring>textLabel1_2_2</cstring>
+                                    </property>
+                                    <property name="text">
+                                        <string>Idle Elapsed time (sec):</string>
+                                    </property>
+                                </widget>
+                                <widget class="QLayoutWidget" row="4" column="0" rowspan="1" colspan="2">
+                                    <property name="name">
+                                        <cstring>layout4</cstring>
+                                    </property>
+                                    <grid>
+                                        <property name="name">
+                                            <cstring>unnamed</cstring>
+                                        </property>
+                                        <widget class="QPushButton" row="1" column="1">
+                                            <property name="name">
+                                                <cstring>m_button_abort_connection</cstring>
+                                            </property>
+                                            <property name="paletteBackgroundColor">
+                                                <color>
+                                                    <red>154</red>
+                                                    <green>154</green>
+                                                    <blue>154</blue>
+                                                </color>
+                                            </property>
+                                            <property name="font">
+                                                <font>
+                                                    <bold>1</bold>
+                                                </font>
+                                            </property>
+                                            <property name="text">
+                                                <string>Abort
+Connection</string>
+                                            </property>
+                                            <property name="accel">
+                                                <string></string>
+                                            </property>
+                                        </widget>
+                                        <widget class="QPushButton" row="0" column="0">
+                                            <property name="name">
+                                                <cstring>m_button_connect_to_mocap_system</cstring>
+                                            </property>
+                                            <property name="enabled">
+                                                <bool>true</bool>
+                                            </property>
+                                            <property name="paletteBackgroundColor">
+                                                <color>
+                                                    <red>144</red>
+                                                    <green>144</green>
+                                                    <blue>144</blue>
+                                                </color>
+                                            </property>
+                                            <property name="font">
+                                                <font>
+                                                </font>
+                                            </property>
+                                            <property name="text">
+                                                <string>Connect
+to Mocap</string>
+                                            </property>
+                                            <property name="accel">
+                                                <string></string>
+                                            </property>
+                                        </widget>
+                                        <widget class="QPushButton" row="0" column="1">
+                                            <property name="name">
+                                                <cstring>m_button_disconnect_from_mocap_system</cstring>
+                                            </property>
+                                            <property name="paletteBackgroundColor">
+                                                <color>
+                                                    <red>144</red>
+                                                    <green>144</green>
+                                                    <blue>144</blue>
+                                                </color>
+                                            </property>
+                                            <property name="font">
+                                                <font>
+                                                </font>
+                                            </property>
+                                            <property name="text">
+                                                <string>Disconnect
+from Mocap</string>
+                                            </property>
+                                            <property name="accel">
+                                                <string></string>
+                                            </property>
+                                        </widget>
+                                        <widget class="QPushButton" row="2" column="1">
+                                            <property name="name">
+                                                <cstring>m_button_quit</cstring>
+                                            </property>
+                                            <property name="paletteBackgroundColor">
+                                                <color>
+                                                    <red>154</red>
+                                                    <green>154</green>
+                                                    <blue>154</blue>
+                                                </color>
+                                            </property>
+                                            <property name="font">
+                                                <font>
+                                                    <bold>1</bold>
+                                                </font>
+                                            </property>
+                                            <property name="text">
+                                                <string>Shutdown
+and Quit</string>
+                                            </property>
+                                            <property name="accel">
+                                                <string></string>
+                                            </property>
+                                        </widget>
+                                        <widget class="QPushButton" row="1" column="0">
+                                            <property name="name">
+                                                <cstring>m_button_stop_robot</cstring>
+                                            </property>
+                                            <property name="paletteBackgroundColor">
+                                                <color>
+                                                    <red>255</red>
+                                                    <green>0</green>
+                                                    <blue>0</blue>
+                                                </color>
+                                            </property>
+                                            <property name="font">
+                                                <font>
+                                                    <bold>1</bold>
+                                                </font>
+                                            </property>
+                                            <property name="text">
+                                                <string>Stop
+Robot</string>
+                                            </property>
+                                            <property name="accel">
+                                                <string></string>
+                                            </property>
+                                        </widget>
+                                    </grid>
+                                </widget>
+                                <widget class="QPushButton" row="3" column="0" rowspan="1" colspan="2">
+                                    <property name="name">
+                                        <cstring>m_button_done_planning</cstring>
+                                    </property>
+                                    <property name="enabled">
+                                        <bool>false</bool>
+                                    </property>
+                                    <property name="text">
+                                        <string>Run Trial</string>
+                                    </property>
+                                </widget>
+                                <widget class="QPushButton" row="2" column="0" rowspan="1" colspan="2">
+                                    <property name="name">
+                                        <cstring>m_button_run_trial</cstring>
+                                    </property>
+                                    <property name="enabled">
+                                        <bool>false</bool>
+                                    </property>
+                                    <property name="text">
+                                        <string>Start Planning</string>
+                                    </property>
+                                </widget>
+                                <widget class="QPushButton" row="0" column="0" rowspan="1" colspan="2">
+                                    <property name="name">
+                                        <cstring>m_button_connect_to_robot</cstring>
+                                    </property>
+                                    <property name="enabled">
+                                        <bool>false</bool>
+                                    </property>
+                                    <property name="text">
+                                        <string>Connect to Robot</string>
+                                    </property>
+                                </widget>
+                                <widget class="QPushButton" row="1" column="0" rowspan="1" colspan="2">
+                                    <property name="name">
+                                        <cstring>m_button_calibrate_robot</cstring>
+                                    </property>
+                                    <property name="enabled">
+                                        <bool>false</bool>
+                                    </property>
+                                    <property name="text">
+                                        <string>Calibrate Robot</string>
+                                    </property>
+                                </widget>
+                            </grid>
+                        </widget>
+                    </grid>
+                </widget>
+                <widget class="QGroupBox">
+                    <property name="name">
+                        <cstring>groupBox3</cstring>
+                    </property>
+                    <property name="sizePolicy">
+                        <sizepolicy>
+                            <hsizetype>7</hsizetype>
+                            <vsizetype>5</vsizetype>
+                            <horstretch>0</horstretch>
+                            <verstretch>1</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="frameShape">
+                        <enum>Panel</enum>
+                    </property>
+                    <property name="frameShadow">
+                        <enum>Raised</enum>
+                    </property>
+                    <property name="title">
+                        <string>System Log</string>
+                    </property>
+                    <grid>
+                        <property name="name">
+                            <cstring>unnamed</cstring>
+                        </property>
+                        <widget class="QTextEdit" row="0" column="0">
+                            <property name="name">
+                                <cstring>m_edit_log</cstring>
+                            </property>
+                            <property name="sizePolicy">
+                                <sizepolicy>
+                                    <hsizetype>7</hsizetype>
+                                    <vsizetype>7</vsizetype>
+                                    <horstretch>10</horstretch>
+                                    <verstretch>0</verstretch>
+                                </sizepolicy>
+                            </property>
+                            <property name="font">
+                                <font>
+                                    <family>Courier New</family>
+                                </font>
+                            </property>
+                        </widget>
+                    </grid>
+                </widget>
+            </widget>
+            <widget class="QLayoutWidget">
+                <property name="name">
+                    <cstring>layout48</cstring>
+                </property>
+                <grid>
+                    <property name="name">
+                        <cstring>unnamed</cstring>
+                    </property>
+                    <property name="margin">
+                        <number>4</number>
+                    </property>
+                    <widget class="QLayoutWidget" row="2" column="0" rowspan="1" colspan="2">
+                        <property name="name">
+                            <cstring>layout46</cstring>
+                        </property>
+                        <hbox>
+                            <property name="name">
+                                <cstring>unnamed</cstring>
+                            </property>
+                            <widget class="QCheckBox">
+                                <property name="name">
+                                    <cstring>m_check_goal_reached</cstring>
+                                </property>
+                                <property name="enabled">
+                                    <bool>false</bool>
+                                </property>
+                                <property name="sizePolicy">
+                                    <sizepolicy>
+                                        <hsizetype>0</hsizetype>
+                                        <vsizetype>0</vsizetype>
+                                        <horstretch>0</horstretch>
+                                        <verstretch>0</verstretch>
+                                    </sizepolicy>
+                                </property>
+                                <property name="text">
+                                    <string></string>
+                                </property>
+                            </widget>
+                            <widget class="QLabel">
+                                <property name="name">
+                                    <cstring>textLabel5</cstring>
+                                </property>
+                                <property name="margin">
+                                    <number>3</number>
+                                </property>
+                                <property name="text">
+                                    <string>Goal Was Reached</string>
+                                </property>
+                            </widget>
+                        </hbox>
+                    </widget>
+                    <widget class="QGroupBox" row="0" column="0" rowspan="1" colspan="2">
+                        <property name="name">
+                            <cstring>m_frame_overhead_view</cstring>
+                        </property>
+                        <property name="sizePolicy">
+                            <sizepolicy>
+                                <hsizetype>7</hsizetype>
+                                <vsizetype>7</vsizetype>
+                                <horstretch>0</horstretch>
+                                <verstretch>1</verstretch>
+                            </sizepolicy>
+                        </property>
+                        <property name="paletteBackgroundColor">
+                            <color>
+                                <red>0</red>
+                                <green>0</green>
+                                <blue>0</blue>
+                            </color>
+                        </property>
+                        <property name="frameShape">
+                            <enum>Panel</enum>
+                        </property>
+                        <property name="frameShadow">
+                            <enum>Raised</enum>
+                        </property>
+                        <property name="title">
+                            <string></string>
+                        </property>
+                    </widget>
+                    <widget class="QLCDNumber" row="1" column="1">
+                        <property name="name">
+                            <cstring>m_lcd_goal_distance</cstring>
+                        </property>
+                        <property name="sizePolicy">
+                            <sizepolicy>
+                                <hsizetype>7</hsizetype>
+                                <vsizetype>1</vsizetype>
+                                <horstretch>0</horstretch>
+                                <verstretch>0</verstretch>
+                            </sizepolicy>
+                        </property>
+                        <property name="minimumSize">
+                            <size>
+                                <width>90</width>
+                                <height>0</height>
+                            </size>
+                        </property>
+                        <property name="paletteForegroundColor">
+                            <color>
+                                <red>0</red>
+                                <green>0</green>
+                                <blue>0</blue>
+                            </color>
+                        </property>
+                        <property name="paletteBackgroundColor">
+                            <color>
+                                <red>255</red>
+                                <green>255</green>
+                                <blue>255</blue>
+                            </color>
+                        </property>
+                        <property name="palette">
+                            <palette>
+                                <active>
+                                    <color>
+                                        <red>0</red>
+                                        <green>0</green>
+                                        <blue>0</blue>
+                                    </color>
+                                    <color>
+                                        <red>236</red>
+                                        <green>233</green>
+                                        <blue>216</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>245</red>
+                                        <green>244</green>
+                                        <blue>235</blue>
+                                    </color>
+                                    <color>
+                                        <red>118</red>
+                                        <green>116</green>
+                                        <blue>108</blue>
+                                    </color>
+                                    <color>
+                                        <red>157</red>
+                                        <green>155</green>
+                                        <blue>143</blue>
+                                    </color>
+                                    <color>
+                                        <red>230</red>
+                                        <green>230</green>
+                                        <blue>230</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>0</red>
+                                        <green>0</green>
+                                        <blue>0</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>0</red>
+                                        <green>0</green>
+                                        <blue>0</blue>
+                                    </color>
+                                    <color>
+                                        <red>49</red>
+                                        <green>106</green>
+                                        <blue>197</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>0</red>
+                                        <green>0</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>0</green>
+                                        <blue>255</blue>
+                                    </color>
+                                </active>
+                                <disabled>
+                                    <color>
+                                        <red>128</red>
+                                        <green>128</green>
+                                        <blue>128</blue>
+                                    </color>
+                                    <color>
+                                        <red>236</red>
+                                        <green>233</green>
+                                        <blue>216</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>254</green>
+                                        <blue>249</blue>
+                                    </color>
+                                    <color>
+                                        <red>118</red>
+                                        <green>116</green>
+                                        <blue>108</blue>
+                                    </color>
+                                    <color>
+                                        <red>157</red>
+                                        <green>155</green>
+                                        <blue>143</blue>
+                                    </color>
+                                    <color>
+                                        <red>230</red>
+                                        <green>230</green>
+                                        <blue>230</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>128</red>
+                                        <green>128</green>
+                                        <blue>128</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>0</red>
+                                        <green>0</green>
+                                        <blue>0</blue>
+                                    </color>
+                                    <color>
+                                        <red>49</red>
+                                        <green>106</green>
+                                        <blue>197</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>0</red>
+                                        <green>0</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>0</green>
+                                        <blue>255</blue>
+                                    </color>
+                                </disabled>
+                                <inactive>
+                                    <color>
+                                        <red>0</red>
+                                        <green>0</green>
+                                        <blue>0</blue>
+                                    </color>
+                                    <color>
+                                        <red>236</red>
+                                        <green>233</green>
+                                        <blue>216</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>254</green>
+                                        <blue>249</blue>
+                                    </color>
+                                    <color>
+                                        <red>118</red>
+                                        <green>116</green>
+                                        <blue>108</blue>
+                                    </color>
+                                    <color>
+                                        <red>157</red>
+                                        <green>155</green>
+                                        <blue>143</blue>
+                                    </color>
+                                    <color>
+                                        <red>230</red>
+                                        <green>230</green>
+                                        <blue>230</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>0</red>
+                                        <green>0</green>
+                                        <blue>0</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>0</red>
+                                        <green>0</green>
+                                        <blue>0</blue>
+                                    </color>
+                                    <color>
+                                        <red>49</red>
+                                        <green>106</green>
+                                        <blue>197</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>255</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>0</red>
+                                        <green>0</green>
+                                        <blue>255</blue>
+                                    </color>
+                                    <color>
+                                        <red>255</red>
+                                        <green>0</green>
+                                        <blue>255</blue>
+                                    </color>
+                                </inactive>
+                            </palette>
+                        </property>
+                        <property name="numDigits">
+                            <number>6</number>
+                        </property>
+                        <property name="segmentStyle">
+                            <enum>Flat</enum>
+                        </property>
+                        <property name="value" stdset="0">
+                            <number>0</number>
+                        </property>
+                    </widget>
+                    <widget class="QLabel" row="1" column="0">
+                        <property name="name">
+                            <cstring>m_distance_label</cstring>
+                        </property>
+                        <property name="minimumSize">
+                            <size>
+                                <width>0</width>
+                                <height>0</height>
+                            </size>
+                        </property>
+                        <property name="maximumSize">
+                            <size>
+                                <width>32767</width>
+                                <height>32767</height>
+                            </size>
+                        </property>
+                        <property name="paletteForegroundColor">
+                            <color>
+                                <red>0</red>
+                                <green>0</green>
+                                <blue>0</blue>
+                            </color>
+                        </property>
+                        <property name="frameShape">
+                            <enum>NoFrame</enum>
+                        </property>
+                        <property name="frameShadow">
+                            <enum>Plain</enum>
+                        </property>
+                        <property name="text">
+                            <string>Dist. from Goal (cm)</string>
+                        </property>
+                        <property name="alignment">
+                            <set>AlignVCenter</set>
+                        </property>
+                    </widget>
+                </grid>
+            </widget>
+        </widget>
+    </grid>
+</widget>
+<toolbars>
+</toolbars>
+<connections>
+    <connection>
+        <sender>m_button_connect_to_robot</sender>
+        <signal>clicked()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_clicked_connect_to_robot()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_calibrate_robot</sender>
+        <signal>clicked()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_clicked_calibrate_robot()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_done_planning</sender>
+        <signal>clicked()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_clicked_done_planning()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_stop_robot</sender>
+        <signal>clicked()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_clicked_stop_robot()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_connect_to_robot</sender>
+        <signal>pressed()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_pressed_button()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_done_planning</sender>
+        <signal>pressed()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_pressed_button()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_calibrate_robot</sender>
+        <signal>pressed()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_pressed_button()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_stop_robot</sender>
+        <signal>pressed()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_pressed_button()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_connect_to_robot</sender>
+        <signal>released()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_released_button()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_done_planning</sender>
+        <signal>released()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_released_button()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_calibrate_robot</sender>
+        <signal>released()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_released_button()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_stop_robot</sender>
+        <signal>released()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_released_button()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_abort_connection</sender>
+        <signal>clicked()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_clicked_abort_connection()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_quit</sender>
+        <signal>clicked()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_clicked_quit()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_disconnect_from_mocap_system</sender>
+        <signal>clicked()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_clicked_disconnect_from_mocap_system()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_connect_to_mocap_system</sender>
+        <signal>clicked()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_clicked_connect_to_mocap_system()</slot>
+    </connection>
+    <connection>
+        <sender>m_button_run_trial</sender>
+        <signal>clicked()</signal>
+        <receiver>LittleDogUI_uic</receiver>
+        <slot>slot_clicked_run_trial()</slot>
+    </connection>
+</connections>
+<tabstops>
+    <tabstop>m_button_connect_to_robot</tabstop>
+    <tabstop>m_button_calibrate_robot</tabstop>
+    <tabstop>m_button_done_planning</tabstop>
+    <tabstop>m_button_connect_to_mocap_system</tabstop>
+    <tabstop>m_button_disconnect_from_mocap_system</tabstop>
+    <tabstop>m_button_stop_robot</tabstop>
+    <tabstop>m_button_abort_connection</tabstop>
+    <tabstop>m_button_quit</tabstop>
+    <tabstop>m_check_mocap_thread_running</tabstop>
+    <tabstop>m_check_calibrate_thread_running</tabstop>
+    <tabstop>m_check_trial_thread_running</tabstop>
+    <tabstop>m_check_mocap_data</tabstop>
+    <tabstop>m_edit_log</tabstop>
+    <tabstop>m_check_goal_reached</tabstop>
+</tabstops>
+<slots>
+    <slot>slot_clicked_connect_to_mocap_system()</slot>
+    <slot>slot_clicked_connect_to_robot()</slot>
+    <slot>slot_clicked_calibrate_robot()</slot>
+    <slot>slot_clicked_run_trial()</slot>
+    <slot>slot_clicked_quit()</slot>
+    <slot>slot_clicked_stop_robot()</slot>
+    <slot>slot_clicked_abort_connection()</slot>
+    <slot>slot_pressed_button()</slot>
+    <slot>slot_released_button()</slot>
+    <slot>slot_clicked_disconnect_from_mocap_system()</slot>
+    <slot>slot_clicked_done_planning()</slot>
+</slots>
+<pixmapinproject/>
+<layoutdefaults spacing="4" margin="8"/>
+</UI>

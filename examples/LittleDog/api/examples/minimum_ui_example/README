@@ -1,0 +1,113 @@
+
+This directory contains the minimum amount of code
+required to run a LittleDog trial using the
+reference UI.
+
+
+------------------------------------------------------------
+Environment Variables
+------------------------------------------------------------
+
+The following environment variable must be set correctly
+for a LittleDog app to run:
+
+	export LITTLEDOG=(location of LittleDog software install)
+
+If using the Qt-based reference UI, the following variable
+must also be set:
+
+	export QTDIR=/usr/lib/qt-3.3
+
+
+------------------------------------------------------------
+Hardware Configuration
+------------------------------------------------------------
+
+Before running the LittleDog robot, refer to provided
+documentation on setting up the robot and editing
+configuration files.
+
+
+------------------------------------------------------------
+Generating the Makefile
+------------------------------------------------------------
+
+Use qmake to generate a Makefile:
+
+	$ qmake minimum_ui_example.pro
+
+To change the files or directories used in the Makefile,
+edit the .pro file and run qmake again.
+
+
+------------------------------------------------------------
+Compiling the Example
+------------------------------------------------------------
+
+To build the example:
+
+	$ make
+
+This should generate an executable file called
+minimum_ui_example.
+
+
+------------------------------------------------------------
+Running the Example
+------------------------------------------------------------
+
+To run the example
+
+	$ ./minimum_ui_example
+
+A LittleDog user interface should show up.  If an error
+message is shown in the terminal window there may be some
+additional configuration necessary.  Read the error and
+provided documentation for help on how to proceed.
+
+
+------------------------------------------------------------
+Command line Argument
+------------------------------------------------------------
+
+For minimum_ui_example, an integer can be passed in as a 
+command line argument.  The integer is the maximum number 
+of seconds that the reference UI will allow this executable
+to remain in STATE_TRIAL_PLANNING before taking action to
+force it to enter STATE_TRIAL_RUNNING.  This argument is
+passed through into the constructor of LittleDogUI.
+
+If no command line argument is passed in, -1 is used, which
+disables the planning deadline feature within LittleDogUI.
+
+Calling the LittleDog::donePlanning() API function is the
+normal way that a trial transitions from trial planning 
+to trial running.  The MyLittleDog class in this directory
+calls donePlanning() while it is inside virtual function
+initControl() since it does not actually do planning.  It
+might be more typical to call it inside updateControl(),
+when the planning is finished.  It can only succesfully be 
+called once for any given trial.
+
+If you want to see what happens if donePlanning() is not
+called immediately (or if it not called by the user at all),
+it would be a good idea to comment out the call in this 
+example and then test how the reference_ui software behaves
+with various arguments.  Some suggested values would be 
+passing in -1, 0, and 10 seconds.
+
+
+------------------------------------------------------------
+Modifying the Example
+------------------------------------------------------------
+
+Most of the interesting stuff is in MyLittleDog.h and
+MyLittleDog.cpp.  Regardless of which UI is used, this
+is where control code will be implemented.
+
+Pay particular attention to the initControl(),
+updateControl(), and uninitControl() virtual functions.
+Refer to the LittleDog API documentation for information
+on these and other functions.
+
+

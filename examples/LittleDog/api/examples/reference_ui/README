@@ -1,0 +1,10 @@
+
+This directory contains a reference UI for the LittleDog
+API.  The UI is implemented with Qt.
+
+Note that this UI is not a stand-alone application.
+A program that uses the UI must provide some additional
+code.
+
+Refer to $LITTLEDOG/examples/minimum_ui_example/README
+for more information.

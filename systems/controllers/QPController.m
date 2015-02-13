@@ -14,7 +14,7 @@ classdef QPController < MIMODrakeSystem
     % solution, etc.
     % @param options structure for specifying objective weights, slack
     % bounds, etc.
-    typecheck(r,'Biped');
+%     typecheck(r,'Biped');
     typecheck(controller_data,'QPControllerData');
 
     if nargin>3
@@ -25,7 +25,7 @@ classdef QPController < MIMODrakeSystem
 
     qddframe = controller_data.acceleration_input_frame; % input frame for desired qddot
 
-    input_frame = MultiCoordinateFrame({r.getStateFrame,qddframe,atlasFrames.FootContactState,body_accel_input_frames{:}});
+    input_frame = MultiCoordinateFrame({r.getStateFrame,qddframe,FootContactState,body_accel_input_frames{:}});
 
     % whether to output generalized accelerations AND inputs (u)
     if ~isfield(options,'output_qdd')
@@ -198,6 +198,12 @@ classdef QPController < MIMODrakeSystem
       end
       obj.mex_ptr = SharedDataHandle(QPControllermex(0,obj,obj.robot.getMexModelPtr.ptr,getB(obj.robot),r.umin,r.umax,terrain_map_ptr));
     end
+    
+  
+    obj.foot_idx = [r.findLinkId('front_right_lower_leg'), ...
+        r.findLinkId('front_left_lower_leg'), ...
+        r.findLinkId('back_right_lower_leg'), ...
+        r.findLinkId('back_left_lower_leg')];
 
     if isa(getTerrain(r),'DRCFlatTerrainMap')
       obj.using_flat_terrain = true;
@@ -290,22 +296,17 @@ classdef QPController < MIMODrakeSystem
     ind = 1;
 
     supp_idx = find(ctrl_data.support_times<=t,1,'last');
-    plan_supp = ctrl_data.supports(supp_idx);
-
-    lfoot_plan_supp_ind = plan_supp.bodies==r.foot_body_id.left;
-    rfoot_plan_supp_ind = plan_supp.bodies==r.foot_body_id.right;
-    if fc(1)>0
-      support_bodies(ind) = r.foot_body_id.left;
-      contact_pts{ind} = plan_supp.contact_pts{lfoot_plan_supp_ind};
-      contact_groups{ind} = plan_supp.contact_groups{lfoot_plan_supp_ind};
-      n_contact_pts(ind) = plan_supp.num_contact_pts(lfoot_plan_supp_ind);
-      ind=ind+1;
-    end
-    if fc(2)>0
-      support_bodies(ind) = r.foot_body_id.right;
-      contact_pts{ind} = plan_supp.contact_pts{rfoot_plan_supp_ind};
-      contact_groups{ind} = plan_supp.contact_groups{rfoot_plan_supp_ind};
-      n_contact_pts(ind) = plan_supp.num_contact_pts(rfoot_plan_supp_ind);
+    plan_supp = ctrl_data.supports(supp_idx);    
+    
+    for i = 1:length(obj.foot_idx)
+        foot_plan_supp_ind = plan_supp.bodies==obj.foot_idx(i);
+        if fc(i)>0
+          support_bodies(ind) = obj.foot_idx(i);
+          contact_pts{ind} = plan_supp.contact_pts{foot_plan_supp_ind};
+          contact_groups{ind} = plan_supp.contact_groups{foot_plan_supp_ind};
+          n_contact_pts(ind) = plan_supp.num_contact_pts(foot_plan_supp_ind);
+          ind=ind+1;
+        end
     end
     
     supp.bodies = support_bodies;
@@ -715,5 +716,6 @@ classdef QPController < MIMODrakeSystem
     n_body_accel_inputs;
     body_accel_bounds;
     n_body_accel_bounds;
+    foot_idx;
   end
 end
