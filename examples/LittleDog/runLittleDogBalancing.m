@@ -94,6 +94,8 @@ clear ins;
 
 % feedback PD trajectory controller
 options.use_ik = false;
+options.Kp = 160.0*ones(nq,1);
+options.Kd = 0.8*2*sqrt(options.Kp);
 pd = IKPDBlock(r,ctrl_data,options);
 ins(1).system = 1;
 ins(1).input = 1;
@@ -115,7 +117,7 @@ end
 x0 = xstar;
 x0(3) = x0(3)+0.02; % drop it a bit
 
-traj = simulate(sys,[0 2],x0);
+traj = simulate(sys,[0 10],x0);
 if visualize
   playback(v,traj,struct('slider',true));
 end

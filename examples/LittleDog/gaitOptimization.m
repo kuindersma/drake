@@ -1,7 +1,7 @@
 function [sol,v,prog,xtraj] = gaitOptimization(gait,seed)
 
   checkDependency('lcmgl');
-  if nargin < 1, gait = 'run_trot'; end
+  if nargin < 1, gait = 'walking_trot'; end
   if nargin < 2, seed = []; end
   if nargin < 3, options = struct(); end
   options = parseOptionsStruct(options); 
@@ -28,7 +28,7 @@ function [sol,v,prog,xtraj] = gaitOptimization(gait,seed)
       N = 21;
       foot(2).in_stance = 6:16;
       foot(3).in_stance = 6:16;
-      if ~isfield(options,'speed'), options.speed = .9; end
+      if ~isfield(options,'speed'), options.speed = .8; end
       if ~isfield(options,'stride_length'), options.stride_length = .55; end
       is_laterally_symmetric = true;
     case 'walking_trot'
@@ -94,13 +94,13 @@ function [sol,v,prog,xtraj] = gaitOptimization(gait,seed)
   state_cost.base_y = 0;
   state_cost.base_roll = 10;
   state_cost.base_yaw = 10;
-  state_cost.front_left_hip_roll = 5;
-  state_cost.front_right_hip_roll = 5;
-  state_cost.back_left_hip_roll = 5;
-  state_cost.back_right_hip_roll = 5;
+  state_cost.front_left_hip_roll = 50;
+  state_cost.front_right_hip_roll = 50;
+  state_cost.back_left_hip_roll = 50;
+  state_cost.back_right_hip_roll = 50;
   state_cost = double(state_cost);
   Q = diag(state_cost(1:nq)); 
-  Qv = diag(state_cost(nq+1:end));
+  Qv = diag(state_cost(nq+1:end))*15;
   Q_comddot = diag([1,1,1]);
   Q_contact_force = 5*eye(3);
 
@@ -173,7 +173,7 @@ function [sol,v,prog,xtraj] = gaitOptimization(gait,seed)
   if check_self_collision
     min_distance = 0.003;
     active_collision_options.collision_groups = {'right_lower_legs','left_lower_legs'};
-    prog = prog.addRigidBodyConstraint(MinDistanceConstraint(robot,min_distance,[-inf,inf],active_collision_options),1:N);
+    prog = prog.addRigidBodyConstraint(MinDistanceConstraint(robot,min_distance,active_collision_options,[-inf,inf]),1:N);
   end
   
   % Add periodicity constraints
@@ -220,7 +220,7 @@ function [sol,v,prog,xtraj] = gaitOptimization(gait,seed)
   prog = prog.setSolverOptions('snopt','majoroptimalitytolerance',1e-4);
   prog = prog.setSolverOptions('snopt','superbasicslimit',2000);
   prog = prog.setSolverOptions('snopt','linesearchtolerance',0.9);
-%  prog = prog.setSolverOptions('snopt','print',sprintf('snopt_%s.out',options.suffix));
+  prog = prog.setSolverOptions('snopt','print','snopt.out');
   
   % Solve trajectory optimization
   tic
@@ -289,28 +289,28 @@ function half_periodic_constraint = halfPeriodicConstraint(robot)
   end
 
   symmetric_matrix = addAntiSymmetricPair(symmetric_matrix,1:2,...
-    robot.getBody(robot.findJointInd('front_left_hip_roll')).dofnum, ...
-    robot.getBody(robot.findJointInd('front_right_hip_roll')).dofnum);
+    robot.getBody(robot.findJointId('front_left_hip_roll')).position_num, ...
+    robot.getBody(robot.findJointInd('front_right_hip_roll')).position_num);
 
   symmetric_matrix = addSymmetricPair(symmetric_matrix,3:4, ...
-    robot.getBody(robot.findJointInd('front_left_hip_pitch')).dofnum, ...
-    robot.getBody(robot.findJointInd('front_right_hip_pitch')).dofnum);
+    robot.getBody(robot.findJointId('front_left_hip_pitch')).position_num, ...
+    robot.getBody(robot.findJointId('front_right_hip_pitch')).position_num);
   
   symmetric_matrix = addSymmetricPair(symmetric_matrix,5:6,...
-    robot.getBody(robot.findJointInd('front_left_knee')).dofnum,...
-    robot.getBody(robot.findJointInd('front_right_knee')).dofnum);
+    robot.getBody(robot.findJointId('front_left_knee')).position_num,...
+    robot.getBody(robot.findJointId('front_right_knee')).position_num);
 
   symmetric_matrix = addAntiSymmetricPair(symmetric_matrix,7:8,...
-    robot.getBody(robot.findJointInd('back_left_hip_roll')).dofnum,...
-    robot.getBody(robot.findJointInd('back_right_hip_roll')).dofnum);
+    robot.getBody(robot.findJointId('back_left_hip_roll')).position_num,...
+    robot.getBody(robot.findJointId('back_right_hip_roll')).position_num);
 
   symmetric_matrix = addSymmetricPair(symmetric_matrix,9:10,...
-    robot.getBody(robot.findJointInd('back_left_hip_pitch')).dofnum,...
-    robot.getBody(robot.findJointInd('back_right_hip_pitch')).dofnum);
+    robot.getBody(robot.findJointId('back_left_hip_pitch')).position_num,...
+    robot.getBody(robot.findJointId('back_right_hip_pitch')).position_num);
 
   symmetric_matrix = addSymmetricPair(symmetric_matrix,11:12,...
-    robot.getBody(robot.findJointInd('back_left_knee')).dofnum,...
-    robot.getBody(robot.findJointInd('back_right_knee')).dofnum);
+    robot.getBody(robot.findJointId('back_left_knee')).position_num,...
+    robot.getBody(robot.findJointId('back_right_knee')).position_num);
   
   base_y = findJointIndices(robot,'base_y'); base_y = base_y(1);
   equal_matrix = addOpposite(equal_matrix,1,base_y);
@@ -335,27 +335,27 @@ end
 function q_mirror = mirrorPositions(robot,q)
   q_mirror = q;
 
-  function n = dofnum(joint_name)
-    n = robot.getBody(robot.findJointInd(joint_name)).dofnum;
+  function n = position_num(joint_name)
+    n = robot.getBody(robot.findJointId(joint_name)).position_num;
   end
   
   % y,roll,yaw
   q_mirror([2,4,6],:) = -q([2,4,6],:);
   
-  q_mirror(dofnum('front_left_hip_roll'),:) = -q(dofnum('front_right_hip_roll'),:);
-  q_mirror(dofnum('front_right_hip_roll'),:) = -q(dofnum('front_left_hip_roll'),:);
-  q_mirror(dofnum('back_left_hip_roll'),:) = -q(dofnum('back_right_hip_roll'),:);
-  q_mirror(dofnum('back_right_hip_roll'),:) = -q(dofnum('back_left_hip_roll'),:);
+  q_mirror(position_num('front_left_hip_roll'),:) = -q(position_num('front_right_hip_roll'),:);
+  q_mirror(position_num('front_right_hip_roll'),:) = -q(position_num('front_left_hip_roll'),:);
+  q_mirror(position_num('back_left_hip_roll'),:) = -q(position_num('back_right_hip_roll'),:);
+  q_mirror(position_num('back_right_hip_roll'),:) = -q(position_num('back_left_hip_roll'),:);
   
-  q_mirror(dofnum('front_left_hip_pitch'),:) = q(dofnum('front_right_hip_pitch'),:);
-  q_mirror(dofnum('front_right_hip_pitch'),:) = q(dofnum('front_left_hip_pitch'),:);
-  q_mirror(dofnum('back_left_hip_pitch'),:) = q(dofnum('back_right_hip_pitch'),:);
-  q_mirror(dofnum('back_right_hip_pitch'),:) = q(dofnum('back_left_hip_pitch'),:);
+  q_mirror(position_num('front_left_hip_pitch'),:) = q(position_num('front_right_hip_pitch'),:);
+  q_mirror(position_num('front_right_hip_pitch'),:) = q(position_num('front_left_hip_pitch'),:);
+  q_mirror(position_num('back_left_hip_pitch'),:) = q(position_num('back_right_hip_pitch'),:);
+  q_mirror(position_num('back_right_hip_pitch'),:) = q(position_num('back_left_hip_pitch'),:);
   
-  q_mirror(dofnum('front_left_knee'),:) = q(dofnum('front_right_knee'),:);
-  q_mirror(dofnum('front_right_knee'),:) = q(dofnum('front_left_knee'),:);
-  q_mirror(dofnum('back_left_knee'),:) = q(dofnum('back_right_knee'),:);
-  q_mirror(dofnum('back_right_knee'),:) = q(dofnum('back_left_knee'),:);
+  q_mirror(position_num('front_left_knee'),:) = q(position_num('front_right_knee'),:);
+  q_mirror(position_num('front_right_knee'),:) = q(position_num('front_left_knee'),:);
+  q_mirror(position_num('back_left_knee'),:) = q(position_num('back_right_knee'),:);
+  q_mirror(position_num('back_right_knee'),:) = q(position_num('back_left_knee'),:);
 end
 
 function displayCallback(N,x)
@@ -379,7 +379,7 @@ function options = parseOptionsStruct(options_in)
 end
 
 
-% todo: get rid of this (in favor of findJointInd then dofnum)
+% todo: get rid of this (in favor of findJointId then position_num)
 function [ indices ] = findJointIndices( rbm, str )
 %findJointIndices Returns indices in the state vector for joints whose
   %name contains a specified string.
