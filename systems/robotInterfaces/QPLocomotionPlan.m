@@ -13,7 +13,7 @@ classdef QPLocomotionPlan < QPControllerPlan
     comtraj = [];
     mu = 0.5;
     plan_shift = zeros(6,1);
-    plan_shift_mode = QPLocomotionPlan.PLAN_SHIFT_Z_AND_ZMP;
+    plan_shift_mode = QPLocomotionPlan.PLAN_SHIFT_XYZ;
     g = 9.81; % gravity m/s^2
     is_quasistatic = false;
     constrained_dofs = [];
@@ -30,7 +30,7 @@ classdef QPLocomotionPlan < QPControllerPlan
     KNEE_KD = 4;
     KNEE_WEIGHT = 1;
 
-    EARLY_CONTACT_ALLOWED_TIME = 0.1; % If a body is about to come into contact within the next [early_contact_allowed_time] seconds, then add an optional support that the controller can use if it senses force on that body
+    EARLY_CONTACT_ALLOWED_TIME = 0.4; % If a body is about to come into contact within the next [early_contact_allowed_time] seconds, then add an optional support that the controller can use if it senses force on that body
 
   end
 
