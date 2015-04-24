@@ -45,18 +45,27 @@ steps.left = footsteps_with_quat([footsteps_with_quat.frame_id] == biped.foot_fr
 
 zmp0 = [];
 initial_supports = [];
+initial_support_surfaces = {};
 if steps.right(1).is_in_contact
   z = steps.right(1).pos;
   zmp0(:,end+1) = z(1:2);
   initial_supports(end+1) = biped.foot_body_id.right;
+  v = quat2rotmat(steps.right(1).pos(4:7)) * [0;0;1];
+  b = -v' * steps.right(1).pos(1:3);
+  initial_support_surfaces{end+1} = [v;b];
 end
 if steps.left(1).is_in_contact
   z = steps.left(1).pos;
   zmp0(:,end+1) = z(1:2);
   initial_supports(end+1) = biped.foot_body_id.left;
+  v = quat2rotmat(steps.left(1).pos(4:7)) * [0;0;1];
+  b = -v' * steps.left(1).pos(1:3);
+  initial_support_surfaces{end+1} = [v;b];
 end
 zmp0 = mean(zmp0, 2);
-supp0 = RigidBodySupportState(biped, initial_supports);
+support_options.use_support_surface = ones(length(initial_supports),1);
+support_options.support_surfaces = initial_support_surfaces;
+supp0 = RigidBodySupportState(biped, initial_supports, support_options);
 zmp_knots = struct('t', options.t0, 'zmp', zmp0, 'supp', supp0);
 
 frame_knots = struct('t', options.t0, ...
@@ -132,8 +141,16 @@ t0 = frame_knots(end).t;
 frame_knots(end+1) = frame_knots(end);
 frame_knots(end).t = t0 + 1.5;
 zmpf = mean([steps.right(end).pos(1:2), steps.left(end).pos(1:2)], 2);
-zmp_knots(end+1) =  struct('t', frame_knots(end-1).t, 'zmp', zmpf, 'supp', RigidBodySupportState(biped, [biped.foot_body_id.right, biped.foot_body_id.left]));
-zmp_knots(end+1) =  struct('t', frame_knots(end).t, 'zmp', zmpf, 'supp', RigidBodySupportState(biped, [biped.foot_body_id.right, biped.foot_body_id.left]));
+
+support_options.use_support_surface = ones(2,1);
+v_right = quat2rotmat(steps.right(end).pos(4:7)) * [0;0;1];
+b_right = -v_right' * steps.right(end).pos(1:3);
+v_left = quat2rotmat(steps.left(end).pos(4:7)) * [0;0;1];
+b_left = -v_left' * steps.left(end).pos(1:3);
+support_options.support_surfaces = {[v_right;b_right], [v_left;b_left]};
+
+zmp_knots(end+1) =  struct('t', frame_knots(end-1).t, 'zmp', zmpf, 'supp', RigidBodySupportState(biped, [biped.foot_body_id.right, biped.foot_body_id.left],support_options));
+zmp_knots(end+1) =  struct('t', frame_knots(end).t, 'zmp', zmpf, 'supp', RigidBodySupportState(biped, [biped.foot_body_id.right, biped.foot_body_id.left],support_options));
 
 % dynamic_footstep_plan = DynamicFootstepPlan(biped, zmp_knots, frame_knots);
 
