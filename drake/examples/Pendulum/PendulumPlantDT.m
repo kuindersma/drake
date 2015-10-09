@@ -18,8 +18,9 @@ classdef PendulumPlantDT < DrakeSystem
       
       obj = setInputFrame(obj,PendulumInput);
 
-      torque_limit = 5;
+      torque_limit = 10;
       obj.p = setInputLimits(obj.p,-torque_limit,torque_limit);
+      obj = setInputLimits(obj,-torque_limit,torque_limit);
       
       obj = setStateFrame(obj,PendulumState);
       obj = setOutputFrame(obj,PendulumState);
