@@ -88,7 +88,7 @@ classdef DifferentialDynamicProgramming
           gx = dg(x_ind);
           gu = dg(u_ind);
           Gxx = d2g(x_ind,x_ind);
-          Gxu = d2g(x_ind,u_ind);
+          %Gxu = d2g(x_ind,u_ind);
           Guu = d2g(u_ind,u_ind);
           Gux = d2g(u_ind,x_ind);
           
@@ -98,9 +98,23 @@ classdef DifferentialDynamicProgramming
           Qux = Gux + Fu'*Vxx*Fx;
           Quu = Guu + Fu'*Vxx*Fu;
 
-          K{i} = -Quu\Qux;
-          k{i} = -Quu\Qu;
+          if 0
+            K{i} = -Quu\Qux;
+            k{i} = -Quu\Qu;
+          else
+            Ain = [-eye(nu); eye(nu)]; 
+            bin = [-p.umin; p.umax];
+            [alpha,info_fqp] = fastQPmex({Quu},Qu',Ain,bin,[],[],[]);
+            if info_fqp < 0
+              keyboard
+            end
+            k{i} = alpha;
 
+            active_ind = sum(reshape(abs(Ain*alpha - bin)<1e-6,nu,2),2) > 0;
+            Quu_free = Quu;
+            Quu_free(active_ind,:) = 0;
+            K{i} = -pinv(Quu_free)*Qux;
+          end
           V = V - 0.5*k{i}'*Quu*k{i};
           Vx = Qx - K{i}*Quu*k{i};
           Vxx = Qxx - K{i}'*Quu*K{i}; 
