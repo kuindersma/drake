@@ -33,7 +33,7 @@ classdef PendulumPlant < SecondOrderSystem
       obj.uG = Point(getInputFrame(obj),0);
     end
     
-    function qdd = sodynamics(obj,t,q,qd,u)
+    function qdd = sodynamics(obj,~,q,qd,u)
       % Implement the second-order dynamics
       qdd = (u - obj.m*obj.g*obj.lc*sin(q) - obj.b*qd)/obj.I;
     end
