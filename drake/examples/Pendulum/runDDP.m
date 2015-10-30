@@ -10,6 +10,7 @@ utraj = zeros(1,N);
 
 options.visualizer = pv;
 options.enable_visualizer = true;
+options.constrain_inputs = true;
 
 ddp = DifferentialDynamicProgramming(p,false,options);
 ddp = ddp.addRunningCost(@p.cost);
@@ -18,7 +19,6 @@ ddp = ddp.addFinalCost(@p.finalCost);
 
 xtraj = ddp.reconstructStateTrajectory(xtraj,0,p.dt);
 utraj = ddp.reconstructInputTrajectory(utraj,0,p.dt);
-
 
 if (0) % open-loop playback
   sys = cascade(utraj,p);

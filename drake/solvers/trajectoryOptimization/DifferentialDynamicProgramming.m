@@ -44,6 +44,7 @@ classdef DifferentialDynamicProgramming
         options.enable_line_search=true;
       end
       
+      obj.visualizer = options.visualizer;
       obj.options = options;
       obj.plant = plant;
       obj.compute_second_derivatives = compute_second_derivatives;
@@ -79,7 +80,13 @@ classdef DifferentialDynamicProgramming
         [V,Vx,Vxx] = feval(obj.final_cost_function,xtraj(:,N));
         K = cell(1,N-1);
         k = cell(1,N-1);
-      
+        
+        Qx = cell(1,N-1);
+        Qu = cell(1,N-1);
+        Qxx = cell(1,N-1);
+        Qux = cell(1,N-1);
+        Quu = cell(1,N-1);
+          
         % below terms for computing expect cost reductions in line search
         sum_kT_Quu_k = 0;
         sum_kT_Qu = 0;
@@ -102,39 +109,40 @@ classdef DifferentialDynamicProgramming
           Guu = d2g(u_ind,u_ind);
           Gux = d2g(u_ind,x_ind);
           
-          Qx = gx + Vx*Fx;
-          Qu = gu + Vx*Fu;
-          Qxx = Gxx + Fx'*Vxx*Fx;
-          Qux = Gux + Fu'*Vxx*Fx;
-          Quu = Guu + Fu'*Vxx*Fu;
+          Qx{i} = gx + Vx*Fx;
+          Qu{i} = gu + Vx*Fu;
+          Qxx{i} = Gxx + Fx'*Vxx*Fx;
+          Qux{i} = Gux + Fu'*Vxx*Fx;
+          Quu{i} = Guu + Fu'*Vxx*Fu;
 
       
           if obj.options.constrain_inputs
             Ain = [-eye(nu); eye(nu)]; 
             bin = [-(p.umin-utraj(:,i)); (p.umax-utraj(:,i))];
-            [alpha,info_fqp] = fastQPmex({Quu},Qu',Ain,bin,[],[],[]);
+            [alpha,info_fqp] = fastQPmex({Quu{i}},Qu{i}',Ain,bin,[],[],[]);
             if info_fqp < 0
               disp('DifferentialDynamicProgramming: fastQP failed, solving unconstrained problem');
-              K{i} = -Quu\Qux;
-              k{i} = -Quu\Qu;
+              K{i} = -Quu{i}\Qux{i};
+              k{i} = -Quu{i}\Qu{i};
             else
               k{i} = alpha;
               active_ind = sum(reshape(abs(Ain*alpha - bin)<1e-6,nu,2),2) > 0;
-              Quu_free = Quu;
+              Quu_free = Quu{i};
               Quu_free(active_ind,:) = 0;
-              K{i} = -pinv(Quu_free)*Qux;
+              K{i} = -pinv(Quu_free)*Qux{i};
             end
           else
-            K{i} = -Quu\Qux;
-            k{i} = -Quu\Qu;
+            Quu_inv = inv(Quu{i});
+            K{i} = -Quu_inv*Qux{i};
+            k{i} = -Quu_inv*Qu{i};
           end
           
-          sum_kT_Quu_k = sum_kT_Quu_k + k{i}'*Quu*k{i};
-          sum_kT_Qu = sum_kT_Qu + k{i}'*Qu;
+          sum_kT_Quu_k = sum_kT_Quu_k + k{i}'*Quu{i}*k{i};
+          sum_kT_Qu = sum_kT_Qu + k{i}'*Qu{i};
         
-          V = V - 0.5*k{i}'*Quu*k{i};
-          Vx = Qx - K{i}*Quu*k{i};
-          Vxx = Qxx - K{i}'*Quu*K{i}; 
+          V = V - 0.5*k{i}'*Quu{i}*k{i};
+          Vx = Qx{i} - K{i}*Quu{i}*k{i};
+          Vxx = Qxx{i} - K{i}'*Quu{i}*K{i}; 
         end
 
         xtraj_new = xtraj;
@@ -145,13 +153,20 @@ classdef DifferentialDynamicProgramming
         while (line_search_incomplete)
           cost = 0;
           for i=1:N-1
-            utraj_new(:,i) = utraj(:,i) + alpha*k{i} + K{i}*(xtraj_new(:,i)-xtraj(:,i));
+            dx = xtraj_new(:,i)-xtraj(:,i);
+            du = alpha*k{i} + K{i}*dx; 
+            utraj_new(:,i) = utraj(:,i) + du;
             if obj.options.constrain_inputs
               % make sure that feedback term doesn't exceed limits
               utraj_new(:,i) = min(p.umax,max(p.umin,utraj_new(:,i)));
             end
             xtraj_new(:,i+1) = p.update(i*p.dt,xtraj_new(:,i),utraj_new(:,i));
             cost = cost + obj.running_cost_function(xtraj_new(:,i),utraj_new(:,i));
+
+%             if ~valuecheck(Qu{i}'+Qux{i}*dx+Quu{i}*du,0, 1e-3)
+%               keyboard
+%             end
+            
           end
           cost = cost + obj.final_cost_function(xtraj_new(:,N));
 
@@ -170,9 +185,7 @@ classdef DifferentialDynamicProgramming
         end
         cost
         prev_cost=cost;
-    
-%         norm(xtraj-xtraj_new)
-        
+            
         xtraj=xtraj_new;
         utraj=utraj_new;
         

@@ -192,6 +192,61 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         end
       end
     end
+    
+    function [xdn,df,phi] = updateWithBasisForces(obj,~,x,u,z)
+      
+      num_q = obj.manip.getNumPositions;
+      num_v = obj.manip.getNumVelocities;
+      num_u = obj.manip.getNumInputs;
+      num_c = obj.getNumContactPairs;
+      if obj.twoD
+        num_z = num_c*2;  
+      else
+        num_z = num_c*4;
+      end
+      
+      q=x(1:num_q); 
+      v=x(num_q+(1:num_v));
+      vToqdot = eye(num_v);%obj.manip.vToqdot(q);
+      qd = vToqdot*v;
+      h = obj.timestep;
+
+      kinsol = doKinematics(obj,q,nargout>1);
+
+      if (nargout<2)
+        [H,C,B] = manipulatorDynamics(obj.manip,q,v);
+        [phi,~,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+        J = vertcat(J{:}); % 2km x n
+        tau =J'*z + B*u - C;
+      else
+        [H,C,B,dH,dC,dB] = manipulatorDynamics(obj.manip,q,v);
+        [phi,~,J,~,~,dJ] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+        
+        dJ = cellfun(@(A)reshape(A,num_c,num_q^2),dJ,'UniformOutput',false);
+        dJ_ = vertcat(dJ{:});
+        dJ = zeros(num_z*num_q,num_q);
+        for i=1:num_q
+          cdx=(i-1)*num_z+(1:num_z);
+          qdx=(i-1)*num_q+(1:num_q);
+          dJ(cdx,:) = dJ_(:,qdx);
+        end
+        J = vertcat(J{:}); % 2km x n
+        tau = J'*z + B*u - C;
+        dtau = [zeros(num_v,1), [matGradMult(dJ,z,true),zeros(num_v,num_v)] + 0*matGradMult(dB,u) - dC, B, J'];
+      end
+      
+      Hinv = inv(H);
+      qdn = qd + h*Hinv*tau;
+      qn = q + h*qd;
+      
+      xdn = [qn;qdn];
+      if nargout > 1
+        dqn = [zeros(num_q,1), [eye(num_q), h*eye(num_v)], zeros(num_q,num_u+num_z)];
+        dH = [zeros(num_q^2,1), dH, zeros(num_q^2,num_u+num_z)]; % add zeros for partials w.r.t. t, u, and z
+        dqdn = [zeros(num_v,1), [zeros(num_q,num_q), eye(num_v), zeros(num_v,num_u+num_z)]] + h*(-Hinv*matGradMult(dH,Hinv*tau) + Hinv*dtau);
+        df = [dqn;dqdn]; % nx x 1+nx+nu+nz
+      end
+    end
 
     function [xdn,df] = update(obj,t,x,u)
       if (nargout>1)
