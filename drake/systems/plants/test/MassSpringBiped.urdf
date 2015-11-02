@@ -1,0 +1,251 @@
+<?xml version="1.0"?>
+<robot name="MassSpringBiped">
+  <material name="green">
+    <color rgba=".3 .6 .4 1" />
+  </material>
+  <material name="red">
+    <color rgba=".9 .1 0 1" />
+  </material>
+  <material name="blue">
+    <color rgba="0 0 1 1" />
+  </material>
+  <material name="black">
+    <color rgba="1 1 1 1" />
+  </material>
+
+  <!-- <link name="base"/> -->
+
+  <link name="torso">
+    <inertial> 
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="1" />
+      <inertia ixx=".01" ixy="0" ixz="0" iyy=".01" iyz="0" izz=".01"/> 
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0"/>
+      <geometry>
+        <box size="0.125 0.125 0.125" />
+      </geometry>
+      <material name="red" />
+    </visual> 
+    <collision>
+      <origin xyz="0 0 0"/>
+      <geometry>
+        <box size="0.125 0.125 0.125" />
+      </geometry>
+    </collision>
+  </link>
+
+
+  <link name="l_hip">
+    <inertial> 
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0001" />
+      <inertia ixx=".00001" ixy="0" ixz="0" iyy=".00001" iyz="0" izz=".00001"/> 
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="black" />
+    </visual> 
+  </link>
+
+
+  <link name="l_upper_leg">
+    <inertial> 
+      <origin xyz="0 0 -0.15" rpy="0 0 0" />
+      <mass value="0.01" />
+      <inertia ixx=".001" ixy="0" ixz="0" iyy=".001" iyz="0" izz=".001"/> 
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.15" rpy="0 0 0" />
+      <geometry>
+        <box size="0.025 0.025 0.3" />
+      </geometry>
+      <material name="green" />
+    </visual> 
+  </link>
+
+
+  <link name="l_lower_leg">
+    <inertial> 
+      <origin xyz="0 0 -0.15" rpy="0 0 0" />
+      <mass value="0.01" />
+      <inertia ixx=".001" ixy="0" ixz="0" iyy=".001" iyz="0" izz=".001"/> 
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.15" rpy="0 0 0" />
+      <geometry>
+        <box size="0.02 0.02 0.3" />
+      </geometry>
+      <material name="blue" />
+    </visual> 
+    <collision group="foot">
+      <origin rpy="0 0 0" xyz="0 0 -0.30"/>
+      <geometry>
+        <sphere radius="0.0"/>
+      </geometry>
+    </collision>
+    <visual group="foot">
+      <origin rpy="0 0 0" xyz="0 0 -0.30"/>
+      <geometry>
+        <sphere radius="0.02"/>
+      </geometry>
+    </visual>
+  </link>
+
+
+  <link name="r_hip">
+    <inertial> 
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.0001" />
+      <inertia ixx=".00001" ixy="0" ixz="0" iyy=".00001" iyz="0" izz=".00001"/> 
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <box size="0.01 0.01 0.01" />
+      </geometry>
+      <material name="black" />
+    </visual> 
+  </link>
+
+  <link name="r_upper_leg">
+    <inertial> 
+      <origin xyz="0 0 -0.15" rpy="0 0 0" />
+      <mass value="0.01" />
+      <inertia ixx=".001" ixy="0" ixz="0" iyy=".001" iyz="0" izz=".001"/> 
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.15" rpy="0 0 0" />
+      <geometry>
+        <box size="0.025 0.025 0.3" />
+      </geometry>
+      <material name="green" />
+    </visual> 
+  </link>
+
+
+  <link name="r_lower_leg">
+    <inertial> 
+      <origin xyz="0 0 -0.15" rpy="0 0 0" />
+      <mass value="0.01" />
+      <inertia ixx=".001" ixy="0" ixz="0" iyy=".001" iyz="0" izz=".001"/> 
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.15" rpy="0 0 0" />
+      <geometry>
+        <box size="0.02 0.02 0.3" />
+      </geometry>
+      <material name="blue" />
+    </visual> 
+    <collision group="foot">
+      <origin rpy="0 0 0" xyz="0 0 -0.30"/>
+      <geometry>
+        <sphere radius="0.0"/>
+      </geometry>
+    </collision>
+    <visual group="foot">
+      <origin rpy="0 0 0" xyz="0 0 -0.30"/>
+      <geometry>
+        <sphere radius="0.02"/>
+      </geometry>
+    </visual>
+  </link>
+
+
+  <joint name="l_hip_x" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0.05 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="torso"/>
+    <child link="l_hip"/>
+    <dynamics damping="0.1" friction="0"/>
+    <limit effort="275" lower="-1.57" upper="1.57" velocity="12"/>
+  </joint>
+  <joint name="l_hip_y" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="l_hip"/>
+    <child link="l_upper_leg"/>
+    <dynamics damping="0.1" friction="0"/>
+    <limit effort="275" lower="-1.57" upper="1.57" velocity="12"/>
+  </joint>
+  <joint name="r_hip_x" type="revolute">
+    <origin rpy="0 0 0" xyz="0 -0.05 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="torso"/>
+    <child link="r_hip"/>
+    <dynamics damping="0.1" friction="0"/>
+    <limit effort="275" lower="-1.57" upper="1.57" velocity="12"/>
+  </joint>
+  <joint name="r_hip_y" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="r_hip"/>
+    <child link="r_upper_leg"/>
+    <dynamics damping="0.1" friction="0"/>
+    <limit effort="275" lower="-1.57" upper="1.57" velocity="12"/>
+  </joint>
+  <joint name="l_leg_spring_joint" type="prismatic">
+    <origin rpy="0 0 0" xyz="0 0 -0.3"/>
+    <parent link="l_upper_leg"/>
+    <child link="l_lower_leg" />
+    <axis xyz="0 0 1" />
+    <dynamics damping="0.1" friction="0"/>
+    <limit lower="-0.25" upper="0.25"/>
+  </joint>
+  <joint name="r_leg_spring_joint" type="prismatic">
+    <origin rpy="0 0 0" xyz="0 0 -0.3"/>
+    <parent link="r_upper_leg"/>
+    <child link="r_lower_leg" />
+    <axis xyz="0 0 1" />
+    <dynamics damping="0.1" friction="0"/>
+    <limit lower="-0.25" upper="0.25"/>
+  </joint>
+  <!-- 
+  <force_element name="l_leg_spring">
+    <linear_spring_damper stiffness="100" damping="20">
+      <link1 link="l_upper_leg" xyz="0 0 -0.15" />
+      <link2 link="l_lower_leg" xyz="0 0 0.15" />
+    </linear_spring_damper>
+  </force_element>
+  <force_element name="r_leg_spring">
+    <linear_spring_damper stiffness="100" damping="20">
+      <link1 link="r_upper_leg" xyz="0 0 -0.15" />
+      <link2 link="r_lower_leg" xyz="0 0 0.15" />
+    </linear_spring_damper>
+  </force_element>
+ -->
+  <transmission type="SimpleTransmission" name="l_hip_x_transmission">
+    <actuator name="l_hip_x" />
+    <joint name="l_hip_x" />
+    <mechanicalReduction>1</mechanicalReduction>
+  </transmission>
+  <transmission type="SimpleTransmission" name="l_hip_y_transmission">
+    <actuator name="l_hip_y" />
+    <joint name="l_hip_y" />
+    <mechanicalReduction>1</mechanicalReduction>
+  </transmission>
+  <transmission type="SimpleTransmission" name="l_spring_transmission">
+    <actuator name="l_spring" />
+    <joint name="l_leg_spring_joint" />
+    <mechanicalReduction>1</mechanicalReduction>
+  </transmission>
+  <transmission type="SimpleTransmission" name="r_hip_x_transmission">
+    <actuator name="r_hip_x" />
+    <joint name="r_hip_x" />
+    <mechanicalReduction>1</mechanicalReduction>
+  </transmission>
+  <transmission type="SimpleTransmission" name="r_hip_y_transmission">
+    <actuator name="r_hip_y" />
+    <joint name="r_hip_y" />
+    <mechanicalReduction>1</mechanicalReduction>
+  </transmission>
+  <transmission type="SimpleTransmission" name="r_spring_transmission">
+    <actuator name="r_spring" />
+    <joint name="r_leg_spring_joint" />
+    <mechanicalReduction>1</mechanicalReduction>
+  </transmission>
+</robot>
