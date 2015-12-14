@@ -131,12 +131,12 @@ for iter = 1:maxIter
     % armijo linesearch
     step  = 1;
     nstep = 0;
-	xc    = clamp(x+step*search);
+    xc    = clamp(x+step*search);
     vc    = xc'*g + 0.5*xc'*H*xc;
     while (vc - oldvalue)/(step*sdotg) < Armijo
         step  = step*stepDec;
         nstep = nstep+1;
-		xc    = clamp(x+step*search);
+        xc    = clamp(x+step*search);
         vc    = xc'*g + 0.5*xc'*H*xc;
         if step<minStep
             result = 2;

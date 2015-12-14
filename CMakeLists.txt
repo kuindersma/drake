@@ -55,7 +55,7 @@ if (NOT WIN32) # many of these might work on win32 with little or no work... the
 	option(WITH_SIGNALSCOPE	"live plotting tool for lcm messages")
 	option(WITH_IRIS		"fast approximate convex segmentation")
 	option(WITH_OCTOMAP 	"provides oct-tree data structures")
-	option(WITH_GUROBI 		"convex/integer optimization solver; free for academics (will prompt you for login bits)")
+	option(WITH_GUROBI 		"convex/integer optimization solver; free for academics (will prompt you for login bits)" ON)
 	option(WITH_MOSEK 		"convex optimization solver; free for academics")
 	option(WITH_YALMIP 		"free optimization front-end for MATLAB")
 	option(WITH_GLOPTIPOLY 	"free global polynomial optimization tooblox")
