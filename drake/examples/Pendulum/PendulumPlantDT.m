@@ -70,7 +70,7 @@ classdef PendulumPlantDT < DrakeSystem
     end
     
     function [c,V] = runLQR(obj)
-      Q = diag([10 1]); R = 0.1;
+      Q = diag([50 2]); R = 0.1;
       [c,V] = tilqr(obj,obj.xG,0,Q,R);
     end
         
