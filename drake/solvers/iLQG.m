@@ -522,9 +522,8 @@ for i = N-1:-1:1
         lower = lims(:,1)-u(:,i);
         upper = lims(:,2)-u(:,i);
 
-        if 0
-          % use fastQP
-          [k_i,result,R,free] = boxQP(QuuF,Qu,lower,upper,k(:,min(i+1,N-1)));
+        if 1
+          % use contact costs
         else
           [k_i,result,R,free] = boxQP(QuuF,Qu,lower,upper,k(:,min(i+1,N-1)));
         end
