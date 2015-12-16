@@ -247,8 +247,144 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         df = [dqn;dqdn]; % nx x 1+nx+nu+nz
       end
     end
+    
+    
+    function [xdn,df] = updateConvex(obj,t,x,u)
+      % this function implement an update based on Todorov 2011, where
+      % instead of solving the full SOCP, we make use of polyhedral
+      % friction cone approximations and solve a QP.
+      
+      % TODO: implement derivatives
 
+      % q_{k+1} = q_{k} + qd_{k+1}*h;
+      % qd_{k+1} = qd_{k} + H^{-1}*(B*u-C)*h + J'*f;
+  
+      if obj.twoD
+        num_d = 2;  
+        dim = 2;  
+      else
+        num_d = 4;  
+        dim = 3;  
+      end
+      num_q = obj.manip.getNumPositions;
+      num_v = obj.manip.getNumVelocities;
+      num_u = obj.manip.getNumInputs;
+      num_c = obj.getNumContactPairs;
+%       num_z = num_c*num_d;  
+      
+      q=x(1:num_q); 
+      v=x(num_q+(1:num_v));
+      vToqdot = eye(num_v);%obj.manip.vToqdot(q);
+      qd = vToqdot*v;
+      h = obj.timestep;
+
+      kinsol = doKinematics(obj,q,nargout>1);
+
+      [H,C,B] = manipulatorDynamics(obj.manip,q,v);
+      [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+
+      active = find(phi<0.001);
+      
+      if isempty(active)
+        qdn = qd + H\(B*u-C)*h;
+        qn = q + qdn*h;
+
+      else
+        num_active = length(active);
+        num_z = num_active*num_d;  
+
+        J = vertcat(J{:}); 
+        V = horzcat(V{:});
+        I = eye(num_c*num_d);
+        Iactive = eye(num_z);
+        Jt_cell = cell(1,num_active);
+        V_cell = cell(1,num_active);
+        Iz_cell = cell(1,num_active);
+        v_min = zeros(num_active,1);
+        for i=1:num_active
+          idx = active(i):num_c:num_c*num_d;
+          Jt_cell{i} = J'*I(idx,:)'; % Jacobian transpose for the ith contact
+          V_cell{i} = V*I(idx,:)'; % basis vectors for ith contact
+          Iz_cell{i} = Iactive((i-1)*num_active+(1:num_d),:); % selection matrix for basis forces and velocities
+          if phi(active(i))<1e-5
+            v_min(i) = -phi(active(i))/h;
+          elseif phi(active(i))>1e-4
+            v_min(i) = -phi(active(i))/h;
+          else
+            v_min(i) = 0;
+          end
+        end
+        J = horzcat(Jt_cell{:})';
+
+        Hinv = inv(H);
+        A = J*Hinv*J';
+        c = J*qd + J*Hinv*(B*u-C)*h;
+
+        phi_max = 0.001; % m, max contact threshold
+        R_min = 1e-7;
+        R_max = 1e-5;
+
+        R = zeros(num_z,1);
+        R(phi(active)>phi_max) = R_max;
+        R(phi(active)<0) = R_min;
+        R(0 <= phi(active) <= phi_max) = R_min + (R_max - R_min);
+        R = diag(R);
+
+        Q = 0.5*(A+0*R);
+        if any(eig(Q)<-1e-8)
+          keyboard;
+        end
+
+        % N*V*(A*z + c) - v_min \ge 0
+        Ain_ = cell(1,num_active);
+        bin_ = cell(1,num_active);
+        N = [0,0,1]; % extract normal component
+        for i=1:num_active
+          Ji = Iz_cell{i}*J;
+          Ai = Ji*Hinv*Ji';
+          ci = Ji*qd + Ji*Hinv*(B*u-C)*h;
+          Ain_{i} = N*V_cell{i}*Ai*Iz_cell{i}; 
+          bin_{i} = v_min(i) - N*V_cell{i}*ci;
+        end
+
+        Ain = sparse(vertcat(Ain_{:}));
+        bin = vertcat(bin_{:});
+        Ain = Ain(bin~=inf,:);
+        bin = bin(bin~=inf);
+
+        Ain = Ain;
+        bin = bin;
+
+        gurobi_options.outputflag = 0; % verbose flag
+        gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
+
+        model.Q = sparse(Q);
+        model.obj = c;
+        model.A = Ain;
+        model.rhs = bin;
+        model.sense = repmat('>',length(bin),1);
+        result = gurobi(model,gurobi_options);
+        try
+          f = result.x;
+        catch
+          error('updateConvex failed.');
+        end;
+
+        qdn = qd + Hinv*((B*u-C)*h + J'*f);
+        qn = q + qdn*h;
+      end
+      
+      xdn = [qn;qdn];
+      df =[];
+    end
+
+      
     function [xdn,df] = update(obj,t,x,u)
+
+      
+      [xdn,df] = updateConvex(obj,t,x,u);
+      return;
+
       if (nargout>1)
         [obj,z,Mvn,wvn,dz,dMvn,dwvn] = solveLCP(obj,t,x,u);
       else
