@@ -249,7 +249,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     end
     
     
-    function [xdn,df] = updateConvex(obj,t,x,u)
+    function [xdn,df] = updateConvex(obj,~,x,u)
       % this function implement an update based on Todorov 2011, where
       % instead of solving the full SOCP, we make use of polyhedral
       % friction cone approximations and solve a QP.
@@ -270,7 +270,6 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       num_v = obj.manip.getNumVelocities;
       num_u = obj.manip.getNumInputs;
       num_c = obj.getNumContactPairs;
-%       num_z = num_c*num_d;  
       
       q=x(1:num_q); 
       v=x(num_q+(1:num_v));
@@ -306,9 +305,9 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           Jt_cell{i} = J'*I(idx,:)'; % Jacobian transpose for the ith contact
           V_cell{i} = V*I(idx,:)'; % basis vectors for ith contact
           Iz_cell{i} = Iactive((i-1)*num_active+(1:num_d),:); % selection matrix for basis forces and velocities
-          if phi(active(i))<1e-5
-            v_min(i) = -phi(active(i))/h;
-          elseif phi(active(i))>1e-4
+          if phi(active(i))<0
+            v_min(i) = -0.01*phi(active(i))/h;
+          elseif phi(active(i))>1e-3
             v_min(i) = -phi(active(i))/h;
           else
             v_min(i) = 0;
@@ -352,8 +351,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         Ain = Ain(bin~=inf,:);
         bin = bin(bin~=inf);
 
-        Ain = Ain;
-        bin = bin;
+%         Ain = Ain;
+%         bin = bin;
 
         gurobi_options.outputflag = 0; % verbose flag
         gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
