@@ -49,7 +49,7 @@ endif()
 option(WITH_SNOPT_PRECOMPILED "precompiled binaries only for snopt; the source requires a license (will be disabled if WITH_SNOPT=ON)"  ON)
 
 # OFF by default:
-option(WITH_SNOPT 		"nonlinear optimization solver; requires access to RobotLocomotion/snopt-pod")
+option(WITH_SNOPT 		"nonlinear optimization solver; requires access to RobotLocomotion/snopt-pod" ON)
 
 if (NOT WIN32) # many of these might work on win32 with little or no work... they just haven't been tried
 	option(WITH_SIGNALSCOPE	"live plotting tool for lcm messages")
