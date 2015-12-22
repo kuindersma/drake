@@ -16,6 +16,12 @@ warning(w);
 v = r.constructVisualizer;
 v.display_dt = 0.02;
 
-% Run simulation, then play it back at realtime speed
-xtraj = simulate(r,[0 3]);
-v.playback(xtraj);
+% Forward simulate dynamics with visulazation, then playback at realtime
+S=warning('off','Drake:DrakeSystem:UnsupportedSampleTime');
+output_select(1).system=1;
+output_select(1).output=1;
+sys = mimoCascade(r,v,[],[],output_select);
+warning(S);
+traj = simulate(sys,[0 2]);
+playback(v,traj,struct('slider',true));
+

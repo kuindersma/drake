@@ -281,8 +281,10 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 
       [H,C,B] = manipulatorDynamics(obj.manip,q,v);
       [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
-
-      active = find(phi<0.001);
+      
+      contact_threshold = 1e-6;
+      
+      active = find(phi < contact_threshold);
       
       if isempty(active)
         qdn = qd + H\(B*u-C)*h;
@@ -291,7 +293,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       else
         num_active = length(active);
         num_z = num_active*num_d;  
-
+ 
         J = vertcat(J{:}); 
         V = horzcat(V{:});
         I = eye(num_c*num_d);
@@ -304,14 +306,14 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           idx = active(i):num_c:num_c*num_d;
           Jt_cell{i} = J'*I(idx,:)'; % Jacobian transpose for the ith contact
           V_cell{i} = V*I(idx,:)'; % basis vectors for ith contact
-          Iz_cell{i} = Iactive((i-1)*num_active+(1:num_d),:); % selection matrix for basis forces and velocities
-          if phi(active(i))<0
-            v_min(i) = -0.01*phi(active(i))/h;
-          elseif phi(active(i))>1e-3
-            v_min(i) = -phi(active(i))/h;
-          else
+          Iz_cell{i} = Iactive((i-1)*num_d+(1:num_d),:); % selection matrix for basis forces and velocities
+%           if phi(active(i))<-1e-4
+%             v_min(i) = -phi(active(i))/(10*h);
+%           elseif phi(active(i))>1e-7
+%             v_min(i) = -phi(active(i))/h;
+%           else
             v_min(i) = 0;
-          end
+%           end
         end
         J = horzcat(Jt_cell{:})';
 
@@ -319,7 +321,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         A = J*Hinv*J';
         c = J*qd + J*Hinv*(B*u-C)*h;
 
-        phi_max = 0.001; % m, max contact threshold
+        phi_max = 1e-3; % m, max contact force distance
         R_min = 1e-7;
         R_max = 1e-5;
 
@@ -327,12 +329,9 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         R(phi(active)>phi_max) = R_max;
         R(phi(active)<0) = R_min;
         R(0 <= phi(active) <= phi_max) = R_min + (R_max - R_min);
-        R = diag(R);
+        R = 0*diag(R);
 
-        Q = 0.5*(A+0*R);
-        if any(eig(Q)<-1e-8)
-          keyboard;
-        end
+        Q = 0.5*(A+R);
 
         % N*V*(A*z + c) - v_min \ge 0
         Ain_ = cell(1,num_active);
@@ -351,17 +350,15 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         Ain = Ain(bin~=inf,:);
         bin = bin(bin~=inf);
 
-%         Ain = Ain;
-%         bin = bin;
-
         gurobi_options.outputflag = 0; % verbose flag
         gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
 
         model.Q = sparse(Q);
         model.obj = c;
-        model.A = Ain;
-        model.rhs = bin;
+        model.A = 0*Ain;
+        model.rhs = 0*bin;
         model.sense = repmat('>',length(bin),1);
+        model.lb = zeros(num_z,1);
         result = gurobi(model,gurobi_options);
         try
           f = result.x;
