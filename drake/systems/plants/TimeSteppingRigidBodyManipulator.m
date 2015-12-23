@@ -261,35 +261,32 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
   
       if obj.twoD
         num_d = 2;  
-        dim = 2;  
       else
         num_d = 4;  
-        dim = 3;  
       end
       num_q = obj.manip.getNumPositions;
       num_v = obj.manip.getNumVelocities;
-      num_u = obj.manip.getNumInputs;
       num_c = obj.getNumContactPairs;
       
       q=x(1:num_q); 
       v=x(num_q+(1:num_v));
-      vToqdot = eye(num_v);%obj.manip.vToqdot(q);
-      qd = vToqdot*v;
+      vToqdot = obj.manip.vToqdot(q);
       h = obj.timestep;
 
-      kinsol = doKinematics(obj,q,nargout>1);
-
+      kinematics_options.compute_gradients = nargout > 1;
+      kinsol = doKinematics(obj, q, [], kinematics_options);
       [H,C,B] = manipulatorDynamics(obj.manip,q,v);
       [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
       
-      contact_threshold = 1e-6;
+      contact_threshold = 1e-3;
       
       active = find(phi < contact_threshold);
       
       if isempty(active)
-        qdn = qd + H\(B*u-C)*h;
+        vn = v + H\(B*u-C)*h;
+        qdn = vToqdot*vn;
         qn = q + qdn*h;
-
+        
       else
         num_active = length(active);
         num_z = num_active*num_d;  
@@ -318,29 +315,32 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         J = horzcat(Jt_cell{:})';
 
         Hinv = inv(H);
-        A = J*Hinv*J';
-        c = J*qd + J*Hinv*(B*u-C)*h;
+        A = J*vToqdot*Hinv*vToqdot'*J';
+        c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
 
-        phi_max = 1e-3; % m, max contact force distance
-        R_min = 1e-7;
-        R_max = 1e-5;
+%         phi_max = 1e-3; % m, max contact force distance
+%         R_min = 1e-7;
+%         R_max = 1e-5;
+%         R = zeros(num_z,1);
+%         R(phi(active)>phi_max) = R_max;
+%         R(phi(active)<0) = R_min;
+%         R(0 <= phi(active) <= phi_max) = R_min + (R_max - R_min);
+%         R = diag(R);
+        R = 1e-3*eye(num_z);
 
-        R = zeros(num_z,1);
-        R(phi(active)>phi_max) = R_max;
-        R(phi(active)<0) = R_min;
-        R(0 <= phi(active) <= phi_max) = R_min + (R_max - R_min);
-        R = 0*diag(R);
-
-        Q = 0.5*(A+R);
-
+        try
+          Q = 0.5*(A+R);
+        catch
+          keyboard
+        end
         % N*V*(A*z + c) - v_min \ge 0
         Ain_ = cell(1,num_active);
         bin_ = cell(1,num_active);
         N = [0,0,1]; % extract normal component
         for i=1:num_active
           Ji = Iz_cell{i}*J;
-          Ai = Ji*Hinv*Ji';
-          ci = Ji*qd + Ji*Hinv*(B*u-C)*h;
+          Ai = Ji*vToqdot*Hinv*vToqdot'*Ji';
+          ci = Ji*vToqdot*v + Ji*vToqdot*Hinv*(B*u-C)*h;
           Ain_{i} = N*V_cell{i}*Ai*Iz_cell{i}; 
           bin_{i} = v_min(i) - N*V_cell{i}*ci;
         end
@@ -353,30 +353,43 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         gurobi_options.outputflag = 0; % verbose flag
         gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
 
-        model.Q = sparse(Q);
-        model.obj = c;
-        model.A = 0*Ain;
-        model.rhs = 0*bin;
-        model.sense = repmat('>',length(bin),1);
-        model.lb = zeros(num_z,1);
-        result = gurobi(model,gurobi_options);
         try
+          model.Q = sparse(Q);
+          model.obj = c;
+          model.A = 0*Ain;
+          model.rhs = 0*bin;
+          model.sense = repmat('>',length(bin),1);
+          model.lb = zeros(num_z,1);
+          result = gurobi(model,gurobi_options);
           f = result.x;
         catch
+          keyboard
           error('updateConvex failed.');
         end;
-
-        qdn = qd + Hinv*((B*u-C)*h + J'*f);
+        
+        vn = v + Hinv*((B*u-C)*h + vToqdot'*J'*f);
+        qdn = vToqdot*vn;
         qn = q + qdn*h;
       end
       
-      xdn = [qn;qdn];
+      % Find quaternion indices
+      quat_bodies = obj.manip.body([obj.manip.body.floating] == 2);      
+      quat_positions = [quat_bodies.position_num];
+      for i=1:size(quat_positions,2)
+        quat_dot = qdn(quat_positions(4:7,i));
+        if norm(quat_dot) > 0 
+          % Update quaternion by following geodesic
+          qn(quat_positions(4:7,i)) = q(quat_positions(4:7,i)) + quat_dot/norm(quat_dot)*tan(norm(h*quat_dot));
+          qn(quat_positions(4:7,i)) = qn(quat_positions(4:7,i))/norm(qn(quat_positions(4:7,i)));
+        end
+      end
+      
+      xdn = [qn;vn];
       df =[];
     end
 
       
     function [xdn,df] = update(obj,t,x,u)
-
       
       [xdn,df] = updateConvex(obj,t,x,u);
       return;
