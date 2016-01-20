@@ -1,3 +1,5 @@
+function simulate_traj()
+
 warning('off','Drake:RigidBodyManipulator:UnsupportedContactPoints');
 warning('off','Drake:RigidBodyManipulator:WeldedLinkInd');
 warning('off','Drake:RigidBodyManipulator:UnsupportedJointLimits');
@@ -9,24 +11,16 @@ options.ignore_self_collisions = true;
 options.use_bullet = false;
 options.enable_fastqp = false;
 s = 'OneLegHopper.urdf';
-dt = 0.005;
+dt = 0.01;
 r = TimeSteppingRigidBodyManipulator(s,dt,options);
 r = r.setStateFrame(OneLegHopperState(r));
 r = r.setOutputFrame(OneLegHopperState(r));
 v = r.constructVisualizer();
 
-q0 = [0;0;.6;-1.2;.6+pi/2];
-x0 = [q0;0*q0];
-x0(2) = 1.0;
-% x0=0.1*randn(r.getNumStates,1);
-% x0(3) = 1.5;
+load hopper_iLQR_traj;
+utraj = utraj.setOutputFrame(r.getInputFrame);
+sys = cascade(utraj,r);
+xtraj_sim = simulate(sys,[0,xtraj.tspan(2)],xtraj.eval(0));
+v.playback(xtraj_sim,struct('slider',true));
 
-% Forward simulate dynamics with visulazation, then playback at realtime
-S=warning('off','Drake:DrakeSystem:UnsupportedSampleTime');
-output_select(1).system=1;
-output_select(1).output=1;
-sys = mimoCascade(r,v,[],[],output_select);
-warning(S);
-traj = simulate(sys,[0 2],x0);
-playback(v,traj,struct('slider',true));
-
+end

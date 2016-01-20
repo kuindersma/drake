@@ -262,7 +262,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       if obj.twoD
         num_d = 2;  
       else
-        num_d = 4;  
+        num_d = 4;
       end
       num_q = obj.manip.getNumPositions;
       num_v = obj.manip.getNumVelocities;
@@ -278,9 +278,11 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       [H,C,B] = manipulatorDynamics(obj.manip,q,v);
       [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
       
-      contact_threshold = 1e-3;
+      active_threshold = 1e-1;
+      contact_threshold = 1e-4;
       
-      active = find(phi < contact_threshold);
+      active = find(phi < active_threshold);
+      phi = phi(active);
       
       if isempty(active)
         vn = v + H\(B*u-C)*h;
@@ -304,10 +306,10 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           Jt_cell{i} = J'*I(idx,:)'; % Jacobian transpose for the ith contact
           V_cell{i} = V*I(idx,:)'; % basis vectors for ith contact
           Iz_cell{i} = Iactive((i-1)*num_d+(1:num_d),:); % selection matrix for basis forces and velocities
-%           if phi(active(i))<-1e-4
-%             v_min(i) = -phi(active(i))/(10*h);
-%           elseif phi(active(i))>1e-7
-%             v_min(i) = -phi(active(i))/h;
+%           if phi(i)<-1e-4
+%             v_min(i) = -phi(i)/(10*h);
+%           elseif phi(i)>contact_threshold
+%             v_min(i) = -phi(i)/h;
 %           else
             v_min(i) = 0;
 %           end
@@ -318,18 +320,28 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         A = J*vToqdot*Hinv*vToqdot'*J';
         c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
 
-%         phi_max = 1e-3; % m, max contact force distance
-%         R_min = 1e-7;
-%         R_max = 1e-5;
-%         R = zeros(num_z,1);
-%         R(phi(active)>phi_max) = R_max;
-%         R(phi(active)<0) = R_min;
-%         R(0 <= phi(active) <= phi_max) = R_min + (R_max - R_min);
-%         R = diag(R);
-        R = 1e-3*eye(num_z);
+        phi_max = 1e-1; % m, max contact force distance
+        R_min = 1e-4; 
+        R_max = 1e3;
+        r = zeros(num_active,1);
+        r(phi>phi_max) = R_max;
+        r(phi<contact_threshold) = R_min;
+        ind = (phi >= 0) & (phi <= phi_max);
+        r(ind) = R_min + (R_max - R_min)*(phi(ind)./phi_max);
+        r = repmat(r,1,num_d)';
+        R = diag(r(:)');
+%         R = 1e-3*eye(num_z);
 
+  
+        num_params = num_active + num_z;
+        Iz = zeros(num_z,num_params); 
+        Iz(:,1:num_z) = eye(num_z);
+        Is = zeros(num_active,num_params); 
+        Is(:,num_z+(1:num_active)) = eye(num_active);
+
+        W = 1e10*eye(num_active);
         try
-          Q = 0.5*(A+R);
+          Q = 0.5*Iz'*(A+R)*Iz + Is'*W*Is;
         catch
           keyboard
         end
@@ -345,23 +357,24 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           bin_{i} = v_min(i) - N*V_cell{i}*ci;
         end
 
-        Ain = sparse(vertcat(Ain_{:}));
+        Ain = sparse(vertcat(Ain_{:})*Iz + Is);
         bin = vertcat(bin_{:});
         Ain = Ain(bin~=inf,:);
         bin = bin(bin~=inf);
 
-        gurobi_options.outputflag = 0; % verbose flag
+        gurobi_options.outputflag = 1; % verbose flag
         gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
 
         try
           model.Q = sparse(Q);
-          model.obj = c;
-          model.A = 0*Ain;
-          model.rhs = 0*bin;
+          model.obj = [c;zeros(num_active,1)];
+          model.A = Ain;
+          model.rhs = bin;
           model.sense = repmat('>',length(bin),1);
-          model.lb = zeros(num_z,1);
+          model.lb = zeros(num_params,1);
           result = gurobi(model,gurobi_options);
-          f = result.x;
+          s = result.x(num_z+(1:num_active))
+          f = result.x(1:num_z);
         catch
           keyboard
           error('updateConvex failed.');

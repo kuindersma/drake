@@ -4,6 +4,7 @@ function runAtlasSagittalDynamics
 options.twoD = true;
 options.view = 'right';
 options.floating = true;
+options.use_bullet = false; 
 options.terrain = RigidBodyFlatTerrain();
 s = 'urdf/atlas_minimal_contact.urdf';
 dt = 0.005;
