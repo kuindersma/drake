@@ -20,10 +20,11 @@ u0 = .1*randn(nu,N);    % initial controls
 % run the optimization
 [xtraj, u, L, Vx, Vxx, cost, trace, stop]  = iLQG(DYNCST, x0, u0, Op);
 
-ddp = DifferentialDynamicProgramming(p,false);
-xtraj = ddp.reconstructStateTrajectory(xtraj,0,p.dt);
-pv.playback(xtraj,struct('slider',true));
+ts = linspace(0,T,N+1);
+xtraj = PPTrajectory(foh(ts,xtraj));
+xtraj = xtraj.setOutputFrame(p.getStateFrame);
 
+pv.playback(xtraj,struct('slider',true));
 
 function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = pend_dyn_cost(x,u,I)
   if nargout == 2

@@ -6,16 +6,16 @@ options.view = 'right';
 options.floating = true;
 options.use_bullet = false;
 options.terrain = RigidBodyFlatTerrain();
-s = 'urdf/atlas_minimal_contact.urdf';
-dt = 0.005;
+s = 'urdf/atlas_convex_hull.urdf';
+dt = 0.001;
 w = warning('off','Drake:RigidBodyManipulator:UnsupportedVelocityLimits');
 r = TimeSteppingRigidBodyManipulator(s,dt,options);
-r = r.removeCollisionGroupsExcept({'heel','toe','back','front','knee','butt'});
-r = compile(r);
+% r = r.removeCollisionGroupsExcept({'heel','toe','back','front','knee','butt'});
+% r = compile(r);
 warning(w);
 
 v = r.constructVisualizer;
-v.display_dt = 0.02;
+v.display_dt = 0.01;
 
 % Forward simulate dynamics with visulazation, then playback at realtime
 S=warning('off','Drake:DrakeSystem:UnsupportedSampleTime');

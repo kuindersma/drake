@@ -273,16 +273,17 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       num_c = obj.getNumContactPairs;
       
       q=x(1:num_q); 
-      v=x(num_q+(1:num_v));
-      vToqdot = obj.manip.vToqdot(q);
-      h = obj.timestep;
-
       kinematics_options.compute_gradients = nargout > 1;
       kinsol = doKinematics(obj, q, [], kinematics_options);
+
+      v=x(num_q+(1:num_v));
+      vToqdot = obj.manip.vToqdot(kinsol);
+      h = obj.timestep;
+
       [H,C,B] = manipulatorDynamics(obj.manip,q,v);
       [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
       
-      active_threshold = 1e-1;
+      active_threshold = 1e-2;
       contact_threshold = 1e-4;
       
       active = find(phi < active_threshold);
@@ -310,13 +311,13 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           Jt_cell{i} = J'*I(idx,:)'; % Jacobian transpose for the ith contact
           V_cell{i} = V*I(idx,:)'; % basis vectors for ith contact
           Iz_cell{i} = Iactive((i-1)*num_d+(1:num_d),:); % selection matrix for basis forces and velocities
-%           if phi(i)<-1e-4
-%             v_min(i) = -phi(i)/(10*h);
-%           elseif phi(i)>contact_threshold
-%             v_min(i) = -phi(i)/h;
-%           else
+          if phi(i)<-1e-6
+            v_min(i) = -phi(i)/h;
+          elseif phi(i)>contact_threshold
+            v_min(i) = -phi(i)/h;
+          else
             v_min(i) = 0;
-%           end
+          end
         end
         J = horzcat(Jt_cell{:})';
 
@@ -343,7 +344,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         Is = zeros(num_active,num_params); 
         Is(:,num_z+(1:num_active)) = eye(num_active);
 
-        W = 1e10*eye(num_active);
+        W = 1e5*eye(num_active);
         try
           Q = 0.5*Iz'*(A+R)*Iz + Is'*W*Is;
         catch
