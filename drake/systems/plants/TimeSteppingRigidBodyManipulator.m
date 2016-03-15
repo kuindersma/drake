@@ -283,7 +283,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       [H,C,B] = manipulatorDynamics(obj.manip,q,v);
       [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
       
-      active_threshold = 1e-2;
+      phi_max = 0.1; % m, max contact force distance
+      active_threshold = phi_max;
       contact_threshold = 1e-4;
       
       active = find(phi < active_threshold);
@@ -311,8 +312,9 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           Jt_cell{i} = J'*I(idx,:)'; % Jacobian transpose for the ith contact
           V_cell{i} = V*I(idx,:)'; % basis vectors for ith contact
           Iz_cell{i} = Iactive((i-1)*num_d+(1:num_d),:); % selection matrix for basis forces and velocities
-          if phi(i)<-1e-6
+          if phi(i)<-1e-3
             v_min(i) = -phi(i)/h;
+            v_min(i) = min(v_min(i),1.0);
           elseif phi(i)>contact_threshold
             v_min(i) = -phi(i)/h;
           else
@@ -325,69 +327,90 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         A = J*vToqdot*Hinv*vToqdot'*J';
         c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
 
-        phi_max = 1e-1; % m, max contact force distance
-        R_min = 1e-4; 
-        R_max = 1e3;
+        R_min = 0.1; 
+        R_max = 1000;
         r = zeros(num_active,1);
         r(phi>phi_max) = R_max;
-        r(phi<contact_threshold) = R_min;
+        r(phi<0) = R_min;
         ind = (phi >= 0) & (phi <= phi_max);
-        r(ind) = R_min + (R_max - R_min)*(phi(ind)./phi_max);
+        r(ind) = R_min + (R_max - R_min).*(phi(ind)./phi_max);
         r = repmat(r,1,num_d)';
         R = diag(r(:)');
-%         R = 1e-3*eye(num_z);
-
   
-        num_params = num_active + num_z;
-        Iz = zeros(num_z,num_params); 
-        Iz(:,1:num_z) = eye(num_z);
-        Is = zeros(num_active,num_params); 
-        Is(:,num_z+(1:num_active)) = eye(num_active);
+%         num_params = num_active + num_z;
+        num_params = num_z;
+%         Iz = zeros(num_z,num_params); 
+%         Iz(:,1:num_z) = eye(num_z);
+%         Is = zeros(num_active,num_params); 
+%         Is(:,num_z+(1:num_active)) = eye(num_active);
 
-        W = 1e5*eye(num_active);
+%         W = 1e2*eye(num_active);
         try
-          Q = 0.5*Iz'*(A+R)*Iz + Is'*W*Is;
+          Q = 0.5*(A+R);
+%           Q = 0.5*Iz'*(A+R)*Iz + Is'*W*Is;
         catch
           keyboard
         end
         % N*V*(A*z + c) - v_min \ge 0
-        Ain_ = cell(1,num_active);
-        bin_ = cell(1,num_active);
+        Ain = zeros(num_active,num_z);
+        bin = zeros(num_active,1);
         N = [0,0,1]; % extract normal component
         for i=1:num_active
-          Ji = Iz_cell{i}*J;
-          Ai = Ji*vToqdot*Hinv*vToqdot'*Ji';
-          ci = Ji*vToqdot*v + Ji*vToqdot*Hinv*(B*u-C)*h;
-          Ain_{i} = N*V_cell{i}*Ai*Iz_cell{i}; 
-          bin_{i} = v_min(i) - N*V_cell{i}*ci;
+          idx = (i-1)*num_d + (1:num_d);
+try
+  Ain(i,:) = N*(V_cell{i}*A(idx,:));
+          bin(i) = v_min(i) - N*(V_cell{i}*c(idx));
+
+catch
+    keyboard
+end
         end
+        
+%         Ain = sparse(vertcat(Ain_{:}));
+%         Ain = sparse(vertcat(Ain_{:})*Iz + Is);
+%         bin = vertcat(bin_{:});
+%         Ain = Ain(bin~=inf,:);
+%         bin = bin(bin~=inf);
 
-        Ain = sparse(vertcat(Ain_{:})*Iz + Is);
-        bin = vertcat(bin_{:});
-        Ain = Ain(bin~=inf,:);
-        bin = bin(bin~=inf);
-
-        gurobi_options.outputflag = 1; % verbose flag
+        gurobi_options.outputflag = 0; % verbose flag
         gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
 
-        try
+%         try
           model.Q = sparse(Q);
-          model.obj = [c;zeros(num_active,1)];
-          model.A = Ain;
+          model.obj = c;
+%           model.obj = [c;zeros(num_active,1)];
+          model.A = sparse(Ain);
           model.rhs = bin;
           model.sense = repmat('>',length(bin),1);
           model.lb = zeros(num_params,1);
           result = gurobi(model,gurobi_options);
-          s = result.x(num_z+(1:num_active))
-          f = result.x(1:num_z);
-        catch
-          keyboard
-          error('updateConvex failed.');
-        end;
+%           s = result.x(num_z+(1:num_active));
+          f = result.x(1:num_z)
+%         catch
+%           keyboard
+%           error('updateConvex failed.');
+%         end;
+%         
         
+%         global f_
+%         if isempty(f_)
+%           f_ = [];
+%         end
+                       
         vn = v + Hinv*((B*u-C)*h + vToqdot'*J'*f);
         qdn = vToqdot*vn;
         qn = q + qdn*h;
+%         f_ = [f_,f];
+        
+%         kinsol = doKinematics(obj, qn, [], kinematics_options);
+%         [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+%         [~,~,~,~,~,~,~,~,n] = contactConstraints(obj,kinsol,obj.multiple_contacts);
+%         v_actual = n*qdn;
+%         
+%         
+%          v_pred = Ain*f - bin + v_min;
+%          v_actual-v_pred
+        
       end
       
       % Find quaternion indices
@@ -428,7 +451,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         vn = Mvn*z + wvn;
       end      
       
-      vToqdot = obj.manip.vToqdot(q);
+      kinsol = doKinematics(obj,q);
+      vToqdot = obj.manip.vToqdot(kinsol);
       qdn = vToqdot*vn;
       qn = q+ h*qdn;
       % Find quaternion indices
@@ -525,12 +549,12 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         num_q = obj.manip.getNumPositions;
         num_v = obj.manip.getNumVelocities;
         q=x(1:num_q); v=x(num_q+(1:num_v));
-        vToqdot = obj.manip.vToqdot(q);
-        qd = vToqdot*v;
-        h = obj.timestep;
 
         kinematics_options.compute_gradients = nargout > 4;
         kinsol = doKinematics(obj, q, [], kinematics_options);
+        vToqdot = obj.manip.vToqdot(kinsol);
+        qd = vToqdot*v;
+        h = obj.timestep;
 
         if (nargout<5)
           [H,C,B] = manipulatorDynamics(obj.manip,q,v);

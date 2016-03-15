@@ -117,7 +117,7 @@ CMAKE_DEPENDENT_OPTION(WITH_XFOIL "use w/ XFOIL to compute aerodynamic coefficie
 ###########################################
 # External Projects that are OFF by default
 ###########################################
-option(WITH_SNOPT 		"nonlinear optimization solver; requires access to RobotLocomotion/snopt-pod")
+option(WITH_SNOPT 		"nonlinear optimization solver; requires access to RobotLocomotion/snopt-pod" ON)
 
 if (NOT WIN32) # many of these might work on win32 with little or no work... they just haven't been tried
 	option(WITH_AVL			"use w/ AVL to compute aerodynamic coefficients for airfoils")
