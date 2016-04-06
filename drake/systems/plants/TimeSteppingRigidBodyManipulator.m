@@ -264,14 +264,12 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       % qd_{k+1} = qd_{k} + H^{-1}*(B*u-C)*h + J'*f;
   
       if obj.twoD
-        dim = 2;
         num_d = 2;  
-        N = [0,1]; % extract normal component
       else
-        dim = 3;
         num_d = 4;
-        N = [0,0,1]; % extract normal component
       end
+      N = [0,0,1]; % extract normal component
+      dim = 3;
       num_q = obj.manip.getNumPositions;
       num_v = obj.manip.getNumVelocities;
       num_c = obj.getNumContactPairs;
@@ -290,9 +288,9 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       terrain_pts = getTerrainContactPoints(obj.manip);
       [~,Jp] = terrainContactPositions(obj.manip,kinsol,terrain_pts,true);
       
-      phi_max = 0.1; % m, max contact force distance
-      active_threshold = phi_max;
-      contact_threshold = 1e-4;
+      phi_max = 0.015; % m, max contact force distance
+      active_threshold = phi_max; % height below which contact forces are calculated
+      contact_threshold = 1e-3; % threshold where force penalties are eliminated (modulo regularization)
       
       active = find(phi < active_threshold);
       phi = phi(active);
@@ -301,29 +299,24 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         vn = v + H\(B*u-C)*h;
         qdn = vToqdot*vn;
         qn = q + qdn*h;
-        
+
       else
         num_active = length(active);
         num_beta = num_active*num_d; % coefficients for friction poly
-        num_f = num_active*dim; % 2D/3D contact forces
  
         V = horzcat(V{:});
         I = eye(num_c*num_d);
-        Iactive = eye(num_beta);
         Jt_cell = cell(1,num_active);
         V_cell = cell(1,num_active);
-        Ibeta_cell = cell(1,num_active);
         v_min = zeros(num_active,1);
         for i=1:num_active
           idx_beta = active(i):num_c:num_c*num_d;
           idx_f = (active(i)-1)*dim+(1:dim);
           Jt_cell{i} = Jp(idx_f,:)'; % Jacobian transpose for the ith contact
           V_cell{i} = V*I(idx_beta,:)'; % basis vectors for ith contact
-          Ibeta_cell{i} = Iactive((i-1)*num_d+(1:num_d),:); % selection matrix for basis forces and velocities
           if phi(i)<-1e-3
             v_min(i) = -phi(i)/h;
-            v_min(i) = min(v_min(i),0.25);
-%             v_min(i) = 0;
+            v_min(i) = min(v_min(i),0.1);
           elseif phi(i)>contact_threshold
             v_min(i) = -phi(i)/h;
           else
@@ -331,90 +324,58 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           end
         end
         J = horzcat(Jt_cell{:})';
-        Vblk = blkdiag(V_cell{:});
-        
-        if obj.twoD
-          Vblk(2:3:end,:) = [];
-        end
+        V = blkdiag(V_cell{:});
         
         Hinv = inv(H);
         A = J*vToqdot*Hinv*vToqdot'*J';
         c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
 
-        R_min = 0.0001; 
-        R_max = 100;
+        % contact smoothing matrix
+        R_min = 1e-2; 
+        R_max = 1e3;
         r = zeros(num_active,1);
         r(phi>phi_max) = R_max;
-        r(phi<0) = R_min;
-        ind = (phi >= 0) & (phi <= phi_max);
-        r(ind) = R_min + (R_max - R_min).*(phi(ind)./phi_max);
+        r(phi<contact_threshold) = R_min;
+        ind = (phi >= contact_threshold) & (phi <= phi_max);
+        y = (phi(ind)-contact_threshold)./(phi_max - contact_threshold)*2 - 1; % scale between -1,1
+        r(ind) = R_min + R_max./(1+exp(-10*y));
         r = repmat(r,1,dim)';
         R = diag(r(:)');
   
-%         num_params = num_active + num_z;
-        num_params = num_beta+num_f;
-        I_beta = zeros(num_beta,num_params);
-        I_beta(:,1:num_beta) = eye(num_beta);        
-        I_f = zeros(num_f,num_params);
-        I_f(:,num_beta+(1:num_f)) = eye(num_f);
-        
-%         Iz = zeros(num_z,num_params); 
-%         Iz(:,1:num_z) = eye(num_z);
-%         Is = zeros(num_active,num_params); 
-%         Is(:,num_z+(1:num_active)) = eye(num_active);
-
-%         W = 1e2*eye(num_active);
+        num_params = num_beta;
         try
-          Q = 0.5*I_f'*(A+R)*I_f;
-%           Q = 0.5*Iz'*(A+R)*Iz + Is'*W*Is;
+          Q = 0.5*V'*(A+R)*V;% + 1e-8*eye(num_params);
         catch
           keyboard
         end
-        % N*V*(A*z + c) - v_min \ge 0
+        % N*(A*z + c) - v_min \ge 0
         Ain = zeros(num_active,num_params);
         bin = zeros(num_active,1);
         for i=1:num_active
           idx = (i-1)*dim + (1:dim);
-          Ain(i,:) = N*A(idx,:)*I_f;
+          Ain(i,:) = N*A(idx,:)*V;
           bin(i) = v_min(i) - N*c(idx);
         end
-        
-        Aeq = Vblk*I_beta - I_f;
-        beq = zeros(num_f,1);
-        
-%         Ain = sparse(vertcat(Ain_{:}));
-%         Ain = sparse(vertcat(Ain_{:})*Iz + Is);
-%         bin = vertcat(bin_{:});
-%         Ain = Ain(bin~=inf,:);
-%         bin = bin(bin~=inf);
 
         gurobi_options.outputflag = 0; % verbose flag
         gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
 
         try
           model.Q = sparse(Q);
-          model.obj = I_f'*c;
-%           model.obj = [c;zeros(num_active,1)];
-          model.A = sparse([Ain;Aeq]);
-          model.rhs = [bin;beq];
-          model.sense = [repmat('>',length(bin),1); repmat('=',length(beq),1)];
-          model.lb = [zeros(num_beta,1);-inf(num_f,1)];
+          model.obj = V'*c;
+          model.A = sparse(Ain);
+          model.rhs = bin;
+          model.sense = repmat('>',length(bin),1);
+          model.lb = zeros(num_beta,1);
           result = gurobi(model,gurobi_options);
-%           s = result.x(num_z+(1:num_active));
-          f = I_f*result.x;
+          f = V*result.x;
         catch
           keyboard
         end;
-        
-%         global f_
-%         if isempty(f_)
-%           f_ = [];
-%         end
                        
         vn = v + Hinv*((B*u-C)*h + vToqdot'*J'*f);
         qdn = vToqdot*vn;
         qn = q + qdn*h;
-%         f_ = [f_,f];
         
 %         kinsol = doKinematics(obj, qn, [], kinematics_options);
 %         [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);

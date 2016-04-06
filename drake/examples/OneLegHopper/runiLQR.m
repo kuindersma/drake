@@ -11,7 +11,7 @@ options.ignore_self_collisions = true;
 options.use_bullet = false;
 options.enable_fastqp = false;
 s = 'OneLegHopper.urdf';
-dt = 0.01;
+dt = 0.005;
 r = TimeSteppingRigidBodyManipulator(s,dt,options);
 r = r.setStateFrame(OneLegHopperState(r));
 r = r.setOutputFrame(OneLegHopperState(r));
@@ -39,21 +39,22 @@ u0 = .1*randn(nu,N);    % initial controls
 
 
 xG = x0;
-xG(2) = xG(2) + 0.4;
+xG(2) = xG(2) + 0.1;
 
 % run the optimization
 [xtraj, utraj, L, Vx, Vxx, total_cost, trace, stop]  = iLQG(DYNCST, x0, u0, Op);
 
-ddp = DifferentialDynamicProgramming(r,false);
-xtraj = ddp.reconstructStateTrajectory(xtraj,0,dt);
-utraj = ddp.reconstructInputTrajectory(utraj,0,dt);
+
+ts = linspace(0,T,N+1);
+xtraj = PPTrajectory(foh(ts,xtraj));
+xtraj = xtraj.setOutputFrame(r.getStateFrame);
 v.playback(xtraj,struct('slider',true));
 
 save('hopper_iLQR_traj.mat','xtraj','utraj');
 
 function [g,dg,d2g] = cost(x,u)
-  Q = 0*diag([100*ones(nx/2,1); 1.0*ones(nx/2,1)]);
-  R = 0.01*eye(nu);
+  Q = diag([10*ones(nx/2,1); 0.001*ones(nx/2,1)]);
+  R = 0.1*eye(nu);
   
   g = (x-xG)'*Q*(x-xG) + u'*R*u;
   if nargout > 1
@@ -64,7 +65,7 @@ function [g,dg,d2g] = cost(x,u)
 end
 
 function [g,dg,d2g] = final_cost(x)
-  Q = diag([100*ones(nx/2,1); 1.0*ones(nx/2,1)]);
+  Q = diag([100*ones(nx/2,1); 10*ones(nx/2,1)]);
 
   g = (x-xG)'*Q*(x-xG);
   if nargout > 1
