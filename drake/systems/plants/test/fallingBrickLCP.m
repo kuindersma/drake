@@ -1,25 +1,22 @@
 function fallingBrickLCP
 
-options.floating = 'quat';
+options.floating = true;
 options.terrain = RigidBodyFlatTerrain();
 % options.ignore_self_collisions = true;
-% options.use_bullet = false;
+options.use_bullet = false;
 s = 'FallingBrickContactPoints.urdf';
 % s = 'FallingBrickBetterCollisionGeometry.urdf';
 p = TimeSteppingRigidBodyManipulator(s,.01,options);
-p = p.addRobotFromURDF(s,[],[],options);
+% p = p.addRobotFromURDF(s,[],[],options);
 % x0 = [0;1;2;rpy2quat(randn(3,1));randn(6,1)];
-x0 = [0;1;2;rpy2quat(randn(3,1));2;1;2;rpy2quat(randn(3,1));randn(12,1)];
-x0 = p.resolveConstraints(x0);
+x0 = [0;1;2;1.57;0;0;10;zeros(5,1)];
 
-if 0 
-  v = p.constructVisualizer();
-  sys = cascade(p,v);
-  sys.simulate([0 8],x0);
-  return;
-end
-
-v = p.constructVisualizer();
-v.drawWrapper(0,x0);
-xtraj = p.simulate([0 4],x0);
-v.playback(xtraj);
+% Forward simulate dynamics with visulazation, then playback at realtime
+v=p.constructVisualizer();
+S=warning('off','Drake:DrakeSystem:UnsupportedSampleTime');
+output_select(1).system=1;
+output_select(1).output=1;
+sys = mimoCascade(p,v,[],[],output_select);
+warning(S);
+traj = simulate(sys,[0 2],x0);
+playback(v,traj,struct('slider',true));

@@ -4,8 +4,9 @@ function runAtlasDynamics
 % Load the model with a floating base
 options.floating = true;
 options.dt = 0.001;
+options.use_bullet = false;
 options.terrain = RigidBodyFlatTerrain;
-r = Atlas('urdf/atlas_convex_hull.urdf',options);
+r = Atlas('urdf/atlas_minimal_contact.urdf',options);
 %r = r.removeCollisionGroupsExcept({'heel','toe','back','front','knee','butt'});
 r = compile(r);
 
@@ -16,7 +17,7 @@ v.display_dt = 0.02;
 % Compute a feasible set of initial conditions for the simulation (e.g. no
 % penetration)
 x0 = Point(r.getStateFrame);
-x0 = resolveConstraints(r,x0);
+x0 = resolveConstraints(r,double(x0));
 
 % Forward simulate dynamics with visulazation, then playback at realtime
 S=warning('off','Drake:DrakeSystem:UnsupportedSampleTime');

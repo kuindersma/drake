@@ -312,14 +312,15 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           Jt_cell{i} = J'*I(idx,:)'; % Jacobian transpose for the ith contact
           V_cell{i} = V*I(idx,:)'; % basis vectors for ith contact
           Iz_cell{i} = Iactive((i-1)*num_d+(1:num_d),:); % selection matrix for basis forces and velocities
-          if phi(i)<-1e-3
-            v_min(i) = -phi(i)/h;
-            v_min(i) = min(v_min(i),1.0);
-          elseif phi(i)>contact_threshold
-            v_min(i) = -phi(i)/h;
-          else
+%           if phi(i)<-1e-3
+% %             v_min(i) = -phi(i)/h;
+% %             v_min(i) = min(v_min(i),0.25);
+%             v_min(i) = 0;
+%           elseif phi(i)>contact_threshold
+%             v_min(i) = -phi(i)/h;
+%           else
             v_min(i) = 0;
-          end
+%           end
         end
         J = horzcat(Jt_cell{:})';
 
@@ -327,7 +328,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         A = J*vToqdot*Hinv*vToqdot'*J';
         c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
 
-        R_min = 0.1; 
+        R_min = 0.001; 
         R_max = 1000;
         r = zeros(num_active,1);
         r(phi>phi_max) = R_max;
@@ -357,13 +358,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         N = [0,0,1]; % extract normal component
         for i=1:num_active
           idx = (i-1)*num_d + (1:num_d);
-try
-  Ain(i,:) = N*(V_cell{i}*A(idx,:));
+          Ain(i,:) = N*(V_cell{i}*A(idx,:));
           bin(i) = v_min(i) - N*(V_cell{i}*c(idx));
-
-catch
-    keyboard
-end
         end
         
 %         Ain = sparse(vertcat(Ain_{:}));
@@ -375,7 +371,7 @@ end
         gurobi_options.outputflag = 0; % verbose flag
         gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
 
-%         try
+        try
           model.Q = sparse(Q);
           model.obj = c;
 %           model.obj = [c;zeros(num_active,1)];
@@ -385,12 +381,10 @@ end
           model.lb = zeros(num_params,1);
           result = gurobi(model,gurobi_options);
 %           s = result.x(num_z+(1:num_active));
-          f = result.x(1:num_z)
-%         catch
-%           keyboard
-%           error('updateConvex failed.');
-%         end;
-%         
+          f = result.x(1:num_z);
+        catch
+          keyboard
+        end;
         
 %         global f_
 %         if isempty(f_)
@@ -403,13 +397,12 @@ end
 %         f_ = [f_,f];
         
 %         kinsol = doKinematics(obj, qn, [], kinematics_options);
-%         [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
-%         [~,~,~,~,~,~,~,~,n] = contactConstraints(obj,kinsol,obj.multiple_contacts);
-%         v_actual = n*qdn;
-%         
-%         
-%          v_pred = Ain*f - bin + v_min;
-%          v_actual-v_pred
+        [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+        [~,~,~,~,~,~,~,~,n,D] = contactConstraints(obj,kinsol,obj.multiple_contacts);
+        v_actual = n*qdn
+
+        v_pred = Ain*f - bin + v_min;
+%         v_actual-v_pred
         
       end
       
