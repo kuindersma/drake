@@ -18,7 +18,7 @@ if nargout > 5,
 elseif nargout > 2,
   [phi,normal,d,~,~,~,~,mu,n,D] = contactConstraints(obj,varargin{:});
 else
-  [phi,normal,d] = contactConstraints(obj,varargin{:});
+  [phi,normal,d,~,~,~,~,mu] = contactConstraints(obj,varargin{:});
 end
 
 if nargout > 1,
