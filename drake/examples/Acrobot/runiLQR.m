@@ -5,16 +5,9 @@ warning('off','Drake:RigidBodyManipulator:WeldedLinkInd');
 warning('off','Drake:RigidBodyManipulator:UnsupportedJointLimits');
 options.twoD = true;
 options.view = 'right';
-options.terrain = RigidBodyFlatTerrain();
-options.floating = true;
-options.ignore_self_collisions = true;
-options.use_bullet = false;
-options.enable_fastqp = false;
-s = 'OneLegHopper.urdf';
-dt = 0.005;
+s = 'Acrobot.urdf';
+dt = 0.01;
 r = TimeSteppingRigidBodyManipulator(s,dt,options);
-r = r.setStateFrame(OneLegHopperState(r));
-r = r.setOutputFrame(OneLegHopperState(r));
 
 nx = r.getNumStates;
 nu = r.getNumInputs;
@@ -29,17 +22,47 @@ Op.lims = [r.umin, r.umax];
 Op.parallel = false;
 
 % optimization problem
-DYNCST  = @(x,u,i) hopper_dyn_cost(x,u);
-T = 1.0; % traj time
-N = T/dt; % horizon
-q0 = [0;0;.6;-1.2;.6+pi/2];
+DYNCST  = @(x,u,i) dyn_cost(x,u);
+T = 0.1; % traj time
+N = 1;%T/dt; % horizon
+q0 = [0;0];
 x0 = [q0;0*q0];
 x0 = double(r.resolveConstraints(x0));
 u0 = .1*randn(nu,N);    % initial controls
 
+xG = [pi;0;0;0];
 
-xG = x0;
-xG(2) = xG(2) + 0.1;
+
+% test gradients
+
+for j=1:10
+  xr = randn(nx,1);
+  ur = randn(nu,1);
+
+  [~,df1] = geval(@cost,xr,ur,struct('grad_method','numerical'));
+  [~,df2] = cost(xr,ur);
+
+  valuecheck(df1,df2,1e-4);
+
+  [~,df1] = geval(@final_cost,xr,struct('grad_method','numerical'));
+  [~,df2] = final_cost(xr);
+
+  valuecheck(df1,df2,1e-4);
+
+  xr = randn(nx,N+1);
+  ur = randn(nu,N+1);
+
+  [f1,df1] = geval(@tmp1,xr,struct('grad_method','numerical'));
+  [f2,df2] = tmp1(xr);
+keyboard
+
+  [f1,df1] = geval(@tmp2,xr,struct('grad_method','numerical'));
+  [f2,df2] = tmp2(xr);
+keyboard
+
+
+end
+
 
 % run the optimization
 [xtraj, utraj, L, Vx, Vxx, total_cost, trace, stop]  = iLQG(DYNCST, x0, u0, Op);
@@ -50,11 +73,9 @@ xtraj = PPTrajectory(foh(ts,xtraj));
 xtraj = xtraj.setOutputFrame(r.getStateFrame);
 v.playback(xtraj,struct('slider',true));
 
-save('hopper_iLQR_traj.mat','xtraj','utraj');
-
 function [g,dg,d2g] = cost(x,u)
-  Q = diag([10*ones(nx/2,1); 0.001*ones(nx/2,1)]);
-  R = 0.1*eye(nu);
+  Q = diag([100*ones(nx/2,1); 0.001*ones(nx/2,1)]);
+  R = 0.01*eye(nu);
   
   g = (x-xG)'*Q*(x-xG) + u'*R*u;
   if nargout > 1
@@ -74,7 +95,25 @@ function [g,dg,d2g] = final_cost(x)
   end
 end
 
-function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = hopper_dyn_cost(x,u,~)
+function [f,fx,fxx] = tmp1(x)
+  f = [];
+  for i=1:N+1
+    [f_,~] = dyn_cost(x(:,i),ur(:,i));
+    f = [f,f_];
+  end
+  [~,~,fx,~,fxx] = dyn_cost(x,ur);  
+end
+
+function [f,fu,fuu] = tmp2(u)
+  f = [];
+  for i=1:N+1
+    [f_,~] = dyn_cost(xr(:,i),u(:,i));
+    f = [f,f_];
+  end
+  [~,~,~,fu,~,fuu] = dyn_cost(xr,u);  
+end
+
+function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cost(x,u,~)
   if nargout == 2
     if size(x,2) > 1
       error('Dynamics are not vectorized');
