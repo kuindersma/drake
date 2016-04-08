@@ -5,7 +5,12 @@
  xsi:schemaLocation="http://drake.mit.edu ../../doc/drakeURDF.xsd" name="Acrobot">
 
   <link name="base_link">
-    <visual>
+   <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.1" />
+      <inertia ixx=".1" ixy="0" ixz="0" iyy=".1" iyz="0" izz=".1" />
+    </inertial>
+   <visual>
       <geometry>
         <box size="0.2 0.2 0.2" />
       </geometry>
@@ -52,7 +57,7 @@
     <visual>
       <origin xyz="0 0 -1" rpy="0 0 0" />
       <geometry>
-         <cylinder length="2.1" radius=".05" />
+        <cylinder length="2.1" radius=".05" />
       </geometry>
       <material name="blue">
         <color rgba="0 0 1 1" />
@@ -89,4 +94,5 @@
   </transmission>
   
   <frame name="hand" link="lower_link" xyz="0 0 -2.1" rpy="0 0 0" />
+
 </robot>

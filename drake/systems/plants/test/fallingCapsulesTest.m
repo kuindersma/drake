@@ -1,6 +1,6 @@
 function fallingCapsulesTest
 
-options.floating = 'quat';
+options.floating = true;
 options.terrain = RigidBodyFlatTerrain();
 N = 5;
 p = TimeSteppingRigidBodyManipulator('Capsule.urdf',.001,options);
@@ -21,8 +21,8 @@ v.drawWrapper(0,x0);
 x0 = p.resolveConstraints(x0,v);
 v.drawWrapper(0,x0);
 
-traj = simulate(p,[0 2],x0);
-v.playback(traj); %,struct('slider',true));
+traj = simulate(p,[0 1],x0);
+v.playback(traj,struct('slider',true));
 % function collisionDetectGradTest(visualize,n_debris)
 %   if nargin < 1
 %     visualize = false;
