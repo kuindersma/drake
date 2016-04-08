@@ -4,9 +4,9 @@ function runAtlasDynamics
 % Load the model with a floating base
 options.floating = true;
 options.dt = 0.001;
-options.use_bullet = false;
+options.use_bullet = true;
 options.terrain = RigidBodyFlatTerrain;
-r = Atlas('urdf/atlas_minimal_contact.urdf',options);
+r = Atlas('urdf/atlas_convex_hull.urdf',options);
 %r = r.removeCollisionGroupsExcept({'heel','toe','back','front','knee','butt'});
 r = compile(r);
 

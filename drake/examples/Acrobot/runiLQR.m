@@ -18,13 +18,13 @@ x_ind = 1:nx;
 u_ind = nx+(1:nu);
 
 % control limits
-Op.lims = [r.umin, r.umax];
+Op.lims = [10*r.umin, 10*r.umax];
 Op.parallel = false;
 
 % optimization problem
 DYNCST  = @(x,u,i) dyn_cost(x,u);
-T = 0.1; % traj time
-N = 1;%T/dt; % horizon
+T = 2.0; % traj time
+N = T/dt; % horizon
 q0 = [0;0];
 x0 = [q0;0*q0];
 x0 = double(r.resolveConstraints(x0));
@@ -34,34 +34,36 @@ xG = [pi;0;0;0];
 
 
 % test gradients
-
-for j=1:10
-  xr = randn(nx,1);
-  ur = randn(nu,1);
-
-  [~,df1] = geval(@cost,xr,ur,struct('grad_method','numerical'));
-  [~,df2] = cost(xr,ur);
-
-  valuecheck(df1,df2,1e-4);
-
-  [~,df1] = geval(@final_cost,xr,struct('grad_method','numerical'));
-  [~,df2] = final_cost(xr);
-
-  valuecheck(df1,df2,1e-4);
-
-  xr = randn(nx,N+1);
-  ur = randn(nu,N+1);
-
-  [f1,df1] = geval(@tmp1,xr,struct('grad_method','numerical'));
-  [f2,df2] = tmp1(xr);
-keyboard
-
-  [f1,df1] = geval(@tmp2,xr,struct('grad_method','numerical'));
-  [f2,df2] = tmp2(xr);
-keyboard
-
-
-end
+% 
+% for j=1:10
+%   xr = randn(nx,1);
+%   ur = randn(nu,1);
+% 
+%   [~,df1,ddf1] = geval(@cost,xr,ur,struct('grad_method','taylorvar'));
+%   [~,df2,ddf2] = cost(xr,ur);
+% 
+%   valuecheck(df1,df2,1e-4);
+%   valuecheck(reshape(ddf1,nx+nu,nx+nu),ddf2,1e-4);
+% 
+%   [~,df1,ddf1] = geval(@final_cost,xr,struct('grad_method','taylorvar'));
+%   [~,df2,ddf2] = final_cost(xr);
+% 
+%   valuecheck(df1,df2,1e-4);
+%   valuecheck(reshape(ddf1,nx,nx),ddf2,1e-4);
+% 
+%   xr = randn(nx,N+1);
+%   ur = randn(nu,N+1);
+% 
+%   [f1,df1] = geval(@tmp1,xr,struct('grad_method','numerical'));
+%   [f2,df2] = tmp1(xr);
+% keyboard
+% 
+%   [f1,df1] = geval(@tmp2,ur,struct('grad_method','numerical'));
+%   [f2,df2] = tmp2(ur);
+% keyboard
+% 
+% 
+% end
 
 
 % run the optimization
@@ -74,8 +76,8 @@ xtraj = xtraj.setOutputFrame(r.getStateFrame);
 v.playback(xtraj,struct('slider',true));
 
 function [g,dg,d2g] = cost(x,u)
-  Q = diag([100*ones(nx/2,1); 0.001*ones(nx/2,1)]);
-  R = 0.01*eye(nu);
+  Q = 0*diag([10*ones(nx/2,1); 0.001*ones(nx/2,1)]);
+  R = 0.001*eye(nu);
   
   g = (x-xG)'*Q*(x-xG) + u'*R*u;
   if nargout > 1
@@ -86,7 +88,7 @@ function [g,dg,d2g] = cost(x,u)
 end
 
 function [g,dg,d2g] = final_cost(x)
-  Q = diag([100*ones(nx/2,1); 10*ones(nx/2,1)]);
+  Q = 5*diag([100*ones(nx/2,1); 10*ones(nx/2,1)]);
 
   g = (x-xG)'*Q*(x-xG);
   if nargout > 1
@@ -95,23 +97,23 @@ function [g,dg,d2g] = final_cost(x)
   end
 end
 
-function [f,fx,fxx] = tmp1(x)
-  f = [];
-  for i=1:N+1
-    [f_,~] = dyn_cost(x(:,i),ur(:,i));
-    f = [f,f_];
-  end
-  [~,~,fx,~,fxx] = dyn_cost(x,ur);  
-end
-
-function [f,fu,fuu] = tmp2(u)
-  f = [];
-  for i=1:N+1
-    [f_,~] = dyn_cost(xr(:,i),u(:,i));
-    f = [f,f_];
-  end
-  [~,~,~,fu,~,fuu] = dyn_cost(xr,u);  
-end
+% function [f,fx,fxx] = tmp1(x)
+%   f = [];
+%   for i=1:N+1
+%     [f_,~] = dyn_cost(x(:,i),ur(:,i));
+%     f = [f,f_];
+%   end
+%   [~,~,fx,~,fxx] = dyn_cost(x,ur);  
+% end
+% 
+% function [f,fu,fuu] = tmp2(u)
+%   f = [];
+%   for i=1:N+1
+%     [f_,~] = dyn_cost(xr(:,i),u(:,i));
+%     f = [f,f_];
+%   end
+%   [~,~,~,fu,~,fuu] = dyn_cost(xr,u);  
+% end
 
 function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cost(x,u,~)
   if nargout == 2

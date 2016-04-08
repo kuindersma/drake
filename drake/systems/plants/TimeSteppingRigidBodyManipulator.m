@@ -219,12 +219,13 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 
       if (nargout<2)
         [H,C,B] = manipulatorDynamics(obj.manip,q,v);
-        [phi,~,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+        [phi,~,~,~,~,~,~,~,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+      
         J = vertcat(J{:}); % 2km x n
         tau =J'*z + B*u - C;
       else
         [H,C,B,dH,dC,dB] = manipulatorDynamics(obj.manip,q,v);
-        [phi,~,J,~,~,dJ] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+        [phi,~,~,~,~,~,~,~,J,dJ] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
         
         dJ = cellfun(@(A)reshape(A,num_c,num_q^2),dJ,'UniformOutput',false);
         dJ_ = vertcat(dJ{:});
@@ -253,7 +254,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     end
     
     
-    function [xdn,df] = updateConvex(obj,~,x,u)
+    function [xdn,df] = updateConvex(obj,t,x,u)
       % this function implement an update based on Todorov 2011, where
       % instead of solving the full SOCP, we make use of polyhedral
       % friction cone approximations and solve a QP.
@@ -268,7 +269,6 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       else
         num_d = 4;
       end
-      N = [0,0,1]; % extract normal component
       dim = 3;
       num_q = obj.manip.getNumPositions;
       num_v = obj.manip.getNumVelocities;
@@ -283,17 +283,33 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       h = obj.timestep;
 
       [H,C,B] = manipulatorDynamics(obj.manip,q,v);
-      [phi,V] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+      [phi,normal,V,xA,xB,idxA,idxB] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
       
-      terrain_pts = getTerrainContactPoints(obj.manip);
-      [~,Jp] = terrainContactPositions(obj.manip,kinsol,terrain_pts,true);
-      
-      phi_max = 0.015; % m, max contact force distance
+      phi_max = 0.1; % m, max contact force distance
       active_threshold = phi_max; % height below which contact forces are calculated
       contact_threshold = 1e-3; % threshold where force penalties are eliminated (modulo regularization)
       
       active = find(phi < active_threshold);
       phi = phi(active);
+      normal = normal(:,active);
+
+%       if obj.manip.contact_options.use_bullet
+%         xpts = xB(:,active);
+%         idxB = idxB(active);
+%         [bodies,~,bind] = unique(idxB);
+% %         normal = -normal;
+%         vmult=1;
+%       else
+        xpts = [xA(:,active),xB(:,active)];
+        idx = [idxA(active),idxB(active)];
+        [bodies,~,bind] = unique(idx);
+    
+%       end
+      J = [];
+      for i=1:length(bodies)
+        [world_pts,Jb] = forwardKin(obj.manip,kinsol,bodies(i),xpts(:,bind==i));
+        J = [J; Jb];
+      end
       
       if isempty(active)
         vn = v + H\(B*u-C)*h;
@@ -301,20 +317,22 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         qn = q + qdn*h;
 
       else
+        
+
+        
         num_active = length(active);
         num_beta = num_active*num_d; % coefficients for friction poly
  
         V = horzcat(V{:});
         I = eye(num_c*num_d);
-        Jt_cell = cell(1,num_active);
         V_cell = cell(1,num_active);
         v_min = zeros(num_active,1);
         for i=1:num_active
           idx_beta = active(i):num_c:num_c*num_d;
-          idx_f = (active(i)-1)*dim+(1:dim);
-          Jt_cell{i} = Jp(idx_f,:)'; % Jacobian transpose for the ith contact
           V_cell{i} = V*I(idx_beta,:)'; % basis vectors for ith contact
+
           if phi(i)<-1e-3
+%             v_min(i) = 0;
             v_min(i) = -phi(i)/h;
             v_min(i) = min(v_min(i),0.1);
           elseif phi(i)>contact_threshold
@@ -323,9 +341,11 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
             v_min(i) = 0;
           end
         end
-        J = horzcat(Jt_cell{:})';
-        V = blkdiag(V_cell{:});
-        
+        V1 = blkdiag(V_cell{:});
+        V2 = -V1;
+        V = blkdiag(V1,V2);
+        normal = [normal,-normal];
+
         Hinv = inv(H);
         A = J*vToqdot*Hinv*vToqdot'*J';
         c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
@@ -342,19 +362,19 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         r = repmat(r,1,dim)';
         R = diag(r(:)');
   
-        num_params = num_beta;
+        num_params = num_beta*2;
         try
-          Q = 0.5*V'*(A+R)*V;% + 1e-8*eye(num_params);
+          Q = 0.5*V'*(A)*V;% + 1e-8*eye(num_params);
         catch
           keyboard
         end
         % N*(A*z + c) - v_min \ge 0
-        Ain = zeros(num_active,num_params);
-        bin = zeros(num_active,1);
-        for i=1:num_active
+        Ain = zeros(num_active*2,num_params);
+        bin = zeros(num_active*2,1);
+        for i=1:num_active*2
           idx = (i-1)*dim + (1:dim);
-          Ain(i,:) = N*A(idx,:)*V;
-          bin(i) = v_min(i) - N*c(idx);
+          Ain(i,:) = normal(:,i)'*A(idx,:)*V;
+          bin(i) = 0 - normal(:,i)'*c(idx);
         end
 
         gurobi_options.outputflag = 0; % verbose flag
@@ -366,25 +386,32 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           model.A = sparse(Ain);
           model.rhs = bin;
           model.sense = repmat('>',length(bin),1);
-          model.lb = zeros(num_beta,1);
+          model.lb = zeros(num_params,1);
           result = gurobi(model,gurobi_options);
           f = V*result.x;
         catch
           keyboard
         end;
                        
+        
+%         vis=obj.constructVisualizer;
+%         figure(25)
+%         clf
+%         vis.draw(t,x)
+%         hold on;
+%         plot(world_pts(1,:),world_pts(3,:),'mo');
+%         for jj=1:size(world_pts,2)
+%           line([world_pts(1,jj), world_pts(1,jj)+0.25*normal(1,jj)],[world_pts(3,jj), world_pts(3,jj)+0.25*normal(3,jj)]);        
+%           line([world_pts(1,jj), world_pts(1,jj)+0.25*V(1,(jj-1)*num_d+1)],[world_pts(3,jj), world_pts(3,jj)+0.25*V(3,(jj-1)*num_d+1)]);        
+%           line([world_pts(1,jj), world_pts(1,jj)+0.25*V(1,(jj-1)*num_d+2)],[world_pts(3,jj), world_pts(3,jj)+0.25*V(3,(jj-1)*num_d+2)]);        
+%           line([world_pts(1,jj), world_pts(1,jj)+ f((jj-1)*num_d+1)] ,[world_pts(3,jj), world_pts(3,jj)+f((jj-1)*num_d+3)],'LineWidth',2,'Color',[1 0 0]);
+%         end
+%         hold off;
+        
         vn = v + Hinv*((B*u-C)*h + vToqdot'*J'*f);
         qdn = vToqdot*vn;
         qn = q + qdn*h;
-        
-%         kinsol = doKinematics(obj, qn, [], kinematics_options);
-%         [phi,V,J] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
-%         [~,~,~,~,~,~,~,~,n,D] = contactConstraints(obj,kinsol,obj.multiple_contacts);
-%         v_actual = n*qdn
-
-%         v_pred = Ain*f - bin + v_min;
-%         v_actual-v_pred
-        
+             
       end
       
       % Find quaternion indices
@@ -398,6 +425,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           qn(quat_positions(4:7,i)) = qn(quat_positions(4:7,i))/norm(qn(quat_positions(4:7,i)));
         end
       end
+      
+      t
       
       xdn = [qn;vn];
       df =[];
@@ -628,6 +657,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           else
             [phiC,normal,d,xA,xB,idxA,idxB,mu,n,D] = obj.manip.contactConstraints(kinsol, obj.multiple_contacts);
           end
+          phiC
+          
           if ~isempty(phiC)
               if isempty(possible_contact_indices)
                 possible_contact_indices = (phiC+h*n*qd) < obj.z_inactive_guess_tol;
