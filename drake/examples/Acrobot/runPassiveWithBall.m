@@ -6,7 +6,7 @@ options.view = 'right';
 options.terrain = RigidBodyFlatTerrain();
 
 
-r = TimeSteppingRigidBodyManipulator(PlanarRigidBodyManipulator('Acrobot.urdf'),.001,options);
+r = TimeSteppingRigidBodyManipulator(PlanarRigidBodyManipulator('AcrobotCollision.urdf'),.001,options);
 options.floating = true;
 r = r.addRobotFromURDF('../../systems/plants/test/ball.urdf',zeros(3,1),zeros(3,1), options);
 

@@ -293,18 +293,10 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       phi = phi(active);
       normal = normal(:,active);
 
-%       if obj.manip.contact_options.use_bullet
-%         xpts = xB(:,active);
-%         idxB = idxB(active);
-%         [bodies,~,bind] = unique(idxB);
-% %         normal = -normal;
-%         vmult=1;
-%       else
-        xpts = [xA(:,active),xB(:,active)];
-        idx = [idxA(active),idxB(active)];
-        [bodies,~,bind] = unique(idx);
-    
-%       end
+      xpts = [xA(:,active),xB(:,active)];
+      idx = [idxA(active),idxB(active)];
+      [bodies,~,bind] = unique(idx);
+
       J = [];
       for i=1:length(bodies)
         [world_pts,Jb] = forwardKin(obj.manip,kinsol,bodies(i),xpts(:,bind==i));
@@ -317,9 +309,6 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         qn = q + qdn*h;
 
       else
-        
-
-        
         num_active = length(active);
         num_beta = num_active*num_d; % coefficients for friction poly
  
@@ -345,6 +334,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         V2 = -V1;
         V = blkdiag(V1,V2);
         normal = [normal,-normal];
+        v_min = [v_min;v_min];
 
         Hinv = inv(H);
         A = J*vToqdot*Hinv*vToqdot'*J';
@@ -360,11 +350,11 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         y = (phi(ind)-contact_threshold)./(phi_max - contact_threshold)*2 - 1; % scale between -1,1
         r(ind) = R_min + R_max./(1+exp(-10*y));
         r = repmat(r,1,dim)';
-        R = diag(r(:)');
-  
+        R = diag([r(:)',r(:)']);
+
         num_params = num_beta*2;
         try
-          Q = 0.5*V'*(A)*V;% + 1e-8*eye(num_params);
+          Q = 0.5*V'*(A+R)*V;% + 1e-8*eye(num_params);
         catch
           keyboard
         end
@@ -374,7 +364,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         for i=1:num_active*2
           idx = (i-1)*dim + (1:dim);
           Ain(i,:) = normal(:,i)'*A(idx,:)*V;
-          bin(i) = 0 - normal(:,i)'*c(idx);
+          bin(i) = v_min(i) - normal(:,i)'*c(idx);
         end
 
         gurobi_options.outputflag = 0; % verbose flag
