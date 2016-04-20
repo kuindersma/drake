@@ -14,7 +14,7 @@ v = r.constructVisualizer;
 
 %acrobot_state = [0;-pi/2;0;-1];
 acrobot_pos = [0;0];
-acrobot_vel = -[.5;5];
+acrobot_vel = -[.75;7];
 ball_pos = [1.5;-.25;0];
 ball_vel = [0;-1;0];
 

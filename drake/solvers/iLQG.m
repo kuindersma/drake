@@ -85,7 +85,7 @@ defaults = {'lims',           [],...            control limits
             'Alpha',          10.^linspace(0,-3,11),... backtracking coefficients
             'tolFun',         1e-7,...          reduction exit criterion
             'tolGrad',        1e-4,...          gradient exit criterion
-            'maxIter',        100,...           maximum iterations            
+            'maxIter',        30,...           maximum iterations            
             'lambda',         1,...             initial value for lambda
             'dlambda',        1,...             initial value for dlambda
             'lambdaFactor',   1.6,...           lambda scaling factor
