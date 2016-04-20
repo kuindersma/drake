@@ -366,7 +366,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 
         num_params = num_beta;
         try
-          Q = 0.5*V'*(A+R*0)*V;% + 1e-8*eye(num_params);
+          Q = 0.5*V'*(A+R)*V + 1e-8*eye(num_params);
         catch
           keyboard
         end
@@ -379,23 +379,37 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           bin(i) = v_min(i) - normal(:,i)'*c(idx);
         end
 
-        gurobi_options.outputflag = 0; % verbose flag
-        gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
-
-        try
-          model.Q = sparse(Q);
-          model.obj = V'*c;
-          model.A = sparse(Ain*0);
-          model.rhs = bin*0;
-          model.sense = repmat('>',length(bin),1);
-          model.lb = zeros(num_params,1);
-          result = gurobi(model,gurobi_options);
-          f = V*result.x;
-        catch
-          keyboard
-        end;
-                       
+        Ain = 0*Ain; % TMP DEBUG
+        bin = 0*bin; % TMP DEBUG
         
+        Ain_fqp = full([Ain; -eye(num_params)]);
+        bin_fqp = [bin; zeros(num_params,1)];
+
+        [result_qp,info_fqp] = fastQPmex({Q},V'*c,Ain_fqp,bin_fqp,[],[],obj.LCP_cache.data.fastqp_active_set);
+        
+        if info_fqp<0
+          disp('calling gurobi');
+          model.LCP_cache.data.fastqp_active_set = [];
+          gurobi_options.outputflag = 0; % verbose flag
+          gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
+
+          try
+            model.Q = sparse(Q);
+            model.obj = V'*c;
+            model.A = sparse(Ain);
+            model.rhs = bin;
+            model.sense = repmat('>',length(bin),1);
+            model.lb = zeros(num_params,1);
+            result = gurobi(model,gurobi_options);
+            result_qp = result.x;
+          catch
+            keyboard
+          end;
+        end
+        f = V*result_qp;
+        active_set = find(abs(Ain_fqp*result_qp - bin_fqp)<1e-6);
+        obj.LCP_cache.data.fastqp_active_set = active_set;
+
 %         vis=obj.constructVisualizer;
 %         figure(25)
 %         clf

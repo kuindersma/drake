@@ -11,7 +11,7 @@ options.ignore_self_collisions = true;
 options.use_bullet = false;
 options.enable_fastqp = false;
 s = 'OneLegHopper.urdf';
-dt = 0.0025;
+dt = 0.001;
 r = TimeSteppingRigidBodyManipulator(s,dt,options);
 r = r.setStateFrame(OneLegHopperState(r));
 r = r.setOutputFrame(OneLegHopperState(r));
@@ -42,7 +42,7 @@ Op.plotFn = @plotfn;
 
 % optimization problem
 DYNCST  = @(x,u,i) hopper_dyn_cost(x,u);
-T = 1.0; % traj time
+T = 0.6; % traj time
 N = T/dt; % horizon
 q0 = [0;0;.6;-1.2;.6+pi/2];
 x0 = [q0;0*q0];
@@ -73,12 +73,12 @@ model.lb = [r.umin;zeros(nc,1)];
 model.ub = [r.umax;inf(nc,1)];
 result = gurobi(model,gurobi_options);
 u0 = Iu*result.x;
-u0 = repmat(u0,1,N);%.1*randn(nu,N);    % initial controls
+u0 = 0*repmat(u0,1,N);%.1*randn(nu,N);    % initial controls
 
 
-% xG = x0;
-% xG(2) = xG(2) + 0.25;
-xG = [-0.1; 0.63; 0.3; -1.3; 1.75; zeros(nq,1)];
+xG = x0;
+xG(2) = xG(2) + 0.3;
+% xG = [-0.1; 0.63; 0.3; -1.3; 1.75; zeros(nq,1)];
 
 % run the optimization
 [xtraj, utraj, L, Vx, Vxx, total_cost, trace, stop]  = iLQG(DYNCST, x0, u0, Op);
@@ -92,7 +92,7 @@ save('hopper_iLQR_traj.mat','xtraj','utraj');
 
 function [g,dg,d2g] = cost(x,u)
 %  Q = 0*diag([10*ones(nx/2,1); 0.001*ones(nx/2,1)]);
-  Q = diag([[1 10 .1 .1 .1]'; 0.001*ones(nx/2,1)]);
+  Q = diag([[1 100 0 0 0]'; 0.001*ones(nx/2,1)]);
   R = 0.01*eye(nu);
   
   g = (x-xG)'*Q*(x-xG) + u'*R*u;
@@ -105,7 +105,7 @@ end
 
 function [g,dg,d2g] = final_cost(x)
 %  Q = 10*diag([10*ones(nx/2,1); 1*ones(nx/2,1)]);
-  Q = diag([[10 100 1 1 1]'; 0.1*ones(nx/2,1)]);
+  Q = diag([[1 1000 0 0 0]'; 0.001*ones(nx/2,1)]);
 
   g = (x-xG)'*Q*(x-xG);
   if nargout > 1

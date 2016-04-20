@@ -1,11 +1,11 @@
-function fallingCapsulesTest2D
+function fallingBallsTest2D
 
 options.floating = true;
 options.terrain = RigidBodyFlatTerrain();
 options.twoD = true;
 N = 2;
 p = TimeSteppingRigidBodyManipulator('ball.urdf',.001,options);
-for i=2:N,
+for i=2:N
   options.namesuffix = num2str(N);
   p = p.addRobotFromURDF('ball.urdf',[],[],options);
 end
