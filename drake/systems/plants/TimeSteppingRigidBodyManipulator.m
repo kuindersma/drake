@@ -285,7 +285,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       [phi,normal,V,xA,xB,idxA,idxB] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
       num_c = length(phi);
       
-      phi_max = 0.01; % m, max contact force distance
+      phi_max = 0.05; % m, max contact force distance
       active_threshold = phi_max; % height below which contact forces are calculated
       contact_threshold = 1e-3; % threshold where force penalties are eliminated (modulo regularization)
       
@@ -352,8 +352,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
 
         % contact smoothing matrix
-        R_min = 1e-2; 
-        R_max = 1e3;
+        R_min = 1e-1; 
+        R_max = 1e2;
         r = zeros(num_active,1);
         r(phi>phi_max) = R_max;
         r(phi<contact_threshold) = R_min;
