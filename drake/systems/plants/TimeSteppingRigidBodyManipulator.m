@@ -353,7 +353,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 
         % contact smoothing matrix
         R_min = 1e-1; 
-        R_max = 1e2;
+        R_max = 1e3;
         r = zeros(num_active,1);
         r(phi>phi_max) = R_max;
         r(phi<contact_threshold) = R_min;

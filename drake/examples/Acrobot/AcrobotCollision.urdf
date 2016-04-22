@@ -18,11 +18,11 @@
         <color rgba="0 1 0 1" />
       </material>
     </visual>
-   <collision>
+<!--    <collision>
       <geometry>
          <box size=".2 .2 .2" />
       </geometry>
-    </collision>
+    </collision> -->
   </link>
 
   <link name="upper_link">
@@ -40,13 +40,12 @@
         <color rgba="1 0 0 1" />
       </material>
     </visual>
-    <collision>
+   <!--  <collision>
       <geometry>
         <origin xyz="0 0 -.5" rpy="0 0 0" />
-        <!-- <capsule length="1.1" radius=".05" /> -->
          <box size=".1 .1 1.1" />
       </geometry>
-    </collision>
+    </collision> -->
   </link>
 
   <link name="lower_link">

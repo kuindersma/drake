@@ -11,7 +11,7 @@ options.ignore_self_collisions = true;
 options.use_bullet = false;
 options.enable_fastqp = false;
 
-dt = 0.005;
+dt = 0.0025;
 m = PlanarRigidBodyManipulator('KneedCompassGait.urdf', options);
 r = TimeSteppingRigidBodyManipulator(m,dt);
 
@@ -25,7 +25,7 @@ x_ind = 1:nx;
 u_ind = nx+(1:nu);
 
 % control limits
-% Op.lims = [r.umin, r.umax];
+Op.lims = [r.umin, r.umax];
 Op.parallel = false;
 Op.regType = 1; % regularization type 1: q_uu+lambda*eye(); 2: V_xx+lambda*eye()
 Op.lambda = 1;
@@ -40,17 +40,22 @@ Op.plotFn = @plotfn;
 
 
 % optimization problem
-DYNCST  = @(x,u,i) dyn_cost(x,u);
+DYNCST  = @(x,u,i) dyn_cost(x,u,i);
 T = 1.0; % traj time
 N = T/dt; % horizon
 
 
-q0 = [0; 1; 0; 0;0;0;];
-% q0 = [0.009;0.997;-0.066;0.161;0.274;0.237];
+% q0 = [0; 1; 0; 0;0;0;];
+q0 = [0.009;0.997;-0.066;0.161;0.274;0.237];
 v0 = 0*q0;
-v0(1) = 0.0;
-% v0(5) = -0.1;
+
+qG = [0.3+0.009; 0.997; 2*0.066;0.161; -0.274;0.237];
+vG = 0*qG;
+
 x0 = [q0;v0];
+xG = [qG;vG];
+
+xtraj_kin = PPTrajectory(foh([0,T],[x0,xG]));
 
 % solve for fixed point
 kinsol = doKinematics(r, q0);
@@ -75,7 +80,7 @@ model.lb = [r.umin;zeros(nc,1)];
 model.ub = [r.umax;inf(nc,1)];
 result = gurobi(model,gurobi_options);
 u0 = Iu*result.x;
-u0 = repmat(u0,1,N) + 0.01*randn(nu,N);    % initial controls
+u0 = repmat(u0,1,N) + 0.0*randn(nu,N);    % initial controls
 
 % u0 = 0.1*randn(nu,N);    % initial controls
 
@@ -94,22 +99,22 @@ xtraj = PPTrajectory(foh(ts,xtraj));
 xtraj = xtraj.setOutputFrame(r.getStateFrame);
 v.playback(xtraj,struct('slider',true));
 
-function [g,dg,d2g] = cost(x,u)
-%   Q = diag([10*ones(nx/2,1); 0.1*ones(nx/2,1)]);
-  Q = diag([10;1;zeros(10,1)]);
+function [g,dg,d2g] = cost(x,u,i)
+  Q = diag([10*ones(nx/2,1); 0*ones(nx/2,1)]);
   R = 0.01*eye(nu);
-  
-  g = (x-xG)'*Q*(x-xG) + u'*R*u;
+
+  xt = xtraj_kin.eval(i./N * T);
+
+  g = (x-xt)'*Q*(x-xt) + u'*R*u;
   if nargout > 1
-    dg = [2*(x'*Q -xG'*Q), 2*u'*R];
+    dg = [2*(x'*Q -xt'*Q), 2*u'*R];
     d2g = [2*Q, zeros(nx,nu); 
            zeros(nu,nx), 2*R];
   end
 end
 
 function [g,dg,d2g] = final_cost(x)
-%   Q = diag([100*ones(nx/2,1); 1*ones(nx/2,1)]);
-  Q = diag([10;1;zeros(10,1)]);
+  Q = diag([100*ones(nx/2,1); 0.0001*ones(nx/2,1)]);
 
   g = (x-xG)'*Q*(x-xG);
   if nargout > 1
@@ -118,7 +123,7 @@ function [g,dg,d2g] = final_cost(x)
   end
 end
 
-function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cost(x,u,~)
+function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cost(x,u,n)
   if nargout == 2
     if size(x,2) > 1
       error('Dynamics are not vectorized');
@@ -128,7 +133,7 @@ function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cost(x,u,~)
       c = final_cost(x);
     else
       f = r.updateConvex(0,x,u);
-      c = cost(x,u);
+      c = cost(x,u,n);
     end
   else
     % x should be nx x N+1 where N is the trajectory length
@@ -150,7 +155,7 @@ function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cost(x,u,~)
         [~,dg,d2g] = final_cost(xi);
         % cu is 0
       else
-        [~,dg,d2g] = cost(xi,ui);
+        [~,dg,d2g] = cost(xi,ui,i);
         cu(:,i) = dg(u_ind);
         [~,df] = geval(@r.updateConvex,0,xi,ui,struct('grad_method','numerical'));
         fx(:,:,i) = full(df(:,1+x_ind)); % +1 to skip time argument

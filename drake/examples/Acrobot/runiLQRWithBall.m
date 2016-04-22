@@ -6,7 +6,7 @@ warning('off','Drake:RigidBodyManipulator:UnsupportedJointLimits');
 % options.use_bullet = true;
 options.view = 'right';
 % options.ignore_self_collisions = false;
-options.terrain = RigidBodyFlatTerrain();
+% options.terrain = RigidBodyFlatTerrain();
 
 dt = 0.005;
 r = TimeSteppingRigidBodyManipulator(PlanarRigidBodyManipulator('AcrobotCollision.urdf'),dt,options);
@@ -24,6 +24,14 @@ u_ind = nx+(1:nu);
 % control limits
 Op.lims = [10*r.umin, 10*r.umax];
 Op.parallel = false;
+Op.plotFn = @plotfn;
+
+  function plotfn(x)
+    ts = linspace(0,T,N+1);
+    xtraj = PPTrajectory(foh(ts,x));
+    xtraj = xtraj.setOutputFrame(r.getStateFrame);
+    v.playback(xtraj);
+  end
 
 % optimization problem
 DYNCST  = @(x,u,i) dyn_cost(x,u);
@@ -31,9 +39,9 @@ T = 1.0; % traj time
 N = T/dt; % horizon
 
 acrobot_pos = [0;0];
-acrobot_vel = -[.5;5];
-ball_pos = [1.5;-.25;0];
-ball_vel = [0;-1;0];
+acrobot_vel = -[.5;5]*0.1;
+ball_pos = [1.5;.5;0];
+ball_vel = [0;0;0];
 
 x0 = [acrobot_pos; ball_pos; acrobot_vel; ball_vel];
 % 
