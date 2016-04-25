@@ -285,7 +285,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       [phi,normal,V,xA,xB,idxA,idxB] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
       num_c = length(phi);
       
-      phi_max = 0.05; % m, max contact force distance
+      phi_max = 0.1; % m, max contact force distance
       active_threshold = phi_max; % height below which contact forces are calculated
       contact_threshold = 1e-3; % threshold where force penalties are eliminated (modulo regularization)
       
@@ -313,7 +313,16 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       end
       
       J = JA-JB;
-
+      
+%       nL = sum([obj.manip.joint_limit_min~=-inf;obj.manip.joint_limit_max~=inf]); % number of joint limits
+      [phiL,JL] = obj.manip.jointLimitConstraints(q);
+      possible_limit_indices = (phiL + h*JL*vToqdot*v) < active_threshold;
+      nL = sum(possible_limit_indices);
+      JL = JL(possible_limit_indices,:);
+      
+      J = [J;JL];
+      phi = [phi;phiL(possible_limit_indices)];
+      
       if isempty(active)
         vn = v + H\(B*u-C)*h;
         qdn = vToqdot*vn;
@@ -326,26 +335,17 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         V = horzcat(V{:});
         I = eye(num_c*num_d);
         V_cell = cell(1,num_active);
-        v_min = zeros(num_active,1);
-        for i=1:num_active
-          idx_beta = active(i):num_c:num_c*num_d;
-          V_cell{i} = V*I(idx_beta,:)'; % basis vectors for ith contact
-
+        v_min = zeros(length(phi),1);
+        for i=1:length(phi)
+          if i<=num_active
+            % is a contact point
+            idx_beta = active(i):num_c:num_c*num_d;
+            V_cell{i} = V*I(idx_beta,:)'; % basis vectors for ith contact
+          end
           v_min(i) =-phi(i)/h;
 %           v_min(i) = 0;
-
-          
-%           v_min(i) = min(v_min(i),0.5);
-%           if phi(i)<0
-%             v_min(i) = -phi(i)/h;
-%             v_min(i) = min(v_min(i),1.0);
-%           elseif phi(i)>0
-%             v_min(i) =-phi(i)/h;
-%           else
-%             v_min(i) = 0;
-%           end
         end
-        V = blkdiag(V_cell{:});
+        V = blkdiag(V_cell{:},eye(nL));
                 
         Hinv = inv(H);
         A = J*vToqdot*Hinv*vToqdot'*J';
@@ -364,19 +364,24 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %         R = diag([r(:)',r(:)']);
         R = diag(r(:));
 
-        num_params = num_beta;
+        num_params = num_beta+nL;
         try
-          Q = 0.5*V'*(A+R)*V + 1e-8*eye(num_params);
+          Q = 0.5*V'*(A)*V + 1e-8*eye(num_params);
         catch
           keyboard
         end
         % N*(A*z + c) - v_min \ge 0
-        Ain = zeros(num_active,num_params);
-        bin = zeros(num_active,1);
+        Ain = zeros(num_active+nL,num_params);
+        bin = zeros(num_active+nL,1);
         for i=1:num_active
           idx = (i-1)*dim + (1:dim);
           Ain(i,:) = normal(:,i)'*A(idx,:)*V;
           bin(i) = v_min(i) - normal(:,i)'*c(idx);
+        end
+        for i=1:nL
+          idx = num_active*dim + i;
+          Ain(i+num_active,:) = A(idx,:)*V;
+          bin(i+num_active) = v_min(i+num_active) - c(idx);
         end
 
         Ain = 0*Ain; % TMP DEBUG

@@ -39,7 +39,7 @@ T = 1.0; % traj time
 N = T/dt; % horizon
 
 acrobot_pos = [0;0];
-acrobot_vel = -[.5;5]*0.1;
+acrobot_vel = -[.5;5];
 ball_pos = [1.5;.5;0];
 ball_vel = [0;0;0];
 
