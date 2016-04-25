@@ -282,15 +282,15 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       h = obj.timestep;
 
       [H,C,B] = manipulatorDynamics(obj.manip,q,v);
-      [phi,normal,V,xA,xB,idxA,idxB] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
-      num_c = length(phi);
+      [phiC,normal,V,xA,xB,idxA,idxB] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+      num_c = length(phiC);
       
       phi_max = 0.1; % m, max contact force distance
       active_threshold = phi_max; % height below which contact forces are calculated
       contact_threshold = 1e-3; % threshold where force penalties are eliminated (modulo regularization)
       
-      active = find(phi < active_threshold);
-      phi = phi(active);
+      active = find(phiC < active_threshold);
+      phiC = phiC(active);
       normal = normal(:,active);
 
       Apts = xA(:,active);
@@ -321,7 +321,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       JL = JL(possible_limit_indices,:);
       
       J = [J;JL];
-      phi = [phi;phiL(possible_limit_indices)];
+      phiL = phiL(possible_limit_indices);
+      phi = [phiC;phiL];
       
       if isempty(active)
         vn = v + H\(B*u-C)*h;
@@ -355,18 +356,32 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         R_min = 1e-1; 
         R_max = 1e3;
         r = zeros(num_active,1);
-        r(phi>phi_max) = R_max;
-        r(phi<contact_threshold) = R_min;
-        ind = (phi >= contact_threshold) & (phi <= phi_max);
-        y = (phi(ind)-contact_threshold)./(phi_max - contact_threshold)*2 - 1; % scale between -1,1
+        r(phiC>phi_max) = R_max;
+        r(phiC<contact_threshold) = R_min;
+        ind = (phiC >= contact_threshold) & (phiC <= phi_max);
+        y = (phiC(ind)-contact_threshold)./(phi_max - contact_threshold)*2 - 1; % scale between -1,1
         r(ind) = R_min + R_max./(1+exp(-10*y));
         r = repmat(r,1,dim)';
 %         R = diag([r(:)',r(:)']);
         R = diag(r(:));
 
+        % joint limit smoothing matrix
+        W_min = 1e-1; 
+        W_max = 1e3;
+        w = zeros(nL,1);
+        w(phiL>phi_max) = W_max;
+        w(phiL<contact_threshold) = W_min;
+        ind = (phiL >= contact_threshold) & (phiL <= phi_max);
+        y = (phiL(ind)-contact_threshold)./(phi_max - contact_threshold)*2 - 1; % scale between -1,1
+        w(ind) = W_min + W_max./(1+exp(-10*y));
+        W = diag(w(:));
+        
+        R = blkdiag(R,W);
+        
+        
         num_params = num_beta+nL;
         try
-          Q = 0.5*V'*(A)*V + 1e-8*eye(num_params);
+          Q = 0.5*V'*(A+R)*V + 1e-8*eye(num_params);
         catch
           keyboard
         end
