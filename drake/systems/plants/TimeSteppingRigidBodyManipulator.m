@@ -19,6 +19,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     z_inactive_guess_tol = .01;
     multiple_contacts = false;
     gurobi_present = false;
+    update_convex = true;
   end
 
   methods
@@ -58,6 +59,12 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         obj.multiple_contacts = options.multiple_contacts;
       end
 
+      if isfield(options, 'update_convex')
+        typecheck(options.update_convex, 'logical');
+        obj.update_convex = options.update_convex;
+      end
+
+      
       if ~isfield(options,'enable_fastqp')
         obj.enable_fastqp = checkDependency('fastqp');
       else
@@ -282,14 +289,25 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       h = obj.timestep;
 
       [H,C,B] = manipulatorDynamics(obj.manip,q,v);
-      [phiC,normal,V,xA,xB,idxA,idxB] = contactConstraintsBV(obj,kinsol,obj.multiple_contacts);
+      [phiC,normal,d,xA,xB,idxA,idxB,mu,n] = contactConstraints(obj,kinsol,obj.multiple_contacts);
+
+      % TODO: clean up
+      nk = length(d);  
+      V = cell(1,2*nk);
+      muI = sparse(diag(mu));
+      norm_mat = sparse(diag(1./sqrt(1 + mu.^2)));
+      for k=1:nk,
+        V{k} = (normal + d{k}*muI)*norm_mat;
+        V{nk+k} = (normal - d{k}*muI)*norm_mat;
+      end
+      
       num_c = length(phiC);
       
       phi_max = 0.1; % m, max contact force distance
       active_threshold = phi_max; % height below which contact forces are calculated
       contact_threshold = 1e-3; % threshold where force penalties are eliminated (modulo regularization)
       
-      active = find(phiC < active_threshold);
+      active = find(phiC + h*n*vToqdot*v < active_threshold);
       phiC = phiC(active);
       normal = normal(:,active);
 
@@ -354,11 +372,11 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 
         % contact smoothing matrix
         R_min = 1e-1; 
-        R_max = 1e3;
+        R_max = 1e4;
         r = zeros(num_active,1);
-        r(phiC>phi_max) = R_max;
-        r(phiC<contact_threshold) = R_min;
-        ind = (phiC >= contact_threshold) & (phiC <= phi_max);
+        r(phiC>=phi_max) = R_max;
+        r(phiC<=contact_threshold) = R_min;
+        ind = (phiC > contact_threshold) & (phiC < phi_max);
         y = (phiC(ind)-contact_threshold)./(phi_max - contact_threshold)*2 - 1; % scale between -1,1
         r(ind) = R_min + R_max./(1+exp(-10*y));
         r = repmat(r,1,dim)';
@@ -369,17 +387,22 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         W_min = 1e-1; 
         W_max = 1e3;
         w = zeros(nL,1);
-        w(phiL>phi_max) = W_max;
-        w(phiL<contact_threshold) = W_min;
-        ind = (phiL >= contact_threshold) & (phiL <= phi_max);
+        w(phiL>=phi_max) = W_max;
+        w(phiL<=contact_threshold) = W_min;
+        ind = (phiL > contact_threshold) & (phiL < phi_max);
         y = (phiL(ind)-contact_threshold)./(phi_max - contact_threshold)*2 - 1; % scale between -1,1
         w(ind) = W_min + W_max./(1+exp(-10*y));
         W = diag(w(:));
         
         R = blkdiag(R,W);
         
-        
         num_params = num_beta+nL;
+        lambda_ub = zeros(num_params,1);
+        scale_fact = 1e3;
+        lambda_ub(1:num_beta) = repmat(max(0.001, scale_fact*(phi_max./phiC - 1.0)),1,num_d)';
+
+        lambda_ub(num_beta+(1:nL)) = max(0.001, scale_fact*(phi_max./phiL - 1.0));
+                
         try
           Q = 0.5*V'*(A+R)*V + 1e-8*eye(num_params);
         catch
@@ -399,16 +422,16 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           bin(i+num_active) = v_min(i+num_active) - c(idx);
         end
 
-        Ain = 0*Ain; % TMP DEBUG
-        bin = 0*bin; % TMP DEBUG
+%         Ain = 0*Ain; % TMP DEBUG
+%         bin = 0*bin; % TMP DEBUG
         
-        Ain_fqp = full([Ain; -eye(num_params)]);
-        bin_fqp = [bin; zeros(num_params,1)];
-
-        [result_qp,info_fqp] = fastQPmex({Q},V'*c,Ain_fqp,bin_fqp,[],[],obj.LCP_cache.data.fastqp_active_set);
+        Ain_fqp = full([Ain; -eye(num_params); eye(num_params)]);
+        bin_fqp = [bin; zeros(num_params,1); lambda_ub];
+ 
+%         [result_qp,info_fqp] = fastQPmex({Q},V'*c,Ain_fqp,bin_fqp,[],[],obj.LCP_cache.data.fastqp_active_set);
         
-        if info_fqp<0
-          disp('calling gurobi');
+        if 1 % info_fqp<0
+%           disp('calling gurobi');
           model.LCP_cache.data.fastqp_active_set = [];
           gurobi_options.outputflag = 0; % verbose flag
           gurobi_options.method = 1; % -1=automatic, 0=primal simplex, 1=dual simplex, 2=barrier
@@ -420,6 +443,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
             model.rhs = bin;
             model.sense = repmat('>',length(bin),1);
             model.lb = zeros(num_params,1);
+            model.ub = lambda_ub;
             result = gurobi(model,gurobi_options);
             result_qp = result.x;
           catch
@@ -480,9 +504,11 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       
     function [xdn,df] = update(obj,t,x,u)
       
-      [xdn,df] = updateConvex(obj,t,x,u);
-      return;
-
+      if obj.update_convex
+        [xdn,df] = updateConvex(obj,t,x,u);
+        return;
+      end
+      
       if (nargout>1)
         [obj,z,Mvn,wvn,dz,dMvn,dwvn] = solveLCP(obj,t,x,u);
       else
