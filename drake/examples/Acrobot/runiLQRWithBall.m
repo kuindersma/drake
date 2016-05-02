@@ -3,15 +3,20 @@ function runiLQRWithBall()
 warning('off','Drake:RigidBodyManipulator:UnsupportedContactPoints');
 warning('off','Drake:RigidBodyManipulator:WeldedLinkInd');
 warning('off','Drake:RigidBodyManipulator:UnsupportedJointLimits');
-% options.use_bullet = true;
 options.view = 'right';
-% options.ignore_self_collisions = false;
-% options.terrain = RigidBodyFlatTerrain();
+options.update_convex = true;
 
 dt = 0.005;
 r = TimeSteppingRigidBodyManipulator(PlanarRigidBodyManipulator('AcrobotCollision.urdf'),dt,options);
 options.floating = true;
 r = r.addRobotFromURDF('../../systems/plants/test/ball.urdf',zeros(3,1),zeros(3,1), options);
+
+% create LCP copy
+options.update_convex = false;
+rlcp = TimeSteppingRigidBodyManipulator(PlanarRigidBodyManipulator('AcrobotCollision.urdf'),dt,options);
+options.floating = true;
+rlcp = rlcp.addRobotFromURDF('../../systems/plants/test/ball.urdf',zeros(3,1),zeros(3,1), options);
+
 
 nx = r.getNumStates;
 nu = r.getNumInputs;
@@ -99,6 +104,24 @@ ts = linspace(0,T,N+1);
 xtraj = PPTrajectory(foh(ts,xtraj));
 xtraj = xtraj.setOutputFrame(r.getStateFrame);
 v.playback(xtraj,struct('slider',true));
+
+keyboard
+
+ts = linspace(0,T,N);
+utraj = PPTrajectory(foh(ts,utraj));
+utraj = utraj.setOutputFrame(r.getInputFrame);
+sys1 = cascade(utraj,r);
+
+traj1 = sys1.simulate([0,T],x0);
+v.playback(traj1,struct('slider',true));
+
+keyboard
+
+utraj = utraj.setOutputFrame(rlcp.getInputFrame);
+sys2 = cascade(utraj,rlcp);
+traj2 = sys2.simulate([0,T],x0);
+traj2 = traj2.setOutputFrame(r.getStateFrame);
+v.playback(traj2,struct('slider',true));
 
 function [g,dg,d2g] = cost(x,u)
   Q = 0*diag([10*ones(nx/2,1); 0.001*ones(nx/2,1)]);
