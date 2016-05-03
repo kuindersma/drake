@@ -448,8 +448,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %         Ain = 0*Ain; % TMP DEBUG
 %         bin = 0*bin; % TMP DEBUG
         
-        Ain_fqp = full([Ain; -eye(num_params); eye(num_params)]);
-        bin_fqp = [bin; zeros(num_params,1); lambda_ub];
+        Ain_fqp = full([-Ain; -eye(num_params); eye(num_params)]);
+        bin_fqp = [-bin; zeros(num_params,1); lambda_ub];
  
 %         [result_qp,info_fqp] = fastQPmex({Q},V'*c,Ain_fqp,bin_fqp,[],[],obj.LCP_cache.data.fastqp_active_set);
         
