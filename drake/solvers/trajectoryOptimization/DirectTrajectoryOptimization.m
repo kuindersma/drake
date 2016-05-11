@@ -83,7 +83,7 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
       obj = obj.addConstraint(BoundingBoxConstraint(zeros(N-1,1),inf(N-1,1)),obj.h_inds);
 
       % create constraints for dynamics and add them
-      obj = obj.addDynamicConstraints();
+%       obj = obj.addDynamicConstraints();
 
       % add control inputs as bounding box constraints
       if any(~isinf(plant.umin)) || any(~isinf(plant.umax))

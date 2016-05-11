@@ -76,7 +76,17 @@ classdef AcrobotPlant < Manipulator
         [df,d2f,d3f]= dynamicsGradients(obj,t,x,u,nargout-1);
       end
     end
-    
+
+    function [f,df] = dynamics_w(obj,t,x,u,w)
+      f = dynamics(obj,t,x,u+w);
+      if (nargout>1)
+        [f,df] = dynamics(obj,t,x,u+w);
+        nx = obj.getNumStates;
+        nu = obj.getNumInputs;
+        df = [df,df(:,1+nx+(1:nu))];
+      end
+    end
+
     function x = getInitialState(obj)
       x = .1*randn(4,1);
     end
@@ -87,6 +97,10 @@ classdef AcrobotPlant < Manipulator
     
     function n = getNumVelocities(obj)
       n = 2;
+    end
+    
+    function n = getNumDisturbances(obj)
+      n =1;
     end
     
     function [c,V]=balanceLQR(obj)
@@ -104,13 +118,118 @@ classdef AcrobotPlant < Manipulator
       end
     end
     
+    
+    
+    
+    
+    function [utraj,xtraj]=robustSwingUpTrajectory(obj)
+      x0 = zeros(4,1); 
+      xf = double(obj.xG);
+      tf0 = 4;
+      
+      N = 12;
+      M = 3;
+      d = linspace(-1,1,M);
+      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 6]);
+      disp('constructor done');
+      prog = prog.setDisturbances(d);
+      prog = prog.addStateConstraint(ConstantConstraint(x0),1);
+      prog = prog.addStateConstraint(ConstantConstraint(xf),N);
+      prog = prog.addRunningCost(@cost);
+      prog = prog.addFinalCost(@finalCost);
+      prog = prog.addRobustConstraints(@cost,@robust_cost);
+      
+      traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
+      
+      for attempts=1:10
+        disp('Running solve');
+        tic
+        [xtraj,utraj,z,F,info] = prog.solveTraj(tf0,traj_init);
+        toc
+        if info==1, break; end
+      end
+
+    
+      
+      function [g,dg] = cost(dt,x,u)
+        R = 1;
+        g = sum((R*u).*u,1);
+        dg = [zeros(1,1+size(x,1)),2*u'*R];
+        return;
+        
+        xd = repmat([pi;0;0;0],1,size(x,2));
+        xerr = x-xd;
+        xerr(1,:) = mod(xerr(1,:)+pi,2*pi)-pi;
+        
+        Q = diag([10,10,1,1]);
+        R = 100;
+        g = sum((Q*xerr).*xerr + (R*u).*u,1);
+        
+        if (nargout>1)
+          dgddt = 0;
+          dgdx = 2*xerr'*Q;
+          dgdu = 2*u'*R;
+          dg = [dgddt,dgdx,dgdu];
+        end
+      end
+      
+      
+      function [g,dg] = robust_cost(dt,x,u,w)
+        [g,dg] = cost(dt,x,u);
+        
+        W = eye(length(w));
+        g = g + w'*W*w;
+        dg = [dg, 2*w'*W];
+      end
+      
+      function [h,dh] = finalCost(t,x)
+        h = t;
+        dh = [1,zeros(1,size(x,1))];
+        return;
+        
+        xd = repmat([pi;0;0;0],1,size(x,2));
+        xerr = x-xd;
+        xerr(1,:) = mod(xerr(1,:)+pi,2*pi)-pi;
+        
+        Qf = 100*diag([10,10,1,1]);
+        h = sum((Qf*xerr).*xerr,1);
+        
+        if (nargout>1)
+          dh = [0, 2*xerr'*Qf];
+        end
+      end      
+    end
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     function [utraj,xtraj]=swingUpTrajectory(obj)
       x0 = zeros(4,1); 
       xf = double(obj.xG);
       tf0 = 4;
       
-      N = 21;
-      prog = DircolTrajectoryOptimization(obj,N,[2 6]);
+      N = 30;
+      prog = DirtranTrajectoryOptimization(obj,N,[2 6]);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
       prog = prog.addRunningCost(@cost);
@@ -125,6 +244,7 @@ classdef AcrobotPlant < Manipulator
         if info==1, break; end
       end
 
+      
       function [g,dg] = cost(dt,x,u)
         R = 1;
         g = sum((R*u).*u,1);
