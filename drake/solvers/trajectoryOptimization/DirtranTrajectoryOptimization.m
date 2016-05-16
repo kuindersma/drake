@@ -25,7 +25,7 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
         options = struct();
       end
       if ~isfield(options,'integration_method')
-        options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
+        options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
       end
       
       obj = obj@DirectTrajectoryOptimization(plant,N,duration,options);
@@ -99,9 +99,7 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
         obj = obj.addCost(running_cost,inds_i);
       end
     end
-  end
-  
-  methods (Access=protected)
+    
     function [f,df] = forward_constraint_fun(obj,h,x0,x1,u)
       nX = obj.plant.getNumStates();
       [xdot,dxdot] = obj.plant.dynamics(0,x0,u);

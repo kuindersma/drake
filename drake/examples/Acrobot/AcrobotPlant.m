@@ -127,10 +127,11 @@ classdef AcrobotPlant < Manipulator
       xf = double(obj.xG);
       tf0 = 4;
       
-      N = 12;
+      N = 50;
       M = 3;
-      d = linspace(-1,1,M);
-      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 6]);
+%       d=0;
+      d = linspace(-0.1,0.1,M);
+      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 5]);
       disp('constructor done');
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
@@ -139,22 +140,101 @@ classdef AcrobotPlant < Manipulator
       prog = prog.addFinalCost(@finalCost);
       prog = prog.addRobustConstraints(@cost,@robust_cost);
       
+      nx=4; nu=1; nw=1;
+%       for j=1:10
+%         hr = randn();
+%         xr = randn(nx,1);
+%         xr2 = randn(nx,1);
+%         ur = randn(nu,1);
+%         ur2 = randn(nu,1);
+%         wr = randn(nw,1);
+%         gr = randn();
+%         zi = abs(randn(M,1));
+%         zij = abs(randn());
+%       
+%         [~,df1] = geval(@cost,hr,xr,ur,struct('grad_method','taylorvar'));
+%         [~,df2] = cost(hr,xr,ur);
+%       
+%         valuecheck(df1,df2,1e-4);
+%       
+%         [~,df1] = geval(@robust_cost,hr,xr,ur,wr,struct('grad_method','taylorvar'));
+%         [~,df2] = robust_cost(hr,xr,ur,wr);
+%       
+%         valuecheck(df1,df2,1e-4);
+%       
+%         [~,df1] = geval(@finalCost,0,xr,struct('grad_method','taylorvar'));
+%         [~,df2] = finalCost(0,xr);
+%       
+%         valuecheck(df1,df2,1e-4);
+%         
+%         
+%         [~,df1] = geval(@prog.forward_constraint_fun,hr,xr,xr2,ur,wr,struct('grad_method','taylorvar'));
+%         [~,df2] = prog.forward_constraint_fun(hr,xr,xr2,ur,wr);
+%       
+%         valuecheck(df1,df2,1e-4);
+%         
+% 
+%         [~,df1] = geval(@prog.backward_constraint_fun,hr,xr,xr2,ur,wr,struct('grad_method','taylorvar'));
+%         [~,df2] = prog.backward_constraint_fun(hr,xr,xr2,ur,wr);
+%       
+%         valuecheck(df1,df2,1e-4);
+%         
+%         
+%         tmp1 = @(gamma,x0,x1,u0,u1,w1) prog.robust_constraint_fun(@cost,@robust_cost,1,gamma,x0,x1,u0,u1,w1);
+% 
+%         [~,df1] = geval(tmp1,gr,xr,xr2,ur,ur2,wr,struct('grad_method','taylorvar'));
+%         [~,df2] = tmp1(gr,xr,xr2,ur,ur2,wr);
+%       
+%         valuecheck(df1,df2,1e-4);
+%         
+%         tmp2 = @(gamma,x0,x1,u0,u1,w1,z) prog.complementarity_fun(@cost,@robust_cost,1,gamma,x0,x1,u0,u1,w1,z);
+% 
+%         [~,df1] = geval(tmp2,gr,xr,xr2,ur,ur2,wr,zij,struct('grad_method','taylorvar'));
+%         [~,df2] = tmp2(gr,xr,xr2,ur,ur2,wr,zij);
+%       
+%         valuecheck(df1,df2,1e-4);
+% 
+%         [~,df1] = geval(@prog.running_gamma_cost,gr,struct('grad_method','taylorvar'));
+%         [~,df2] = prog.running_gamma_cost(gr);
+%       
+%         valuecheck(df1,df2,1e-4);
+%         
+%         [~,df1] = geval(@prog.z_sum_constr,zi,struct('grad_method','taylorvar'));
+%         [~,df2] = prog.z_sum_constr(zi);
+%       
+%         valuecheck(df1,df2,1e-4);
+% 
+%         [~,df1] = geval(@prog.w_equality,wr,zi,struct('grad_method','taylorvar'));
+%         [~,df2] = prog.w_equality(wr,zi);
+%       
+%         valuecheck(df1,df2,1e-4);
+%         
+%         
+%       end
+% 
+%       keyboard
+%       
+%       
+%       
+%       
+      
+     
       traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
       
-      for attempts=1:10
+      for attempts=1:1
         disp('Running solve');
         tic
         [xtraj,utraj,z,F,info] = prog.solveTraj(tf0,traj_init);
         toc
         if info==1, break; end
       end
-
+%       keyboard
     
       
       function [g,dg] = cost(dt,x,u)
         R = 1;
         g = sum((R*u).*u,1);
-        dg = [zeros(1,1+size(x,1)),2*u'*R];
+        dg = [zeros(1,1+nx),2*u'*R];
         return;
         
         xd = repmat([pi;0;0;0],1,size(x,2));
@@ -184,7 +264,7 @@ classdef AcrobotPlant < Manipulator
       
       function [h,dh] = finalCost(t,x)
         h = t;
-        dh = [1,zeros(1,size(x,1))];
+        dh = [1,zeros(1,nx)];
         return;
         
         xd = repmat([pi;0;0;0],1,size(x,2));
@@ -201,35 +281,13 @@ classdef AcrobotPlant < Manipulator
     end
     
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     function [utraj,xtraj]=swingUpTrajectory(obj)
       x0 = zeros(4,1); 
       xf = double(obj.xG);
       tf0 = 4;
       
-      N = 30;
-      prog = DirtranTrajectoryOptimization(obj,N,[2 6]);
+      N = 50;
+      prog = DirtranTrajectoryOptimization(obj,N,[2 5]);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
       prog = prog.addRunningCost(@cost);
@@ -243,7 +301,6 @@ classdef AcrobotPlant < Manipulator
         toc
         if info==1, break; end
       end
-
       
       function [g,dg] = cost(dt,x,u)
         R = 1;
