@@ -14,10 +14,14 @@ classdef AcrobotPlant < Manipulator
     
     xG
     uG
+    w_max
   end
   
   methods
-    function obj = AcrobotPlant
+    function obj = AcrobotPlant(w_max)
+      if nargin < 1
+        w_max = 0;
+      end
       obj = obj@Manipulator(2,1);
       obj = setInputLimits(obj,-10,10);
 
@@ -35,6 +39,7 @@ classdef AcrobotPlant < Manipulator
 %      obj = setParamFrame(obj,CoordinateFrame('AcrobotParams',1,'p',...
 %        { 'lc2' }));
       obj = setParamLimits(obj,zeros(obj.getParamFrame.dim,1));
+      obj.w_max = w_max;
     end
 
     function [H,C,B] = manipulatorDynamics(obj,q,qd)
@@ -71,7 +76,9 @@ classdef AcrobotPlant < Manipulator
     % vectorized version?
     
     function [f,df,d2f,d3f] = dynamics(obj,t,x,u)
-      f = dynamics@Manipulator(obj,t,x,u);
+      
+      w = rand*(2*obj.w_max) - obj.w_max;
+      f = dynamics@Manipulator(obj,t,x,u+w);
       if (nargout>1)
         [df,d2f,d3f]= dynamicsGradients(obj,t,x,u,nargout-1);
       end
@@ -122,7 +129,7 @@ classdef AcrobotPlant < Manipulator
     
     
     
-    function [utraj,xtraj]=robustSwingUpTrajectory(obj)
+    function [utraj,xtraj]=robustSwingUpTrajectory(obj,disturbances)
       x0 = zeros(4,1); 
       xf = double(obj.xG);
       tf0 = 4;
@@ -130,7 +137,7 @@ classdef AcrobotPlant < Manipulator
       N = 50;
       M = 3;
 %       d=0;
-      d = linspace(-0.1,0.1,M);
+      d = linspace(-disturbances+eps,disturbances,M);
       prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 5]);
       disp('constructor done');
       prog = prog.setDisturbances(d);
@@ -228,7 +235,7 @@ classdef AcrobotPlant < Manipulator
         toc
         if info==1, break; end
       end
-%       keyboard
+      keyboard
     
       
       function [g,dg] = cost(dt,x,u)
@@ -257,7 +264,7 @@ classdef AcrobotPlant < Manipulator
       function [g,dg] = robust_cost(dt,x,u,w)
         [g,dg] = cost(dt,x,u);
         
-        W = eye(length(w));
+        W = 1e-7*eye(length(w));
         g = g + w'*W*w;
         dg = [dg, 2*w'*W];
       end
@@ -286,7 +293,7 @@ classdef AcrobotPlant < Manipulator
       xf = double(obj.xG);
       tf0 = 4;
       
-      N = 50;
+      N = 70;
       prog = DirtranTrajectoryOptimization(obj,N,[2 5]);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);

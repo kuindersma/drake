@@ -38,8 +38,8 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       nX = obj.nX;
       nU = obj.nU;
       nW = obj.nU;
-      nG = N;
-      nZ = M*N;
+      nG = N-1;
+      nZ = M*(N-1);
       
       num_vars = nH + N*(nX+nU+nW) + nG + nZ;
       obj.h_inds = (1:nH)';
@@ -54,6 +54,10 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       for i = 1:N
         if(i<N)
           x_names{i} = sprintf('h[%d]',i);
+          x_names{nH+(nX+nU+nW)*N+i} = sprintf('g%d[%d]',i);
+          for j = 1:M
+            x_names{nH+(nX+nU+nW)*N+nG+(i-1)*M+j} = sprintf('z%d[%d]',j,i);
+          end
         end
         for j = 1:nX
           x_names{nH+(i-1)*nX+j}=sprintf('x%d[%d]',j,i);
@@ -63,10 +67,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         end
         for j = 1:nW
           x_names{nH+(nX+nU)*N+(i-1)*nW+j} = sprintf('w%d[%d]',j,i);
-        end
-        x_names{nH+(nX+nU+nW)*N+i} = sprintf('g%d[%d]',i);
-        for j = 1:M
-          x_names{nH+(nX+nU+nW)*N+nG+(i-1)*M+j} = sprintf('z%d[%d]',j,i);
         end
       end
 
@@ -87,36 +87,47 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       nW = obj.nW;
       N = obj.N;
       M = obj.M;
+      nZ = M*(N-1);
       
       for i=1:N-1
         for j=1:M
-          % gabba lower bound constraint: gamma - ell \ge 0
+          % gamma lower bound constraint: gamma - ell \ge 0
           n_vars = 2*nX + 2*nU + nW + 1;
           inds = {obj.gamma_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1);obj.w_inds(:,i+1)};
           robust_bound_function_j = @(gamma,x0,x1,u0,u1,w1) obj.robust_constraint_fun(running_cost,running_cost_with_w,j,gamma,x0,x1,u0,u1,w1);
           constraint = FunctionHandleConstraint(0,inf,n_vars,robust_bound_function_j);
           obj = obj.addConstraint(constraint, inds);
-          % complementarity constraint: (gamma-ell)'z=0
-          n_vars = 2*nX + 2*nU + nW + 2;
-          inds = {obj.gamma_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1);obj.w_inds(:,i+1);obj.z_inds((i-1)*M+j)};
-          complementarity_fun_j = @(gamma,x0,x1,u0,u1,w1,zij) obj.complementarity_fun(running_cost,running_cost_with_w,j,gamma,x0,x1,u0,u1,w1,zij);
-          constraint = FunctionHandleConstraint(0,0,n_vars,complementarity_fun_j);
-          obj = obj.addConstraint(constraint, inds);
-          % bounds on z: 0 \le z \le 1
-          inds = {obj.z_inds((i-1)*M+j)};
-          constraint = BoundingBoxConstraint(0,1);
-          obj = obj.addConstraint(constraint, inds);
+%           % complementarity constraint: (gamma-ell)'z=0
+%           n_vars = 2*nX + 2*nU + nW + 2;
+%           inds = {obj.gamma_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1);obj.w_inds(:,i+1);obj.z_inds((i-1)*M+j)};
+%           complementarity_fun_j = @(gamma,x0,x1,u0,u1,w1,zij) obj.complementarity_fun(running_cost,running_cost_with_w,j,gamma,x0,x1,u0,u1,w1,zij);
+%           constraint = FunctionHandleConstraint(0,0,n_vars,complementarity_fun_j);
+%           obj = obj.addConstraint(constraint, inds);
         end
-        % Sum constraint on z: \sum_j zij = 1
-        inds = {obj.z_inds((i-1)*M+(1:M))};
-        constraint = FunctionHandleConstraint(1,1,M,@obj.z_sum_constr);
-        obj = obj.addConstraint(constraint, inds);
-        % equality constraint on wi: wi - \sum_j zij = 0
-        inds = {obj.w_inds(:,i);obj.z_inds((i-1)*M+(1:M))};
-        constraint = FunctionHandleConstraint(zeros(nW,1),zeros(nW,1),nW+M,@obj.w_equality);
-        obj = obj.addConstraint(constraint, inds);
-        
+          % complementarity constraint: (gamma-ell)'z=0
+          n_vars = 2*nX + 2*nU + nW + 1 + M;
+          inds = {obj.gamma_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1);obj.w_inds(:,i+1);obj.z_inds((i-1)*M+(1:M))};
+          complementarity_fun = @(gamma,x0,x1,u0,u1,w1,zi) obj.complementarity_fun(running_cost,running_cost_with_w,gamma,x0,x1,u0,u1,w1,zi);
+          constraint = FunctionHandleConstraint(0,0,n_vars,complementarity_fun);
+          obj = obj.addConstraint(constraint, inds);
+
+%           % complementarity constraint: (gamma-ell)'z=0
+%           inds = {obj.gamma_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1);obj.w_inds(:,i+1);obj.z_inds((i-1)*M+(1:M))};
+%           complementarity_fun = @(gamma,x0,x1,u0,u1,w1) obj.complementarity_fun(running_cost,running_cost_with_w,gamma,x0,x1,u0,u1,w1);
+%           constraint = NonlinearComplementarityConstraint(complementarity_fun,2*nX + 2*nU + nW + 1,M,2,0.1);
+%           obj = obj.addConstraint(constraint, inds);
+
+          
+          % Sum constraint on z: \sum_j zij = 1
+          inds = {obj.z_inds((i-1)*M+(1:M))};
+          constraint = FunctionHandleConstraint(1,1,M,@obj.z_sum_constr);
+          obj = obj.addConstraint(constraint, inds);
+          % equality constraint on wi: wi - \sum_j zij = 0
+          inds = {obj.w_inds(:,i);obj.z_inds((i-1)*M+(1:M))};
+          constraint = FunctionHandleConstraint(zeros(nW,1),zeros(nW,1),nW+M,@obj.w_equality);
+          obj = obj.addConstraint(constraint, inds);        
       end
+      obj = obj.addConstraint(BoundingBoxConstraint(zeros(nZ,1),ones(nZ,1)),obj.z_inds);
     end
     
     function obj = addDynamicConstraints(obj)
@@ -192,11 +203,33 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
             -dgw1(1+obj.nX+obj.nU+(1:obj.nW))];
     end
 
-    function [f,df] = complementarity_fun(obj,running_cost,running_cost_with_w,j,gamma,x0,x1,u0,u1,w1,zij)
-      [g,dg] = robust_constraint_fun(obj,running_cost,running_cost_with_w,j,gamma,x0,x1,u0,u1,w1);
-      f = g'*zij;
-      df = [dg*zij, g];
+%     function [f,df] = complementarity_fun(obj,running_cost,running_cost_with_w,j,gamma,x0,x1,u0,u1,w1,zij)
+%       [g,dg] = robust_constraint_fun(obj,running_cost,running_cost_with_w,j,gamma,x0,x1,u0,u1,w1);
+%       f = g'*zij;
+%       df = [dg*zij, g];
+%     end
+
+    function [f,df] = complementarity_fun(obj,running_cost,running_cost_with_w,gamma,x0,x1,u0,u1,w1,zi)
+      v = zeros(obj.M,1);
+      dv = [];
+      for j=1:obj.M
+        [g,dg] = robust_constraint_fun(obj,running_cost,running_cost_with_w,j,gamma,x0,x1,u0,u1,w1);
+        v(j) = g;
+        dv = [dv;dg];
+      end
+      f = v'*zi;
+      df = [zi'*dv, v'];
     end
+
+%     function [f,df] = complementarity_fun(obj,running_cost,running_cost_with_w,gamma,x0,x1,u0,u1,w1)
+%       f = zeros(obj.M,1);
+%       df = [];
+%       for j=1:obj.M
+%         [g,dg] = robust_constraint_fun(obj,running_cost,running_cost_with_w,j,gamma,x0,x1,u0,u1,w1);
+%         f(j) = g;
+%         df = [df;dg];
+%       end
+%     end
     
     function [f,df] = running_gamma_cost(~,gamma)
       f = gamma; % scalar
