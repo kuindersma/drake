@@ -85,12 +85,13 @@ classdef AcrobotPlant < Manipulator
     end
 
     function [f,df] = dynamics_w(obj,t,x,u,w)
-      f = dynamics(obj,t,x,u+w);
       if (nargout>1)
         [f,df] = dynamics(obj,t,x,u+w);
         nx = obj.getNumStates;
         nu = obj.getNumInputs;
         df = [df,df(:,1+nx+(1:nu))];
+      else
+        f = dynamics(obj,t,x,u+w);
       end
     end
 
@@ -134,11 +135,12 @@ classdef AcrobotPlant < Manipulator
       xf = double(obj.xG);
       tf0 = 4;
       
-      N = 10;
+      N = 11;
       M = 1;
       d=0;
 %       d = linspace(-disturbances+eps,disturbances,M);
-      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 5]);
+      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
+      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 5],options);
       disp('constructor done');
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
@@ -147,6 +149,7 @@ classdef AcrobotPlant < Manipulator
       prog = prog.addRunningCost(@running_cost);
       prog = prog.addFinalCost(@final_cost);
       prog = prog.addRobustConstraints(@robust_cost);
+      prog = prog.addRobustDynamicConstraints();
       
       nx=4; nu=1; nw=1;
 %       for j=1:10

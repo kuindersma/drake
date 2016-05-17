@@ -27,8 +27,8 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       obj.nW = plant.getNumDisturbances();
       obj = obj.setupRobustVariables(N,M);
       obj = obj.addDynamicConstraints;
-      obj = obj.addRobustDynamicConstraints;
-      obj = obj.addGammaCost;
+%       obj = obj.addRobustDynamicConstraints;
+%       obj = obj.addGammaCost;
     end
 
     function obj = addRobustStateConstraint(obj,constraint,time_index,x_indices)
@@ -64,7 +64,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       nG = N-1;
       nZ = M*(N-1);
       
-      num_vars = nH + N*(2*nX+nU+nW) + nG + nZ;
+      num_vars = nH + N*(2*nX+2*nU+nW) + nG + nZ;
       obj.h_inds = (1:nH)';
       obj.x_inds = reshape(nH + (1:nX*N),nX,N);
       obj.xr_inds = reshape(nH + nX*N+(1:nX*N),nX,N);
@@ -140,6 +140,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       end
       obj = obj.addConstraint(BoundingBoxConstraint(zeros(nZ,1),ones(nZ,1)),obj.z_inds);
       obj = obj.addConstraint(ConstantConstraint(zeros(nW,1)),obj.w_inds(:,N));
+%       obj = obj.addConstraint(ConstantConstraint(zeros(N*nW,1)),obj.w_inds);
       obj = obj.addConstraint(ConstantConstraint(zeros(nU,1)),obj.u_inds(:,N));
     end
     
@@ -148,38 +149,44 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       nU = obj.nU;
       nW = obj.nW;
       N = obj.N;
+
+%       n_vars = 2*nX + nU + 1;
+%       cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.forward_constraint_fun);
+
       
-      constraints = cell(N-1,1);
-      dyn_inds = cell(N-1,1);
+%       constraints = cell(N-1,1);
+%       dyn_inds = cell(N-1,1);
       
-      switch obj.options.integration_method
-        case DirtranTrajectoryOptimization.FORWARD_EULER
+%       switch obj.options.integration_method
+%         case DirtranTrajectoryOptimization.FORWARD_EULER
           n_vars = 2*nX + nU + nW + 1;
           cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.forward_robust_dynamics_fun);
-        case DirtranTrajectoryOptimization.BACKWARD_EULER
-          n_vars = 2*nX + nU + nW + 1;
-          cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.backward_robust_dynamics_fun);
-        case DirtranTrajectoryOptimization.MIDPOINT
-          n_vars = 2*nX + 2*nU + 2*nW + 1;
-          cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.midpoint_robust_dynamics_fun);
-        otherwise
-          error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
-      end
+%         case DirtranTrajectoryOptimization.BACKWARD_EULER
+%           n_vars = 2*nX + nU + nW + 1;
+%           cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.backward_robust_dynamics_fun);
+%         case DirtranTrajectoryOptimization.MIDPOINT
+%           n_vars = 2*nX + 2*nU + 2*nW + 1;
+%           cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.midpoint_robust_dynamics_fun);
+%         otherwise
+%           error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
+%       end
       
-      for i=1:obj.N-1,
-        switch obj.options.integration_method
-          case DirtranTrajectoryOptimization.FORWARD_EULER
-            dyn_inds{i} = {obj.h_inds(i);obj.xr_inds(:,i);obj.xr_inds(:,i+1);obj.u_inds(:,i);obj.w_inds(:,i)};
-          case DirtranTrajectoryOptimization.BACKWARD_EULER
-            dyn_inds{i} = {obj.h_inds(i);obj.xr_inds(:,i);obj.xr_inds(:,i+1);obj.u_inds(:,i);obj.w_inds(:,i)};
-          case DirtranTrajectoryOptimization.MIDPOINT
-            dyn_inds{i} = {obj.h_inds(i);obj.xr_inds(:,i);obj.xr_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1);obj.w_inds(:,i);obj.w_inds(:,i+1)};
-          otherwise
-            error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
-        end
-        constraints{i} = cnstr;
-        
-        obj = obj.addConstraint(constraints{i}, dyn_inds{i});
+      for i=1:N-1,
+%         switch obj.options.integration_method
+%           case DirtranTrajectoryOptimization.FORWARD_EULER
+            dyn_inds = {obj.h_inds(i);obj.xr_inds(:,i);obj.xr_inds(:,i+1);obj.u_inds(:,i);obj.w_inds(:,i)};
+%           case DirtranTrajectoryOptimization.BACKWARD_EULER
+%             dyn_inds{i} = {obj.h_inds(i);obj.xr_inds(:,i);obj.xr_inds(:,i+1);obj.u_inds(:,i);obj.w_inds(:,i)};
+%           case DirtranTrajectoryOptimization.MIDPOINT
+%             dyn_inds{i} = {obj.h_inds(i);obj.xr_inds(:,i);obj.xr_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1);obj.w_inds(:,i);obj.w_inds(:,i+1)};
+%           otherwise
+%             error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
+%         end
+%         constraints{i} = cnstr;
+
+%         dyn_inds = {obj.h_inds(i);obj.xr_inds(:,i);obj.xr_inds(:,i+1);obj.u_inds(:,i)};
+
+        obj = obj.addConstraint(cnstr, dyn_inds);
       end
     end
     
