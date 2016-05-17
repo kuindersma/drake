@@ -134,18 +134,19 @@ classdef AcrobotPlant < Manipulator
       xf = double(obj.xG);
       tf0 = 4;
       
-      N = 50;
-      M = 3;
-%       d=0;
-      d = linspace(-disturbances+eps,disturbances,M);
+      N = 10;
+      M = 1;
+      d=0;
+%       d = linspace(-disturbances+eps,disturbances,M);
       prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 5]);
       disp('constructor done');
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
-      prog = prog.addRunningCost(@cost);
-      prog = prog.addFinalCost(@finalCost);
-      prog = prog.addRobustConstraints(@cost,@robust_cost);
+      prog = prog.addRobustStateConstraint(ConstantConstraint(x0),1);
+      prog = prog.addRunningCost(@running_cost);
+      prog = prog.addFinalCost(@final_cost);
+      prog = prog.addRobustConstraints(@robust_cost);
       
       nx=4; nu=1; nw=1;
 %       for j=1:10
@@ -220,11 +221,7 @@ classdef AcrobotPlant < Manipulator
 %       end
 % 
 %       keyboard
-%       
-%       
-%       
-%       
-      
+
      
       traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
       
@@ -238,7 +235,7 @@ classdef AcrobotPlant < Manipulator
       keyboard
     
       
-      function [g,dg] = cost(dt,x,u)
+      function [g,dg] = running_cost(dt,x,u)
         R = 1;
         g = sum((R*u).*u,1);
         dg = [zeros(1,1+nx),2*u'*R];
@@ -260,31 +257,19 @@ classdef AcrobotPlant < Manipulator
         end
       end
       
-      
-      function [g,dg] = robust_cost(dt,x,u,w)
-        [g,dg] = cost(dt,x,u);
-        
+      function [g,dg] = robust_cost(x,xr,w)
         W = 1e-7*eye(length(w));
-        g = g + w'*W*w;
-        dg = [dg, 2*w'*W];
+        Qw = 1e-3*eye(nx);
+        xerr = x-xr;
+        g = xerr'*Qw*xerr + w'*W*w;
+        dg = [2*xerr'*Qw, -2*xerr'*Qw, 2*w'*W];
       end
       
-      function [h,dh] = finalCost(t,x)
+      function [h,dh] = final_cost(t,x)
         h = t;
         dh = [1,zeros(1,nx)];
-        return;
-        
-        xd = repmat([pi;0;0;0],1,size(x,2));
-        xerr = x-xd;
-        xerr(1,:) = mod(xerr(1,:)+pi,2*pi)-pi;
-        
-        Qf = 100*diag([10,10,1,1]);
-        h = sum((Qf*xerr).*xerr,1);
-        
-        if (nargout>1)
-          dh = [0, 2*xerr'*Qf];
-        end
-      end      
+      end
+     
     end
     
     
