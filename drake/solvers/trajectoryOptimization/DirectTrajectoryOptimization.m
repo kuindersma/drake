@@ -46,14 +46,11 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
 
     %#ok<*PROP>
 
-      if isscalar(durations), durations=[durations,durations]; end
       if nargin < 4
         options = struct();
       end
 
-      if ~isfield(options,'time_option')
-        options.time_option = 1;
-      end
+
       if ~plant.isTI
         error('Drake:DirectTrajectoryOptimization:UnsupportedPlant','Only time-invariant plants are currently supported');
       end
@@ -65,32 +62,7 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
       obj.options = options;
       obj.plant = plant;
 
-      obj = obj.setupVariables(N);
-
-      % Construct total time linear constraint
-      switch options.time_option
-        case 1 % all timesteps are constant
-          A_time = [ones(1,N-1);[eye(N-2) zeros(N-2,1)] - [zeros(N-2,1) eye(N-2)]];
-          time_constraint = LinearConstraint([durations(1);zeros(N-2,1)],[durations(2);zeros(N-2,1)],A_time);
-          obj = obj.addConstraint(time_constraint,obj.h_inds);
-        case 2 % all timesteps independent
-          A_time = ones(1,N-1);
-          time_constraint = LinearConstraint(durations(1),durations(2),A_time);
-          obj = obj.addConstraint(time_constraint,obj.h_inds);
-      end
-
-      % Ensure that all h values are non-negative
-      obj = obj.addConstraint(BoundingBoxConstraint(zeros(N-1,1),inf(N-1,1)),obj.h_inds);
-
-      % create constraints for dynamics and add them
-%       obj = obj.addDynamicConstraints();
-
-      % add control inputs as bounding box constraints
-      if any(~isinf(plant.umin)) || any(~isinf(plant.umax))
-        control_limit = BoundingBoxConstraint(repmat(plant.umin,N,1),repmat(plant.umax,N,1));
-        obj = obj.addConstraint(control_limit,obj.u_inds(:));
-      end
-
+  
     end
     
     function N = getN(obj)

@@ -149,7 +149,6 @@ classdef AcrobotPlant < Manipulator
       prog = prog.addRunningCost(@running_cost);
       prog = prog.addFinalCost(@final_cost);
       prog = prog.addRobustConstraints(@robust_cost);
-      prog = prog.addRobustDynamicConstraints();
       
       nx=4; nu=1; nw=1;
 %       for j=1:10

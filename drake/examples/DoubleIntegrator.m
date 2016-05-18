@@ -16,6 +16,21 @@ classdef DoubleIntegrator < LinearSystem
       g = x'*Q*x + u'*R*u;
     end
     
+    function d = getNumDisturbances(obj)
+      d=1;
+    end
+    
+    function [f,df] = dynamics_w(obj,t,x,u,w)
+      if (nargout>1)
+        [f,df] = dynamics(obj,t,x,u+w);
+        nx = obj.getNumStates;
+        nu = obj.getNumInputs;
+        df = [df,df(:,1+nx+(1:nu))];
+      else
+        f = dynamics(obj,t,x,u+w);
+      end
+    end
+    
     function v = constructVisualizer(obj)
       function draw(t,x)
         blockx = [-1, -1, 1, 1, -1];
@@ -196,7 +211,74 @@ classdef DoubleIntegrator < LinearSystem
       % solve the optimization problem (with 2 sec as the initial guess for
       % the duration)
       prog.solveTraj(2);
+    end
+    
+    
+    function robustDirtran(disturbances,M)
+
+      plant = DoubleIntegrator;
+      
+      x0 = [-2; -2];
+      xf = [0;0];
+      tf0 = 6;
+      
+      N = 15;
+      d = linspace(-disturbances,disturbances*.4,M);
+      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
+      prog = RobustDirtranTrajectoryOptimization(plant,N,M,[4 8],options);
+      disp('constructor done');
+      prog = prog.setDisturbances(d);
+      prog = prog.addStateConstraint(ConstantConstraint(x0),1);
+      prog = prog.addStateConstraint(ConstantConstraint(xf),N);
+      prog = prog.addRobustStateConstraint(ConstantConstraint(x0),1);
+      prog = prog.addRunningCost(@running_cost);
+      prog = prog.addRobustConstraints(@robust_cost);
+      
+      function [g,dg] = running_cost(dt,x,u)
+        g = dt; dg = [1,0*x',0*u']; % see geval.m for our gradient format
+      end
+      
+      function [g,dg] = robust_cost(x,xr,w)
+        W = 1e-4*eye(length(w));
+        Qw = eye(2);
+        xerr = x-xr;
+        g = xerr'*Qw*xerr + w'*W*w;
+        dg = [2*xerr'*Qw, -2*xerr'*Qw, 2*w'*W];
+      end
+      
+      % add a display function to draw the trajectory on every iteration
+      function displayStateTrajectory(t,x,u)
+        plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
+        axis([-5,1,-2.5,2.5]); axis equal;
+        drawnow;
+      end
+      prog = addTrajectoryDisplayFunction(prog,@displayStateTrajectory);
+   
+      
+     traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
+      
+      for attempts=1:1
+        disp('Running solve');
+        tic
+        [xtraj,utraj,z,F,info] = prog.solveTraj(tf0,traj_init);
+        toc
+        if info==1, break; end
+      end
+      
+      figure(2)
+      xs = z(prog.x_inds);
+      xrs = z(prog.xr_inds);
+      plot(xs(1,:),xs(2,:),'b.-','MarkerSize',10);
+      hold on;
+      plot(xrs(1,:),xrs(2,:),'r.-','MarkerSize',10);
+      hold off;
+      
+      
+      keyboard
+    
     end    
+  
+    
   end
   
 end
