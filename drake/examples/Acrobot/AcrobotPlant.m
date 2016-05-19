@@ -135,10 +135,10 @@ classdef AcrobotPlant < Manipulator
       xf = double(obj.xG);
       tf0 = 4;
       
-      N = 17;
-      M = 1;
-      d=0;
-%       d = linspace(-disturbances+eps,disturbances,M);
+      N = 30;
+      M = 2;
+%       d=0;
+      d = linspace(-disturbances+eps,disturbances,M);
       options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
       prog = RobustDirtranTrajectoryOptimization(obj,N,M,[3 6],options);
       disp('constructor done');
@@ -222,6 +222,17 @@ classdef AcrobotPlant < Manipulator
 %       end
 % 
 %       keyboard
+
+
+
+      
+      % add a display function to draw the trajectory on every iteration
+      function displayStateTrajectory(t,x,u)
+        plot(x(1,:),x(3,:),'b.-','MarkerSize',10);
+        drawnow;
+      end
+      prog = addTrajectoryDisplayFunction(prog,@displayStateTrajectory);
+   
 
      
       traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));

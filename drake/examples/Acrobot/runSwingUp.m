@@ -6,7 +6,7 @@ p = AcrobotPlant;
 
 % [utraj,xtraj] = swingUpTrajectory(p);
 
-disturbances = 0.5;
+disturbances = 0.1;
 
 [utraj,xtraj] = robustSwingUpTrajectory(p,disturbances);
 

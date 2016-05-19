@@ -233,6 +233,60 @@ classdef DoubleIntegrator < LinearSystem
       prog = prog.addRobustConstraints(@robust_cost);
         
       disp('constructor done');
+      
+      
+      
+      
+      
+      
+      
+      
+%       
+%       nx=2; nu=1; nw=1;
+%       for j=1:10
+%         hr = randn();
+%         xr = randn(nx,1);
+%         xr2 = randn(nx,1);
+%         ur = randn(nu,1);
+%         ur2 = randn(nu,1);
+%         wr = randn(nw,1);
+%         gr = randn();
+%       
+%         [~,df1] = geval(@running_cost,hr,xr,ur,struct('grad_method','taylorvar'));
+%         [~,df2] = running_cost(hr,xr,ur);
+%       
+%         valuecheck(df1,df2,1e-4);
+%       
+%         [~,df1] = geval(@robust_cost,xr,ur,wr,struct('grad_method','taylorvar'));
+%         [~,df2] = robust_cost(xr,ur,wr);
+%       
+%         valuecheck(df1,df2,1e-4);
+%         
+%         
+%         [~,df1] = geval(@prog.forward_robust_dynamics_fun,hr,xr,ur,ur2,wr,struct('grad_method','taylorvar'));
+%         [~,df2] = prog.forward_robust_dynamics_fun(hr,xr,ur,ur2,wr);
+%       
+%         valuecheck(df1,df2,1e-4);
+%         
+%         
+%         tmp1 = @(gamma,h,x0,x1,u,du) prog.robust_bound_fun(@robust_cost,1,gamma,h,x0,x1,u,du);
+% 
+%         [~,df1] = geval(tmp1,gr,hr,xr,xr2,ur,ur2,struct('grad_method','taylorvar'));
+%         [~,df2] = tmp1(gr,hr,xr,xr2,ur,ur2);
+%       
+%         valuecheck(df1,df2,1e-4);
+%         
+%       end
+% 
+%       keyboard
+
+      
+      
+      
+      
+      
+      
+      
 
       function [g,dg] = running_cost(dt,x,u)
         g = dt; dg = [1,0*x',0*u']; % see geval.m for our gradient format
@@ -264,15 +318,7 @@ classdef DoubleIntegrator < LinearSystem
         toc
         if info==1, break; end
       end
-      
-      figure(2)
-      xs = z(prog.x_inds);
-      dxs = z(prog.dx_inds);
-      plot(xs(1,:),xs(2,:),'b.-','MarkerSize',10);
-      hold on;
-      plot(xs(1,:)-dxs(1,:),xs(2,:)-dxs(2,:),'r.-','MarkerSize',10);
-      hold off;
-      
+     
       
       keyboard
     
