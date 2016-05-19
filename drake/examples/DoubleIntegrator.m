@@ -223,27 +223,27 @@ classdef DoubleIntegrator < LinearSystem
       tf0 = 6;
       
       N = 15;
-      d = linspace(-disturbances,disturbances*.4,M);
+      d = linspace(-disturbances+1e-2,disturbances,M);
       options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
       prog = RobustDirtranTrajectoryOptimization(plant,N,M,[4 8],options);
-      disp('constructor done');
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
-      prog = prog.addRobustStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addRunningCost(@running_cost);
       prog = prog.addRobustConstraints(@robust_cost);
-      
+        
+      disp('constructor done');
+
       function [g,dg] = running_cost(dt,x,u)
         g = dt; dg = [1,0*x',0*u']; % see geval.m for our gradient format
       end
       
-      function [g,dg] = robust_cost(x,xr,w)
-        W = 1e-4*eye(length(w));
-        Qw = eye(2);
-        xerr = x-xr;
-        g = xerr'*Qw*xerr + w'*W*w;
-        dg = [2*xerr'*Qw, -2*xerr'*Qw, 2*w'*W];
+      function [g,dg] = robust_cost(dx,du,w)
+        W = 0*eye(length(w));
+        Qw = 200*eye(2);
+        Rw = 0.1;
+        g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
+        dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
       end
       
       % add a display function to draw the trajectory on every iteration
@@ -267,10 +267,10 @@ classdef DoubleIntegrator < LinearSystem
       
       figure(2)
       xs = z(prog.x_inds);
-      xrs = z(prog.xr_inds);
+      dxs = z(prog.dx_inds);
       plot(xs(1,:),xs(2,:),'b.-','MarkerSize',10);
       hold on;
-      plot(xrs(1,:),xrs(2,:),'r.-','MarkerSize',10);
+      plot(xs(1,:)-dxs(1,:),xs(2,:)-dxs(2,:),'r.-','MarkerSize',10);
       hold off;
       
       

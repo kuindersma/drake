@@ -160,7 +160,7 @@ classdef NonlinearProgram
       obj.solver_options.snopt = struct();
       obj.solver_options.snopt.MajorIterationsLimit = 1000;
       obj.solver_options.snopt.MinorIterationsLimit = 500;
-      obj.solver_options.snopt.IterationsLimit = 10000;
+      obj.solver_options.snopt.IterationsLimit = 5000;
       obj.solver_options.snopt.MajorOptimalityTolerance = 1e-6;
       obj.solver_options.snopt.MajorFeasibilityTolerance = 1e-6;
       obj.solver_options.snopt.MinorFeasibilityTolerance = 1e-6;

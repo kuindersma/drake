@@ -135,17 +135,16 @@ classdef AcrobotPlant < Manipulator
       xf = double(obj.xG);
       tf0 = 4;
       
-      N = 11;
+      N = 17;
       M = 1;
       d=0;
 %       d = linspace(-disturbances+eps,disturbances,M);
       options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 5],options);
+      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[3 6],options);
       disp('constructor done');
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
-      prog = prog.addRobustStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addRunningCost(@running_cost);
       prog = prog.addFinalCost(@final_cost);
       prog = prog.addRobustConstraints(@robust_cost);
@@ -259,12 +258,12 @@ classdef AcrobotPlant < Manipulator
         end
       end
       
-      function [g,dg] = robust_cost(x,xr,w)
-        W = 1e-7*eye(length(w));
-        Qw = 1e-3*eye(nx);
-        xerr = x-xr;
-        g = xerr'*Qw*xerr + w'*W*w;
-        dg = [2*xerr'*Qw, -2*xerr'*Qw, 2*w'*W];
+      function [g,dg] = robust_cost(dx,du,w)
+        W = 0*eye(length(w));
+        Qw = 200*eye(4);
+        Rw = 0.1;
+        g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
+        dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
       end
       
       function [h,dh] = final_cost(t,x)
