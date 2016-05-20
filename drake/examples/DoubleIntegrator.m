@@ -223,7 +223,7 @@ classdef DoubleIntegrator < LinearSystem
       tf0 = 6;
       
       N = 15;
-      d = linspace(-disturbances+1e-2,disturbances,M);
+      d = linspace(-disturbances,disturbances,M);
       options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
       prog = RobustDirtranTrajectoryOptimization(plant,N,M,[4 8],options);
       prog = prog.setDisturbances(d);

@@ -1,4 +1,4 @@
-function runSwingUp()
+function runSwingUp(dist,M)
 %% runs trajectory optimization and animates open-loop playback
 
 p = AcrobotPlant;
@@ -6,9 +6,7 @@ p = AcrobotPlant;
 
 % [utraj,xtraj] = swingUpTrajectory(p);
 
-disturbances = 0.1;
-
-[utraj,xtraj] = robustSwingUpTrajectory(p,disturbances);
+[utraj,xtraj] = robustSwingUpTrajectory(p,dist,M);
 
 % Q = diag([100 100 10 10]);
 % R = 0.01;

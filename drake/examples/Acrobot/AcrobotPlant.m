@@ -130,17 +130,15 @@ classdef AcrobotPlant < Manipulator
     
     
     
-    function [utraj,xtraj]=robustSwingUpTrajectory(obj,disturbances)
+    function [utraj,xtraj]=robustSwingUpTrajectory(obj,disturbances,M)
       x0 = zeros(4,1); 
       xf = double(obj.xG);
       tf0 = 4;
       
       N = 30;
-      M = 2;
-%       d=0;
-      d = linspace(-disturbances+eps,disturbances,M);
+      d = linspace(-disturbances,disturbances,M);
       options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[3 6],options);
+      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 10],options);
       disp('constructor done');
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
@@ -248,7 +246,7 @@ classdef AcrobotPlant < Manipulator
     
       
       function [g,dg] = running_cost(dt,x,u)
-        R = 1;
+        R = 10;
         g = sum((R*u).*u,1);
         dg = [zeros(1,1+nx),2*u'*R];
         return;
@@ -271,7 +269,7 @@ classdef AcrobotPlant < Manipulator
       
       function [g,dg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
-        Qw = 200*eye(4);
+        Qw = 500*eye(4);
         Rw = 0.1;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
