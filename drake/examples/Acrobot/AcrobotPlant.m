@@ -41,6 +41,10 @@ classdef AcrobotPlant < Manipulator
       obj = setParamLimits(obj,zeros(obj.getParamFrame.dim,1));
       obj.w_max = w_max;
     end
+    
+    function obj = addDisturbanceBound(obj,dist)
+      obj.w_max = dist;
+    end
 
     function [H,C,B] = manipulatorDynamics(obj,q,qd)
       % keep it readable:
@@ -130,15 +134,14 @@ classdef AcrobotPlant < Manipulator
     
     
     
-    function [utraj,xtraj]=robustSwingUpTrajectory(obj,disturbances,M)
+    function [utraj,xtraj]=robustSwingUpTrajectory(obj,N,M,disturbances)
       x0 = zeros(4,1); 
       xf = double(obj.xG);
       tf0 = 4;
       
-      N = 30;
       d = linspace(-disturbances,disturbances,M);
-      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 10],options);
+      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
+      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[4 6],options);
       disp('constructor done');
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
@@ -283,13 +286,12 @@ classdef AcrobotPlant < Manipulator
     end
     
     
-    function [utraj,xtraj]=swingUpTrajectory(obj)
+    function [utraj,xtraj]=swingUpTrajectory(obj,N)
       x0 = zeros(4,1); 
       xf = double(obj.xG);
       tf0 = 4;
       
-      N = 70;
-      prog = DirtranTrajectoryOptimization(obj,N,[2 5]);
+      prog = DirtranTrajectoryOptimization(obj,N,[2 6]);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
       prog = prog.addRunningCost(@cost);

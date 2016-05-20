@@ -11,6 +11,8 @@ classdef PendulumPlant < SecondOrderSystem
     
     xG;
     uG;
+    w_max =0;
+
   end
   
   methods
@@ -38,8 +40,28 @@ classdef PendulumPlant < SecondOrderSystem
       qdd = (u - obj.m*obj.g*obj.lc*sin(q) - obj.b*qd)/obj.I;
     end
     
+    function obj = addDisturbanceBound(obj,dist)
+      obj.w_max = dist;
+    end
+
+    function n = getNumDisturbances(obj)
+      n =1;
+    end
+    
+    function [f,df] = dynamics_w(obj,t,x,u,w)
+      if (nargout>1)
+        [f,df] = dynamics(obj,t,x,u+w);
+        nx = obj.getNumStates;
+        nu = obj.getNumInputs;
+        df = [df,df(:,1+nx+(1:nu))];
+      else
+        f = dynamics(obj,t,x,u+w);
+      end
+    end
+    
     function [f,df,d2f,d3f]=dynamics(obj,t,x,u)
-      f=dynamics@SecondOrderSystem(obj,t,x,u);
+      w = rand*(2*obj.w_max) - obj.w_max;
+      f=dynamics@SecondOrderSystem(obj,t,x,u+w);
       if (nargout>1)
         [df,d2f,d3f]= dynamicsGradients(obj,t,x,u,nargout-1);
       end
@@ -73,6 +95,104 @@ classdef PendulumPlant < SecondOrderSystem
         V=regionOfAttraction(pp,V,options);
       end
     end
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    function [utraj,xtraj]=robustSwingUpTrajectory(obj,N,M,disturbances)
+      x0 = [0;0]; 
+      xf = double(obj.xG);
+      tf0 = 4;
+      
+      d = linspace(-disturbances,disturbances,M);
+      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
+      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 6],options);
+      disp('constructor done');
+      prog = prog.setDisturbances(d);
+      prog = prog.addStateConstraint(ConstantConstraint(x0),1);
+      prog = prog.addStateConstraint(ConstantConstraint(xf),N);
+      prog = prog.addRunningCost(@cost);
+      prog = prog.addFinalCost(@finalCost);
+      prog = prog.addRobustConstraints(@robust_cost);
+            
+      % add a display function to draw the trajectory on every iteration
+      function displayStateTrajectory(t,x,u)
+        plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
+        drawnow;
+      end
+      prog = addTrajectoryDisplayFunction(prog,@displayStateTrajectory);
+   
+      
+      traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
+      
+      for attempts=1:1
+        disp('Running solve');
+        tic
+        [xtraj,utraj,z,F,info] = prog.solveTraj(tf0,traj_init);
+        toc
+        if info==1, break; end
+      end
+      keyboard
+    
+      
+      function [g,dg] = cost(dt,x,u);
+        R = 10;
+        g = (R*u).*u;
+        
+        if (nargout>1)
+          dg = [zeros(1,3),2*u'*R];
+        end
+      end
+      
+      function [h,dh] = finalCost(tf,x)
+        h = tf;
+        if (nargout>1)
+          dh = [1, zeros(1,2)];
+        end
+      end
+      
+      
+      function [g,dg] = robust_cost(dx,du,w)
+        W = 0*eye(length(w));
+        Qw = 500*eye(2);
+        Rw = 0.1;
+        g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
+        dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
+      end
+      
+    
+     
+    end
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     function [utraj,xtraj]=swingUpTrajectory(obj,options)
       x0 = [0;0]; 

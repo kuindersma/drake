@@ -112,19 +112,54 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       
       for i=1:N-1
         for j=1:M
-          % gamma lower bound constraint: gamma - ell \ge 0
-          n_vars = 2*(1+nX+nU);
-          inds = {obj.gamma_inds(i); ...
-                  obj.h_inds(i); ...
-                  obj.x_inds(:,i); ...
-                  obj.x_inds(:,i+1); ...
-                  obj.u_inds(:,i); ...
-                  obj.du_inds((j-1)*nU+(1:nU),i)};
-          
-          robust_bound_function_j = @(gamma,h,x0,x1,u,du) obj.robust_bound_fun(robust_cost,j,gamma,h,x0,x1,u,du);
-          constraint = FunctionHandleConstraint(0,inf,n_vars,robust_bound_function_j);
-          obj = obj.addConstraint(constraint, inds);
+          switch obj.options.integration_method
+            case DirtranTrajectoryOptimization.FORWARD_EULER
+              n_vars = 2*(1+nX+nU);
+              inds = {obj.gamma_inds(i); ...
+                      obj.h_inds(i); ...
+                      obj.x_inds(:,i); ...
+                      obj.x_inds(:,i+1); ...
+                      obj.u_inds(:,i); ...
+                      obj.du_inds((j-1)*nU+(1:nU),i)};
 
+              robust_bound_function_j = @(gamma,h,x0,x1,u,du) obj.robust_forward_bound_fun(robust_cost,j,gamma,h,x0,x1,u,du);
+              constraint = FunctionHandleConstraint(0,inf,n_vars,robust_bound_function_j);
+              obj = obj.addConstraint(constraint, inds);
+
+            case DirtranTrajectoryOptimization.BACKWARD_EULER
+              n_vars = 2*(1+nX+nU);
+              inds = {obj.gamma_inds(i); ...
+                      obj.h_inds(i); ...
+                      obj.x_inds(:,i); ...
+                      obj.x_inds(:,i+1); ...
+                      obj.u_inds(:,i); ...
+                      obj.du_inds((j-1)*nU+(1:nU),i)};
+
+              robust_bound_function_j = @(gamma,h,x0,x1,u,du) obj.robust_backward_bound_fun(robust_cost,j,gamma,h,x0,x1,u,du);
+              constraint = FunctionHandleConstraint(0,inf,n_vars,robust_bound_function_j);
+              obj = obj.addConstraint(constraint, inds);
+
+            case DirtranTrajectoryOptimization.MIDPOINT
+              n_vars = 2*(1+nX) + 3*nU;
+              inds = {obj.gamma_inds(i); ...
+                      obj.h_inds(i); ...
+                      obj.x_inds(:,i); ...
+                      obj.x_inds(:,i+1); ...
+                      obj.u_inds(:,i); ...
+                      obj.du_inds((j-1)*nU+(1:nU),i); ...
+                      obj.u_inds(:,i+1)};
+
+              robust_bound_function_j = @(gamma,h,x0,x1,u0,du0,u1) obj.robust_midpoint_bound_fun(robust_cost,j,gamma,h,x0,x1,u0,du0,u1);
+              constraint = FunctionHandleConstraint(0,inf,n_vars,robust_bound_function_j);
+              obj = obj.addConstraint(constraint, inds);
+            
+            otherwise
+              error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
+          end
+          
+          
+          % gamma lower bound constraint: gamma - ell \ge 0
+          
           if any(~isinf(obj.plant.umin)) || any(~isinf(obj.plant.umax))
             inds = {obj.u_inds(:,i); obj.du_inds((j-1)*nU+(1:nU),i)};
             constraint = FunctionHandleConstraint(obj.plant.umin,obj.plant.umax,2*nU,@obj.delta_u_bound);
@@ -148,32 +183,33 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     
     function [f,df] = backward_robust_dynamics_fun(obj,h,x0,x1,u,du,w)
       [xdot,dxdot] = obj.plant.dynamics_w(0,x1,u+du,w);
-      f = x1 - x0 - h*xdot;
-      df = [-xdot ... h
-        -eye(obj.nX) ... x0
-        (eye(obj.nX) - h*dxdot(:,2:1+obj.nX)) ... x1 
-        -h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u
-        -h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du
-        -h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
+      f = x0 + h*xdot;
+      df = [xdot ... h
+        eye(obj.nX) ... x0
+        h*dxdot(:,2:1+obj.nX) ... x1
+        h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u
+        h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du
+        h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
     end
     
     function [f,df] = midpoint_robust_dynamics_fun(obj,h,x0,x1,u0,du0,u1,du1,w0,w1)
       [xdot,dxdot] = obj.plant.dynamics_w(0,.5*(x0+x1),.5*(u0+du0+u1+du1),.5*(w0+w1));
-      f = x1 - x0 - h*xdot;
-      df = [-xdot ... h
-        (-eye(obj.nX) - .5*h*dxdot(:,1+(1:obj.nX))) ... x0
-        (eye(obj.nX) - .5*h*dxdot(:,1+(1:obj.nX)))... x1
-        -.5*h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u0
-        -.5*h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du0
-        -.5*h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u1
-        -.5*h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du1
-        -.5*h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW)) ... w0
-        -.5*h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w1
+      f = x0 + h*xdot;
+      df = [xdot ... h
+        (eye(obj.nX) + .5*h*dxdot(:,1+(1:obj.nX))) ... x0
+        .5*h*dxdot(:,1+(1:obj.nX))... x1
+        .5*h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u0
+        .5*h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du0
+        .5*h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u1
+        .5*h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du1
+        .5*h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW)) ... w0
+        .5*h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w1
     end
     
     
-    function [f,df] = robust_bound_fun(obj,robust_cost,j,gamma,h,x0,x1,u,du)
+    function [f,df] = robust_forward_bound_fun(obj,robust_cost,j,gamma,h,x0,x1,u,du)
       w = obj.disturbances(:,j);
+      
       [r,dr] = obj.forward_robust_dynamics_fun(h,x0,u,du,w);
     
       xerr = x1-r;
@@ -198,7 +234,77 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
             -dg((1:obj.nX))*dxerr_du, ... u
             -dg((1:obj.nX))*dxerr_ddu-dg(obj.nX + (1:obj.nU))]; %ddu
     end
-  
+    
+    
+    
+    function [f,df] = robust_backward_bound_fun(obj,robust_cost,j,gamma,h,x0,x1,u,du)
+      w = obj.disturbances(:,j);
+      
+      [r,dr] = obj.backward_robust_dynamics_fun(h,x0,x1,u,du,w);
+    
+      xerr = x1-r;
+      [g,dg] = robust_cost(xerr,du,w);
+      f = gamma - g;
+      
+      dr_dh = dr(:,1);
+      dr_dx0 = dr(:,1+(1:obj.nX));
+      dr_dx1 = dr(:,1+obj.nX+(1:obj.nX));
+      dr_du = dr(:,1+2*obj.nX+(1:obj.nU));
+      dr_ddu = dr(:,1+2*obj.nX+obj.nU+(1:obj.nU));
+      
+      dxerr_dh = -dr_dh;
+      dxerr_dx0 = -dr_dx0;
+      dxerr_dx1 = eye(obj.nX) - dr_dx1;
+      dxerr_du = -dr_du;
+      dxerr_ddu = -dr_ddu;
+      
+      df = [1, ... gamma
+            -dg((1:obj.nX))*dxerr_dh, ... h
+            -dg((1:obj.nX))*dxerr_dx0, ... x0
+            -dg((1:obj.nX))*dxerr_dx1, ... x1
+            -dg((1:obj.nX))*dxerr_du, ... u
+            -dg((1:obj.nX))*dxerr_ddu-dg(obj.nX + (1:obj.nU))]; %ddu
+    end
+    
+    
+       
+    function [f,df] = robust_midpoint_bound_fun(obj,robust_cost,j,gamma,h,x0,x1,u0,du0,u1)
+      w = obj.disturbances(:,j);
+      
+      [r,dr] = obj.midpoint_robust_dynamics_fun(h,x0,x1,u0,du0,u1,0*u1,w,0*w);
+    
+      xerr = x1-r;
+      [g,dg] = robust_cost(xerr,du0,w);
+      f = gamma - g;
+          
+      dr_dh = dr(:,1);
+      dr_dx0 = dr(:,1+(1:obj.nX));
+      dr_dx1 = dr(:,1+obj.nX+(1:obj.nX));
+      dr_du0 = dr(:,1+2*obj.nX+(1:obj.nU));
+      dr_ddu0 = dr(:,1+2*obj.nX+obj.nU+(1:obj.nU));
+      dr_du1 = dr(:,1+2*obj.nX+2*obj.nU+(1:obj.nU));
+      
+      dxerr_dh = -dr_dh;
+      dxerr_dx0 = -dr_dx0;
+      dxerr_dx1 = eye(obj.nX) - dr_dx1;
+      dxerr_du0 = -dr_du0;
+      dxerr_ddu0 = -dr_ddu0;
+      dxerr_du1 = -dr_du1;
+      
+      df = [1, ... gamma
+            -dg((1:obj.nX))*dxerr_dh, ... h
+            -dg((1:obj.nX))*dxerr_dx0, ... x0
+            -dg((1:obj.nX))*dxerr_dx1, ... x1
+            -dg((1:obj.nX))*dxerr_du0, ... u0
+            -dg((1:obj.nX))*dxerr_ddu0-dg(obj.nX + (1:obj.nU)) ... du0
+            -dg((1:obj.nX))*dxerr_du1]; % du1
+    end
+    
+    
+    
+    
+    
+    
     function [f,df] = gamma_cost(obj,gamma)
       f = ones(1,obj.N-1)*gamma; 
       df = ones(1,obj.N-1);
