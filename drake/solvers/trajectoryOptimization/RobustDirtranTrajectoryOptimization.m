@@ -301,10 +301,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     end
     
     
-    
-    
-    
-    
     function [f,df] = gamma_cost(obj,gamma)
       f = ones(1,obj.N-1)*gamma; 
       df = ones(1,obj.N-1);
