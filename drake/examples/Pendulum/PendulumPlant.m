@@ -125,9 +125,9 @@ classdef PendulumPlant < SecondOrderSystem
       q=x(1:obj.num_q); 
       qd=x((obj.num_q+1):end);
       
-      m_ = obj.m;
+      m_ = obj.m + w;
       l_ = obj.lc;
-      b_ = obj.b + w;
+      b_ = obj.b;
       
       qdd = (u - m_*obj.g*l_*sin(q) - b_*qd)/obj.I;
       f = [qd;qdd];
@@ -137,7 +137,7 @@ classdef PendulumPlant < SecondOrderSystem
         dfdt = zeros(2,1);
         dfdx = [0, 1; -ii*m_*obj.g*l_*cos(q),-b_*ii];
         dfdu = [0;ii];
-        dfdw = [0;-ii*qd];
+        dfdw = [0;-ii*obj.g*l_*sin(q)];
         df = [dfdt, dfdx, dfdu, dfdw];
       end
     end
@@ -294,26 +294,19 @@ classdef PendulumPlant < SecondOrderSystem
 
       
       options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 20],options);
+      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 10],options);
       disp('constructor done');
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
       prog = prog.addRunningCost(@cost);
-      prog = prog.addFinalCost(@finalCost);
+%       prog = prog.addFinalCost(@finalCost);
       prog = prog.addRobustConstraints(@robust_cost);
       
-      
 %       
-%       
-%       
-%       
-%       
-%       
-%       
-%       
-%       
-%       nx=2; nu=1; nw=3;
+% 
+%    
+%       nx=2; nu=1; nw=1;
 %       for j=1:10
 %         hr = randn();
 %         xr = randn(nx,1);
@@ -384,36 +377,8 @@ classdef PendulumPlant < SecondOrderSystem
 %       keyboard
 % 
 %       
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-            
+%       
+%             
       % add a display function to draw the trajectory on every iteration
       function displayStateTrajectory(t,x,u)
         plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
@@ -435,7 +400,7 @@ classdef PendulumPlant < SecondOrderSystem
     
       
       function [g,dg] = cost(dt,x,u);
-        R = 10;
+        R = 1;
         g = (R*u).*u;
         
         if (nargout>1)
@@ -452,15 +417,14 @@ classdef PendulumPlant < SecondOrderSystem
       
       function [g,dg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
-        Qw = 500*eye(2);
-        Rw = 10;
+        Qw = 100*eye(2);
+        Rw = 1;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
       end
        
     end
     
-    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -471,14 +435,6 @@ classdef PendulumPlant < SecondOrderSystem
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    
-    
-    
-    
-    
-    
-    
-   
-
   end
 
 end
