@@ -214,7 +214,18 @@ classdef DoubleIntegrator < LinearSystem
     end
     
     
-    function robustDirtran(disturbances,M)
+    
+    
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    function robustDirtran(N,M,lb,ub)
 
       plant = DoubleIntegrator;
       
@@ -222,26 +233,21 @@ classdef DoubleIntegrator < LinearSystem
       xf = [0;0];
       tf0 = 6;
       
-      N = 15;
-      d = linspace(-disturbances,disturbances,M);
-      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
+      d = linspace(lb,ub,M);
+      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
       prog = RobustDirtranTrajectoryOptimization(plant,N,M,[4 8],options);
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
-      prog = prog.addRunningCost(@running_cost);
+      prog = prog.addRunningCost(@cost);
       prog = prog.addRobustConstraints(@robust_cost);
         
       disp('constructor done');
       
+          
       
       
-      
-      
-      
-      
-      
-      
+   
       nx=2; nu=1; nw=1;
       for j=1:10
         hr = randn();
@@ -252,8 +258,8 @@ classdef DoubleIntegrator < LinearSystem
         wr = randn(nw,1);
         gr = randn();
       
-        [~,df1] = geval(@running_cost,hr,xr,ur,struct('grad_method','taylorvar'));
-        [~,df2] = running_cost(hr,xr,ur);
+        [~,df1] = geval(@cost,hr,xr,ur,struct('grad_method','taylorvar'));
+        [~,df2] = cost(hr,xr,ur);
       
         valuecheck(df1,df2,1e-4);
       
@@ -261,13 +267,23 @@ classdef DoubleIntegrator < LinearSystem
         [~,df2] = robust_cost(xr,ur,wr);
       
         valuecheck(df1,df2,1e-4);
+
+      
         
         
         [~,df1] = geval(@prog.forward_robust_dynamics_fun,hr,xr,ur,ur2,wr,struct('grad_method','taylorvar'));
         [~,df2] = prog.forward_robust_dynamics_fun(hr,xr,ur,ur2,wr);
       
         valuecheck(df1,df2,1e-4);
+
+        tmp0 = @(h,x0,x1,u,du) prog.forward_state_eq_constraint(1,h,x0,x1,u,du);
+        
+        [~,df1] = geval(tmp0,hr,xr,xr2,ur,ur2,struct('grad_method','taylorvar'));
+        [~,df2] = tmp0(hr,xr,xr2,ur,ur2);
       
+        valuecheck(df1,df2,1e-4);
+
+        
         [~,df1] = geval(@prog.backward_robust_dynamics_fun,hr,xr,xr2,ur,ur2,wr,struct('grad_method','taylorvar'));
         [~,df2] = prog.backward_robust_dynamics_fun(hr,xr,xr2,ur,ur2,wr);
       
@@ -306,14 +322,8 @@ classdef DoubleIntegrator < LinearSystem
       keyboard
 
       
-      
-      
-      
-      
-      
-      
 
-      function [g,dg] = running_cost(dt,x,u)
+      function [g,dg] = cost(dt,x,u)
         g = dt; dg = [1,0*x',0*u']; % see geval.m for our gradient format
       end
       

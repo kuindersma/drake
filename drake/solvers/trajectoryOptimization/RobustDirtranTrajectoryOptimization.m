@@ -35,7 +35,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         options.time_option = 1;
       end
       
-      
       % Construct total time linear constraint
       switch options.time_option
         case 1 % all timesteps are constant
@@ -112,6 +111,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       
       for i=1:N-1
         for j=1:M
+          % gamma lower bound constraint: gamma - ell \ge 0
           switch obj.options.integration_method
             case DirtranTrajectoryOptimization.FORWARD_EULER
               n_vars = 2*(1+nX+nU);
@@ -124,6 +124,20 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
 
               robust_bound_function_j = @(gamma,h,x0,x1,u,du) obj.robust_forward_bound_fun(robust_cost,j,gamma,h,x0,x1,u,du);
               constraint = FunctionHandleConstraint(0,inf,n_vars,robust_bound_function_j);
+              obj = obj.addConstraint(constraint, inds);
+              
+
+              % constrain x-dx=0
+              n_vars = 1+2*(nX+nU);
+              inds = {obj.h_inds(i); ...
+                      obj.x_inds(:,i); ...
+                      obj.x_inds(:,i+1); ...
+                      obj.u_inds(:,i); ...
+                      obj.du_inds((j-1)*nU+(1:nU),i)};
+
+              robust_dyn_fun_j = @(h,x0,x1,u,du) obj.forward_state_eq_constraint(j,h,x0,x1,u,du);
+ 
+              constraint = FunctionHandleConstraint([0;0],[0;0],n_vars,robust_dyn_fun_j);
               obj = obj.addConstraint(constraint, inds);
 
             case DirtranTrajectoryOptimization.BACKWARD_EULER
@@ -157,15 +171,18 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
               error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
           end
           
-          
-          % gamma lower bound constraint: gamma - ell \ge 0
-          
           if any(~isinf(obj.plant.umin)) || any(~isinf(obj.plant.umax))
             inds = {obj.u_inds(:,i); obj.du_inds((j-1)*nU+(1:nU),i)};
             constraint = FunctionHandleConstraint(obj.plant.umin,obj.plant.umax,2*nU,@obj.delta_u_bound);
             obj = obj.addConstraint(constraint, inds);  
           end        
         end
+        
+        running_cost = FunctionHandleObjective(2*nX, @obj.state_regularizer);
+        inds = {obj.x_inds(:,i);obj.x_inds(:,i+1)};
+        obj = obj.addCost(running_cost,inds);
+        
+        
       end
       
       obj = obj.addConstraint(ConstantConstraint(zeros(nU,1)),obj.u_inds(:,N)); % last u=0
@@ -234,7 +251,28 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
             -dg((1:obj.nX))*dxerr_du, ... u
             -dg((1:obj.nX))*dxerr_ddu-dg(obj.nX + (1:obj.nU))]; %ddu
     end
+
     
+    function [f,df] = forward_state_eq_constraint(obj,j,h,x0,x1,u,du)
+      w = obj.disturbances(:,j);
+      
+      [r,dr] = obj.forward_robust_dynamics_fun(h,x0,u,du,w);
+    
+      f = x1-r;
+      
+      dr_dh = dr(:,1);
+      dr_dx0 = dr(:,1+(1:obj.nX));
+      dr_du = dr(:,1+obj.nX+(1:obj.nU));
+      dr_ddu = dr(:,1+obj.nX+obj.nU+(1:obj.nU));
+      
+      dxerr_dh = -dr_dh;
+      dxerr_dx0 = -dr_dx0;
+      dxerr_dx1 = eye(obj.nX);
+      dxerr_du = -dr_du;
+      dxerr_ddu = -dr_ddu;
+      
+      df = [dxerr_dh, dxerr_dx0, dxerr_dx1, dxerr_du, dxerr_ddu];
+    end
     
     
     function [f,df] = robust_backward_bound_fun(obj,robust_cost,j,gamma,h,x0,x1,u,du)
@@ -305,7 +343,15 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       f = ones(1,obj.N-1)*gamma; 
       df = ones(1,obj.N-1);
     end
-        
+
+    function [f,df] = state_regularizer(obj,x0,x1)
+      nq = obj.nX/2;
+      Q = 100*diag([ones(1,nq),0.1*ones(1,nq)]);
+      xerr = x1-x0;
+      f = xerr'*Q*xerr; 
+      df = [-2*xerr'*Q,2*xerr'*Q];
+    end
+
     function [f,df] = delta_u_bound(obj,u,du)
       f = u+du;
       df = [eye(obj.nU), eye(obj.nU)];

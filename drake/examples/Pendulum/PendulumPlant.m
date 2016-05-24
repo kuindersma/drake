@@ -243,8 +243,8 @@ classdef PendulumPlant < SecondOrderSystem
       Q = diag([10 1]); R = 1;
 
       options.num_branches=5;
-     options.stabilize=true;
-     options.verify=false;
+      options.stabilize=true;
+      options.verify=false;
       options.xs = [0;0];
       options.Tslb = 2;
       options.Tsub = 6;
@@ -271,15 +271,13 @@ classdef PendulumPlant < SecondOrderSystem
       tf0 = 4;
       
       nw=1;
-%       
-%       if M>2
-%         d = rand(nw,M).*repmat(ub-lb,1,M) + repmat(lb,1,M);
-%       elseif M==1
-%         d = lb;
-%       end
-
-%       d = [lb,ub];
+      
+      if M>2
         d = linspace(ub,lb,M);
+%         d = rand(nw,M).*repmat(ub-lb,1,M) + repmat(lb,1,M);
+      elseif M==1
+        d = lb;
+      end
 
 %       d = zeros(nw,M);
 %       d(:,1) = [lb(1);lb(2);lb(3)];
@@ -293,18 +291,18 @@ classdef PendulumPlant < SecondOrderSystem
       
 
       
-      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[2 10],options);
+      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
+      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[3 10],options);
       disp('constructor done');
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
       prog = prog.addRunningCost(@cost);
-%       prog = prog.addFinalCost(@finalCost);
+      prog = prog.addFinalCost(@finalCost);
       prog = prog.addRobustConstraints(@robust_cost);
       
-%       
-% 
+      
+
 %    
 %       nx=2; nu=1; nw=1;
 %       for j=1:10
@@ -375,8 +373,8 @@ classdef PendulumPlant < SecondOrderSystem
 %       end
 % 
 %       keyboard
-% 
-%       
+
+      
 %       
 %             
       % add a display function to draw the trajectory on every iteration
@@ -417,8 +415,8 @@ classdef PendulumPlant < SecondOrderSystem
       
       function [g,dg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
-        Qw = 100*eye(2);
-        Rw = 1;
+        Qw = 10*eye(2);
+        Rw = 10;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
       end
