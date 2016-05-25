@@ -241,85 +241,83 @@ classdef DoubleIntegrator < LinearSystem
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
       prog = prog.addRunningCost(@cost);
       prog = prog.addRobustConstraints(@robust_cost);
+      prog = prog.addDeltaXEqualsZeroConstraint();
         
       disp('constructor done');
       
           
       
-      
-   
-      nx=2; nu=1; nw=1;
-      for j=1:10
-        hr = randn();
-        xr = randn(nx,1);
-        xr2 = randn(nx,1);
-        ur = randn(nu,1);
-        ur2 = randn(nu,1);
-        wr = randn(nw,1);
-        gr = randn();
-      
-        [~,df1] = geval(@cost,hr,xr,ur,struct('grad_method','taylorvar'));
-        [~,df2] = cost(hr,xr,ur);
-      
-        valuecheck(df1,df2,1e-4);
-      
-        [~,df1] = geval(@robust_cost,xr,ur,wr,struct('grad_method','taylorvar'));
-        [~,df2] = robust_cost(xr,ur,wr);
-      
-        valuecheck(df1,df2,1e-4);
-
-      
-        
-        
-        [~,df1] = geval(@prog.forward_robust_dynamics_fun,hr,xr,ur,ur2,wr,struct('grad_method','taylorvar'));
-        [~,df2] = prog.forward_robust_dynamics_fun(hr,xr,ur,ur2,wr);
-      
-        valuecheck(df1,df2,1e-4);
-
-        tmp0 = @(h,x0,x1,u,du) prog.forward_state_eq_constraint(1,h,x0,x1,u,du);
-        
-        [~,df1] = geval(tmp0,hr,xr,xr2,ur,ur2,struct('grad_method','taylorvar'));
-        [~,df2] = tmp0(hr,xr,xr2,ur,ur2);
-      
-        valuecheck(df1,df2,1e-4);
-
-        
-        [~,df1] = geval(@prog.backward_robust_dynamics_fun,hr,xr,xr2,ur,ur2,wr,struct('grad_method','taylorvar'));
-        [~,df2] = prog.backward_robust_dynamics_fun(hr,xr,xr2,ur,ur2,wr);
-      
-        valuecheck(df1,df2,1e-4);
-      
-        [~,df1] = geval(@prog.midpoint_robust_dynamics_fun,hr,xr,xr2,ur,ur2,ur*.1,ur2*.1,wr,wr*.3,struct('grad_method','taylorvar'));
-        [~,df2] = prog.midpoint_robust_dynamics_fun(hr,xr,xr2,ur,ur2,ur*.1,ur2*.1,wr,wr*.3);
-      
-        valuecheck(df1,df2,1e-4);
-      
-        
-        tmp1 = @(gamma,h,x0,x1,u,du) prog.robust_forward_bound_fun(@robust_cost,1,gamma,h,x0,x1,u,du);
-
-        [~,df1] = geval(tmp1,gr,hr,xr,xr2,ur,ur2,struct('grad_method','taylorvar'));
-        [~,df2] = tmp1(gr,hr,xr,xr2,ur,ur2);
-      
-        valuecheck(df1,df2,1e-4);
-
-        tmp2 = @(gamma,h,x0,x1,u,du) prog.robust_backward_bound_fun(@robust_cost,1,gamma,h,x0,x1,u,du);
-
-        [~,df1] = geval(tmp2,gr,hr,xr,xr2,ur,ur2,struct('grad_method','taylorvar'));
-        [~,df2] = tmp2(gr,hr,xr,xr2,ur,ur2);
-      
-        valuecheck(df1,df2,1e-4);
-        
-        tmp3 = @(gamma,h,x0,x1,u0,du0,u1) prog.robust_midpoint_bound_fun(@robust_cost,1,gamma,h,x0,x1,u0,du0,u1);
-
-        [~,df1] = geval(tmp3,gr,hr,xr,xr2,ur,ur2,ur*.1,struct('grad_method','taylorvar'));
-        [~,df2] = tmp3(gr,hr,xr,xr2,ur,ur2,ur*.1);
-      
-        valuecheck(df1,df2,1e-4);
-
-
-      end
-
-      keyboard
+%       
+%    
+%       nx=2; nu=1; nw=1;
+%       for j=1:10
+%         hr = randn();
+%         xr = randn(nx,1);
+%         xr2 = randn(nx,1);
+%         ur = randn(nu,1);
+%         ur2 = randn(nu,1);
+%         wr = randn(nw,1);
+%         gr = randn();
+%       
+%         [~,df1] = geval(@cost,hr,xr,ur,struct('grad_method','taylorvar'));
+%         [~,df2] = cost(hr,xr,ur);
+%       
+%         valuecheck(df1,df2,1e-4);
+%       
+%         [~,df1] = geval(@robust_cost,xr,ur,wr,struct('grad_method','taylorvar'));
+%         [~,df2] = robust_cost(xr,ur,wr);
+%       
+%         valuecheck(df1,df2,1e-4);        
+%         
+%         [~,df1] = geval(@prog.forward_robust_dynamics_fun,hr,xr,ur,ur2,wr,struct('grad_method','taylorvar'));
+%         [~,df2] = prog.forward_robust_dynamics_fun(hr,xr,ur,ur2,wr);
+%       
+%         valuecheck(df1,df2,1e-4);
+% 
+%         tmp0 = @(h,x0,x1,u,du) prog.forward_state_eq_constraint(1,h,x0,x1,u,du);
+%         
+%         [~,df1] = geval(tmp0,hr,xr,xr2,ur,ur2,struct('grad_method','taylorvar'));
+%         [~,df2] = tmp0(hr,xr,xr2,ur,ur2);
+%       
+%         valuecheck(df1,df2,1e-4);
+% 
+%         
+%         [~,df1] = geval(@prog.backward_robust_dynamics_fun,hr,xr,xr2,ur,ur2,wr,struct('grad_method','taylorvar'));
+%         [~,df2] = prog.backward_robust_dynamics_fun(hr,xr,xr2,ur,ur2,wr);
+%       
+%         valuecheck(df1,df2,1e-4);
+%       
+%         [~,df1] = geval(@prog.midpoint_robust_dynamics_fun,hr,xr,xr2,ur,ur2,ur*.1,ur2*.1,wr,wr*.3,struct('grad_method','taylorvar'));
+%         [~,df2] = prog.midpoint_robust_dynamics_fun(hr,xr,xr2,ur,ur2,ur*.1,ur2*.1,wr,wr*.3);
+%       
+%         valuecheck(df1,df2,1e-4);
+%       
+%         
+%         tmp1 = @(gamma,h,x0,x1,u,du) prog.robust_forward_bound_fun(@robust_cost,1,gamma,h,x0,x1,u,du);
+% 
+%         [~,df1] = geval(tmp1,gr,hr,xr,xr2,ur,ur2,struct('grad_method','taylorvar'));
+%         [~,df2] = tmp1(gr,hr,xr,xr2,ur,ur2);
+%       
+%         valuecheck(df1,df2,1e-4);
+% 
+%         tmp2 = @(gamma,h,x0,x1,u,du) prog.robust_backward_bound_fun(@robust_cost,1,gamma,h,x0,x1,u,du);
+% 
+%         [~,df1] = geval(tmp2,gr,hr,xr,xr2,ur,ur2,struct('grad_method','taylorvar'));
+%         [~,df2] = tmp2(gr,hr,xr,xr2,ur,ur2);
+%       
+%         valuecheck(df1,df2,1e-4);
+%         
+%         tmp3 = @(gamma,h,x0,x1,u0,du0,u1) prog.robust_midpoint_bound_fun(@robust_cost,1,gamma,h,x0,x1,u0,du0,u1);
+% 
+%         [~,df1] = geval(tmp3,gr,hr,xr,xr2,ur,ur2,ur*.1,struct('grad_method','taylorvar'));
+%         [~,df2] = tmp3(gr,hr,xr,xr2,ur,ur2,ur*.1);
+%       
+%         valuecheck(df1,df2,1e-4);
+% 
+% 
+%       end
+% 
+%       keyboard
 
       
 

@@ -3,30 +3,35 @@ classdef PendulumPlantDT < DrakeSystem
   
   properties
     p % PendulumPlant
-    dt = 0.005;
+    dt;
     S = eye(2);
     xG = [pi;0];
   end
   
   methods
-    function obj = PendulumPlantDT
+    function obj = PendulumPlantDT(h)
       % Construct a new PendulumPlant
       obj = obj@DrakeSystem(0,2,1,2,false,true);
-      obj = setSampleTime(obj,[obj.dt;0]); 
+      obj = setSampleTime(obj,[h;0]); 
       
       obj.p = PendulumPlant;
       
       obj = setInputFrame(obj,PendulumInput);
 
+      obj.dt = h;
       torque_limit = 3;
       obj.p = setInputLimits(obj.p,-torque_limit,torque_limit);
       obj = setInputLimits(obj,-torque_limit,torque_limit);
       
       obj = setStateFrame(obj,PendulumState);
       obj = setOutputFrame(obj,PendulumState);
-
-      [~,V] = obj.runLQR();
-      obj.S = V.S;
+% 
+%       [~,V] = obj.runLQR();
+%       obj.S = V.S;
+    end
+    
+    function obj = setMass(obj,mass)
+      obj.p.m = mass;
     end
     
     function [xdn,df,d2f]=update(obj,t,x,u)
