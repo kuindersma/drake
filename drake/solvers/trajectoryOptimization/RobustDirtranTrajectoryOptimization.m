@@ -186,6 +186,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     
     
     function obj = addDeltaXEqualsZeroConstraint(obj)
+      error('doesnt make sense with integration error included');
       obj = obj.addConstraint(ConstantConstraint(zeros(obj.nX*obj.M*obj.N,1)),obj.dx_inds(:)); 
     end
   
@@ -276,22 +277,31 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       end
       
       [r,dr] = obj.forward_robust_dynamics_fun(h,x0,u,du,w);
-    
-      f = dx0_max + dx1j - r + x1; % delta_x(1) = max(delta_x(0)) + x0 + f(x0,u0+du0,w) - x(1)
+      
+      [xdot,dxdot] = obj.plant.dynamics(0,x0,u);
+      
+      e = 0.5*h^2*xdot;
+%       e = 0.5*h^2*dxdot(:,1+(1:obj.nX))*xdot;
+  
+      f = dx1j - e - dx0_max - r + x1; % delta_x(1) = e + max(delta_x(0)) + x0 + f(x0,u0+du0,w) - x(1)
       
       dr_dh = dr(:,1);
       dr_dx0 = dr(:,1+(1:obj.nX));
       dr_du = dr(:,1+obj.nX+(1:obj.nU));
       dr_ddu = dr(:,1+obj.nX+obj.nU+(1:obj.nU));
       
-      df_dh = -dr_dh;
-      df_dx0 = -dr_dx0;
+      de_dh = h*xdot;
+      de_dx0 = 0.5*h^2*dxdot(:,1+(1:obj.nX));
+      de_du = 0.5*h^2*dxdot(:,1+obj.nX+(1:obj.nU));
+      
+      df_dh = -dr_dh - de_dh;
+      df_dx0 = -dr_dx0 - de_dx0;
       df_dx1 = eye(obj.nX);
       df_ddx1 = eye(obj.nX);
-      df_du = -dr_du;
+      df_du = -dr_du - de_du;
       df_ddu = -dr_ddu;
       
-      df = [df_dh, df_dx0, df_ddx0 df_dx1, df_ddx1, df_du, df_ddu];
+      df = [df_dh, df_dx0, -df_ddx0 df_dx1, df_ddx1, df_du, df_ddu];
     end
     
     
