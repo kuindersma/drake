@@ -177,7 +177,7 @@ classdef NonlinearProgram
       obj.solver_options.fmincon.GradObj = 'on';
       obj.solver_options.snopt.sense = 'Minimize';
       obj.constraint_err_tol = 1e-4;
-      obj.check_grad = true;
+      obj.check_grad = false;
     end
 
     function [obj,cnstr_id] = addCompositeConstraints(obj,cnstr,xind,data_ind)

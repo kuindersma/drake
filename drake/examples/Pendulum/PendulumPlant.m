@@ -189,29 +189,29 @@ classdef PendulumPlant < SecondOrderSystem
       tf0 = 4;
 
       options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
-      traj_opt = DirtranTrajectoryOptimization(obj,N,[3 8]);
+      traj_opt = DirtranTrajectoryOptimization(obj,N,[5.5 6]);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
       traj_opt = traj_opt.addRunningCost(@cost);
-      traj_opt = traj_opt.addRunningCost(@integrationCost);
+%       traj_opt = traj_opt.addRunningCost(@obj.integrationCost);
       traj_opt = traj_opt.addFinalCost(@finalCost);
       traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
       
-%       
+      
 %       nx=2; nu=1; nw=1;
 %       for j=1:10
 %         h = rand;
 %         x = randn(nx,1);
 %         u = randn(nu,1);
 %         
-%         [~,df1] = geval(@integrationCost,h,x,u,struct('grad_method','taylorvar'));
+%         [~,df1] = geval(@integrationCost,h,x,u,struct('grad_method','numerical'));
 %         [~,df2] = integrationCost(h,x,u);
 %       
-%         valuecheck(df1,df2,1e-4);
+%         valuecheck(df1,df2);
 %       end
 %       
+%       keyboard
 %       
-      
      % add a display function to draw the trajectory on every iteration
       function displayStateTrajectory(t,x,u)
         plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
@@ -220,7 +220,7 @@ classdef PendulumPlant < SecondOrderSystem
       traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
       
       function [g,dg] = cost(h,x,u)
-        R = 0;
+        R = 10;
         
         g = (R*u).*u;
         
@@ -230,33 +230,39 @@ classdef PendulumPlant < SecondOrderSystem
       end
       
       function [h,dh] = finalCost(tf,x)
-        h = 0*tf;
+        h = tf;
         if (nargout>1)
-          dh = [0, zeros(1,2)];
+          dh = [1, zeros(1,2)];
         end
       end
-      
-      function [g,dg] = integrationCost(h,x,u)
-        Q = 10;
-        [xdot,dxdot] = obj.dynamics(0,x,u);
-        nx = obj.getNumStates;
-        nu = obj.getNumInputs;
-        
-        e = 0.5*h^2*dxdot(:,1+(1:nx))*xdot;
-        g = e'*Q*e;
-        if (nargout>1)
-          de_dh = h*dxdot(:,1+(1:nx))*xdot;
-          de_dx = 0.5*h^2*dxdot(:,1+(1:nx))*dxdot(:,1+(1:nx));
-          de_du = 0.5*h^2*dxdot(:,1+(1:nx))*dxdot(:,1+nx+(1:nu));
-          dg = [2*e'*Q*de_dh,2*e'*Q*de_dx,2*e'*Q*de_du];
-        end
-      end
+   
       
       info=0;
       while (info~=1)
         tic
         [xtraj,utraj,z,F,info] = traj_opt.solveTraj(tf0,traj_init);
         toc
+      end
+    end
+    
+       
+    function [g,dg] = integrationCost(obj,h,x,u)
+      Q = 0.1;
+      [xdot,dxdot,ddxdot] = obj.dynamics(0,x,u);
+      nx = obj.getNumStates;
+      nu = obj.getNumInputs;
+
+      e = 0.5*h^2*dxdot(:,1+(1:nx))*xdot;
+      g = e'*Q*e;
+      if (nargout>1)
+        de_dh = h*dxdot(:,1+(1:nx))*xdot;
+
+        ddxdot_dx = [ddxdot(:,4+(2:3)),ddxdot(:,8+(2:3))];
+        M = full(ddxdot_dx(:,1:2)*xdot(1) + ddxdot_dx(:,3:4)*xdot(2));
+        de_dx = 0.5*h^2*(dxdot(:,1+(1:nx))*dxdot(:,1+(1:nx)) + M);
+
+        de_du = 0.5*h^2*dxdot(:,1+(1:nx))*dxdot(:,1+nx+(1:nu));
+        dg = [2*e'*Q*de_dh,2*e'*Q*de_dx,2*e'*Q*de_du];
       end
     end
     

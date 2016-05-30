@@ -102,24 +102,6 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
       
       
       
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
     end
     
     function N = getN(obj)
