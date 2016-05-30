@@ -1,19 +1,22 @@
 function testDTSwingUP
 
-load robust_80_linear.mat
+load robust_200_linear_0.4.mat
+% load nominal_200_linear.mat
 
-h = 0.01;
+% h = 0.01;
+ts = utraj.getBreaks();
+h=ts(2)-ts(1);
 
 p = PendulumPlantDT(h);
 v = PendulumVisualizer();
 
-K = [-100,-30]; % PD gains
+% K = [-100,-30]; % PD gains
 
 xtraj = xtraj.setOutputFrame(p.getStateFrame);
 utraj = utraj.setOutputFrame(p.getInputFrame);
 
-v.playback(xtraj,struct('slider',true));
-keyboard;
+% v.playback(xtraj,struct('slider',true));
+% keyboard;
 
 % % run LQR on nominal plan
 % Q = diag([100 10]);
@@ -47,7 +50,7 @@ for i=1:1
 %   p = p.setMass(1+rand*(ub(1)-lb(1))+lb(1));
 %   p = p.setCOMLength(0.5+rand*(ub(2)-lb(2))+lb(2));
 %   p = p.setDamping(0.1+rand*(ub(3)-lb(3))+lb(3));
-  p = p.setMass(1+lb);
+  p = p.setMass(1+0.5);
   sys = feedback(p,c);
 
   if 1
@@ -62,7 +65,7 @@ for i=1:1
   v.playback(traj,struct('slider',true));
 
   count = count + 1;
-  if norm(double(traj.eval(traj.tspan(2)))-double(p.xG)) > 0.01
+  if norm(double(traj.eval(traj.tspan(2)))-double(p.xG)) > 0.1
     fail_count = fail_count + 1;
   end
   fprintf('Successes: %d, Failures: %d\n',count-fail_count,fail_count);

@@ -6,8 +6,8 @@ v = PendulumVisualizer();
 K = [-100,-30]; % PD gains
 
 if 1
-%   [utraj,xtraj] = robustSwingUpTrajectory(p,N,M,lb,ub,K);
-  [utraj,xtraj] = swingUpTrajectory(p,N);
+  [utraj,xtraj] = robustSwingUpTrajectory(p,N,M,lb,ub,K);
+%   [utraj,xtraj] = swingUpTrajectory(p,N);
 else
   load nominal_20.mat
 
@@ -27,7 +27,7 @@ for i=1:N-1
 end
 plot(cumsum(hs),lte,'b-');
 
-if 1
+if 0
   % run LQR on nominal plan
   Q = diag([100 10]);
   R = 0.01;
