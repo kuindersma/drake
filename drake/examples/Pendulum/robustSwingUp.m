@@ -13,18 +13,18 @@ if 1
     dus = z(prog.du_inds);
     hs = z(prog.h_inds);
 
-    xs_ = xs;
-    xs__ = xs;
-    for i=1:N-1
-      xs_(:,i+1) = xs_(:,i) + hs(i) * p.dynamics_w(0,xs_(:,i), us(i) + dus(i), lb);
-      xs__(:,i+1) = xs__(:,i) + hs(i) * p.dynamics_w(0,xs__(:,i), us(i) + K*(xs__(:,i)-xs(:,i)), lb);
-    end
+%     xs_ = xs;
+%     xs__ = xs;
+%     for i=1:N-1
+%       xs_(:,i+1) = xs_(:,i) + hs(i) * p.dynamics_w(0,xs_(:,i), us(i) + dus(i), lb);
+%       xs__(:,i+1) = xs__(:,i) + hs(i) * p.dynamics_w(0,xs__(:,i), us(i) + K*(xs__(:,i)-xs(:,i)), lb);
+%     end
 
     figure(12);
     plot(xs(1,:),xs(2,:),'b.-','MarkerSize',10);
     hold on;
     plot(xs(1,:)+dxs(1,:),xs(2,:)+dxs(2,:),'g.-','MarkerSize',10);
-    plot(xs_(1,:),xs_(2,:),'r.-','MarkerSize',10);
+%     plot(xs_(1,:),xs_(2,:),'r.-','MarkerSize',10);
 %       plot(xs__(1,:),xs__(2,:),'m.-','MarkerSize',10);
     hold off;
 

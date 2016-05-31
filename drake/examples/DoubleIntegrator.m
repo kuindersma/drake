@@ -234,7 +234,7 @@ classdef DoubleIntegrator < LinearSystem
       tf0 = 6;
       
       d = linspace(lb,ub,M);
-      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
+      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
       prog = RobustDirtranTrajectoryOptimization(plant,N,M,[4 8],options);
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);

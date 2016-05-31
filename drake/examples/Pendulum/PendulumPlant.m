@@ -188,7 +188,7 @@ classdef PendulumPlant < SecondOrderSystem
       xf = double(obj.xG);
       tf0 = 4;
 
-      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
+      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
       traj_opt = DirtranTrajectoryOptimization(obj,N,[3 8]);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
@@ -334,7 +334,7 @@ classdef PendulumPlant < SecondOrderSystem
 %       d(:,7) = [lb(1);ub(2);ub(3)];
 %       d(:,8) = [ub(1);ub(2);ub(3)];
       
-      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
+      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
       prog = RobustDirtranTrajectoryOptimization(obj,N,M,[3 8],options);
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
