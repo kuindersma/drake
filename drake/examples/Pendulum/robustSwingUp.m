@@ -6,8 +6,34 @@ v = PendulumVisualizer();
 K = [-100,-30]; % PD gains
 
 if 1
-  [utraj,xtraj] = robustSwingUpTrajectory(p,N,M,lb,ub,K);
-%   [utraj,xtraj] = swingUpTrajectory(p,N);
+ [utraj,xtraj,z,prog] = robustSwingUpTrajectory(p,N,M,lb,ub,K);
+    xs = z(prog.x_inds);
+    dxs = z(prog.dx_inds);
+    us = z(prog.u_inds);
+    dus = z(prog.du_inds);
+    hs = z(prog.h_inds);
+
+    xs_ = xs;
+    xs__ = xs;
+    for i=1:N-1
+      xs_(:,i+1) = xs_(:,i) + hs(i) * p.dynamics_w(0,xs_(:,i), us(i) + dus(i), lb);
+      xs__(:,i+1) = xs__(:,i) + hs(i) * p.dynamics_w(0,xs__(:,i), us(i) + K*(xs__(:,i)-xs(:,i)), lb);
+    end
+
+    figure(12);
+    plot(xs(1,:),xs(2,:),'b.-','MarkerSize',10);
+    hold on;
+    plot(xs(1,:)+dxs(1,:),xs(2,:)+dxs(2,:),'g.-','MarkerSize',10);
+    plot(xs_(1,:),xs_(2,:),'r.-','MarkerSize',10);
+%       plot(xs__(1,:),xs__(2,:),'m.-','MarkerSize',10);
+    hold off;
+
+    keyboard
+elseif 1
+ 
+  [utraj,xtraj] = swingUpTrajectory(p,N);
+
+
 else
   load nominal_20.mat
 
@@ -18,14 +44,14 @@ end
 % v.playback(xtraj,struct('slider',true));
 % keyboard;
 
-breaks = utraj.getBreaks();
-hs = breaks(2:end)-breaks(1:end-1);
-figure(99);
-lte = [];
-for i=1:N-1
-  lte = [lte, p.integrationCost(hs(i),xtraj.eval(breaks(i)),utraj.eval(breaks(i)))];
-end
-plot(cumsum(hs),lte,'b-');
+% breaks = utraj.getBreaks();
+% hs = breaks(2:end)-breaks(1:end-1);
+% figure(99);
+% lte = [];
+% for i=1:N-1
+%   lte = [lte, p.integrationCost(hs(i),xtraj.eval(breaks(i)),utraj.eval(breaks(i)))];
+% end
+% plot(cumsum(hs),lte,'b-');
 
 if 0
   % run LQR on nominal plan
@@ -59,7 +85,7 @@ for i=1:1
 %   p = p.setMass(1+rand*(ub(1)-lb(1))+lb(1));
 %   p = p.setCOMLength(0.5+rand*(ub(2)-lb(2))+lb(2));
 %   p = p.setDamping(0.1+rand*(ub(3)-lb(3))+lb(3));
-%   p = p.setMass(1+rand*(ub-lb)+lb);
+  p = p.setMass(1+rand*(ub-lb)+lb);
   sys = feedback(p,c);
 
   if 1

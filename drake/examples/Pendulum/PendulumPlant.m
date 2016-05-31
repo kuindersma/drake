@@ -310,14 +310,14 @@ classdef PendulumPlant < SecondOrderSystem
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     
-    function [utraj,xtraj]=robustSwingUpTrajectory(obj,N,M,lb,ub,K)
+    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,N,M,lb,ub,K)
       x0 = [0;0]; 
       xf = double(obj.xG);
       tf0 = 4;
       
       nw=1;
       
-      if M>2
+      if M>=2
         d = linspace(ub,lb,M);
 %         d = rand(nw,M).*repmat(ub-lb,1,M) + repmat(lb,1,M);
       elseif M==1
@@ -343,7 +343,7 @@ classdef PendulumPlant < SecondOrderSystem
       prog = prog.addFinalCost(@finalCost);
       prog = prog.addRobustConstraints(@robust_cost);
       prog = prog.addLinearControlConstraint(K);
-      prog = prog.addStateRegularization();
+%       prog = prog.addStateRegularization();
       
       
       disp('constructor done');
@@ -419,7 +419,8 @@ classdef PendulumPlant < SecondOrderSystem
         toc
         if info==1, break; end
       end
-      keyboard
+      
+
     
       
       function [g,dg] = cost(dt,x,u);
@@ -441,7 +442,7 @@ classdef PendulumPlant < SecondOrderSystem
       function [g,dg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
         Qw = 250*eye(2);
-        Rw = 50;
+        Rw = 1;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
       end

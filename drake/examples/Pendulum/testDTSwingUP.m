@@ -1,7 +1,7 @@
 function testDTSwingUP
 
-load robust_200_linear_0.4.mat
-% load nominal_200_linear.mat
+load robust_100_linear_0.6.mat
+%load nominal_100_linear.mat
 
 % h = 0.01;
 ts = utraj.getBreaks();
@@ -50,7 +50,7 @@ for i=1:1
 %   p = p.setMass(1+rand*(ub(1)-lb(1))+lb(1));
 %   p = p.setCOMLength(0.5+rand*(ub(2)-lb(2))+lb(2));
 %   p = p.setDamping(0.1+rand*(ub(3)-lb(3))+lb(3));
-  p = p.setMass(1+0.5);
+  p = p.setMass(1+0.55);
   sys = feedback(p,c);
 
   if 1

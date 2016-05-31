@@ -158,11 +158,11 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
           obj = obj.addConstraint(constraint, inds);
               
           
-%           if any(~isinf(obj.plant.umin)) || any(~isinf(obj.plant.umax))
-%             inds = {obj.u_inds(:,i); obj.du_inds((j-1)*nU+(1:nU),i)};
-%             constraint = FunctionHandleConstraint(obj.plant.umin,obj.plant.umax,2*nU,@obj.delta_u_bound);
-%             obj = obj.addConstraint(constraint, inds);  
-%           end        
+          if any(~isinf(obj.plant.umin)) || any(~isinf(obj.plant.umax))
+            inds = {obj.u_inds(:,i); obj.du_inds((j-1)*nU+(1:nU),i)};
+            constraint = FunctionHandleConstraint(obj.plant.umin,obj.plant.umax,2*nU,@obj.delta_u_bound);
+            obj = obj.addConstraint(constraint, inds);  
+          end        
         end
         
         
@@ -170,7 +170,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       end
       
       obj = obj.addConstraint(ConstantConstraint(zeros(nX,1)),obj.dx_inds(1:nX,1)); % first dx=0
-      obj = obj.addConstraint(ConstantConstraint(zeros(nU,1)),obj.u_inds(:,N)); % last u=0
+%       obj = obj.addConstraint(ConstantConstraint(zeros(nU,1)),obj.u_inds(:,N)); % last u=0
     end
     
 
@@ -194,7 +194,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     function obj = addLinearControlConstraint(obj,K)
       obj.K = K;
       n_vars = obj.nX + obj.nU;
-      for i=1:obj.N-1
+      for i=1:obj.N
         for j=1:obj.M
           inds = {obj.dx_inds((j-1)*obj.nX+(1:obj.nX),i); ...
                   obj.du_inds((j-1)*obj.nU+(1:obj.nU),i)};
@@ -217,16 +217,16 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
     end
     
-%     function [f,df] = backward_robust_dynamics_fun(obj,h,x0,x1,u,du,w)
-%       [xdot,dxdot] = obj.plant.dynamics_w(0,x1,u+du,w);
-%       f = x0 + h*xdot;
-%       df = [xdot ... h
-%         eye(obj.nX) ... x0
-%         h*dxdot(:,2:1+obj.nX) ... x1
-%         h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u
-%         h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du
-%         h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
-%     end
+    function [f,df] = backward_robust_dynamics_fun(obj,h,x0,x1,u,du,w)
+      [xdot,dxdot] = obj.plant.dynamics_w(0,x1,u+du,w);
+      f = x0 + h*xdot;
+      df = [xdot ... h
+        eye(obj.nX) ... x0
+        h*dxdot(:,2:1+obj.nX) ... x1
+        h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u
+        h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du
+        h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
+    end
     
 %     function [f,df] = midpoint_robust_dynamics_fun(obj,h,x0,x1,u0,du0,u1,du1,w0,w1)
 %       [xdot,dxdot] = obj.plant.dynamics_w(0,.5*(x0+x1),.5*(u0+du0+u1+du1),.5*(w0+w1));
@@ -295,7 +295,41 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       
       df = [df_dh, df_dx0, -dr_dx0*df_ddx0, df_dx1, df_ddx1, df_du, df_ddu];
     end
-    
+
+%     function [f,df] = backward_delta_x_constraint(obj,j,h,x0,dx0,x1,dx1j,u,du)
+%       w = obj.disturbances(:,j);
+%       
+%       dx0_max = dx0(1:obj.nX);
+%       df_ddx0 = zeros(obj.nX,obj.nX*obj.M);
+%       df_ddx0(:,1:obj.nX) = eye(obj.nX);
+%       for j=2:obj.M
+%          dx0j = dx0((j-1)*obj.nX+(1:obj.nX));
+%          if norm(dx0j)>norm(dx0_max)
+%             dx0_max = dx0j;
+%             df_ddx0 = zeros(obj.nX,obj.nX*obj.M);
+%             df_ddx0(:,(j-1)*obj.nX+(1:obj.nX)) = eye(obj.nX);
+%          end        
+%       end
+%       
+%       [r,dr] = obj.forward_robust_dynamics_fun(h,x0+dx0_max,u,du,w);
+%       
+%       f = dx1j - r + x1; % delta_x(1) = x0 + f(x0+max(delta_x(0)),u0+du0,w) - x(1)
+%       
+%       dr_dh = dr(:,1);
+%       dr_dx0 = dr(:,1+(1:obj.nX));
+%       dr_du = dr(:,1+obj.nX+(1:obj.nU));
+%       dr_ddu = dr(:,1+obj.nX+obj.nU+(1:obj.nU));
+%       
+%       df_dh = -dr_dh;
+%       df_dx0 = -dr_dx0;
+%       df_dx1 = eye(obj.nX);
+%       df_ddx1 = eye(obj.nX);
+%       df_du = -dr_du;
+%       df_ddu = -dr_ddu;
+%       
+%       df = [df_dh, df_dx0, -dr_dx0*df_ddx0, df_dx1, df_ddx1, df_du, df_ddu];
+%     end
+%     
     
 %     function [f,df] = robust_backward_bound_fun(obj,robust_cost,j,gamma,h,x0,x1,u,du)
 %       w = obj.disturbances(:,j);

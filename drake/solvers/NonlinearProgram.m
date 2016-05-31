@@ -161,9 +161,9 @@ classdef NonlinearProgram
       obj.solver_options.snopt.MajorIterationsLimit = 1000;
       obj.solver_options.snopt.MinorIterationsLimit = 500;
       obj.solver_options.snopt.IterationsLimit = 10000;
-      obj.solver_options.snopt.MajorOptimalityTolerance = 1e-4;
-      obj.solver_options.snopt.MajorFeasibilityTolerance = 1e-4;
-      obj.solver_options.snopt.MinorFeasibilityTolerance = 1e-4;
+      obj.solver_options.snopt.MajorOptimalityTolerance = 1e-6;
+      obj.solver_options.snopt.MajorFeasibilityTolerance = 1e-6;
+      obj.solver_options.snopt.MinorFeasibilityTolerance = 1e-6;
       obj.solver_options.snopt.SuperbasicsLimit = 300;
       obj.solver_options.snopt.VerifyLevel = 0;
       obj.solver_options.snopt.DerivativeOption = 1;
@@ -176,7 +176,7 @@ classdef NonlinearProgram
       obj.solver_options.fmincon.GradConstr = 'on';
       obj.solver_options.fmincon.GradObj = 'on';
       obj.solver_options.snopt.sense = 'Minimize';
-      obj.constraint_err_tol = 1e-4;
+      obj.constraint_err_tol = 1e-6;
       obj.check_grad = false;
     end
 

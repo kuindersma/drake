@@ -64,7 +64,8 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
 
       obj.N = N;
 
-      if 1
+      if 0
+        warning('Setting up constraints in DirectTrajectoryOptimization class');
         
         if isscalar(duration), duration=[duration,duration]; end
 
