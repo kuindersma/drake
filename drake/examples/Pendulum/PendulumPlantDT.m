@@ -34,14 +34,14 @@ classdef PendulumPlantDT < DrakeSystem
       obj.p.m = mass;
     end
     
-    function [xdn,df,d2f]=update(obj,t,x,u)
-      [f,df,d2f] = obj.p.dynamics(t,x,u);
-      xdn=x+obj.dt*f;
+    function [xdn,dxdn,d2xdn]=update(obj,h,x,u)
+      [f,df,d2f] = obj.p.dynamics(0,x,u);
+      xdn=x+h*f;
       if nargout > 1
         nx = getNumStates(obj);
         nu = getNumInputs(obj);
-        df = [zeros(nx,1),eye(nx),zeros(nx,nu)]+obj.dt*df;
-        d2f = obj.dt*d2f;
+        dxdn = [f,eye(nx)+h*df(:,1+(1:nx)),h*df(:,1+nx+(1:nu))];
+        d2xdn = obj.dt*d2f;
       end
     end
    
@@ -78,6 +78,56 @@ classdef PendulumPlantDT < DrakeSystem
       Q = diag([50 2]); R = 0.1;
       [c,V] = tilqr(obj,obj.xG,0,Q,R);
     end
+     
+    
+    function [utraj,xtraj]=swingUpTrajectory(obj,N,options)
+      x0 = [0;0]; 
+      xf = double(obj.xG);
+      tf0 = 4;
+
+      options.integration_method = DirtranTrajectoryOptimization.DT_SYSTEM;
+      traj_opt = DirtranTrajectoryOptimization(obj,N,[3 8],options);
+      traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
+      traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
+      traj_opt = traj_opt.addRunningCost(@cost);
+      traj_opt = traj_opt.addFinalCost(@finalCost);
+      traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
+      
+      % add a display function to draw the trajectory on every iteration
+      function displayStateTrajectory(t,x,u)
+        plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
+        drawnow;
+      end
+      traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
+      
+      function [g,dg] = cost(h,x,u)
+        R = 1;
         
+        g = (R*u).*u;
+        
+        if (nargout>1)
+          dg = [zeros(1,3),2*u'*R];
+        end
+      end
+      
+      function [h,dh] = finalCost(tf,x)
+        h = tf;
+        if (nargout>1)
+          dh = [1, zeros(1,2)];
+        end
+      end
+   
+      
+%       info=0;
+%       while (info~=1)
+      tic
+      [xtraj,utraj,z,F,info] = traj_opt.solveTraj(tf0,traj_init);
+      toc
+%       end
+    end
+    
+    
+    
+    
   end
 end

@@ -17,6 +17,7 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
     FORWARD_EULER = 1;
     BACKWARD_EULER = 2;
     MIDPOINT = 3;  % DEFAULT
+    DT_SYSTEM = 4;
   end
   
   methods
@@ -49,6 +50,9 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
         case DirtranTrajectoryOptimization.MIDPOINT
           n_vars = 2*nX + 2*nU + 1;
           cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.midpoint_constraint_fun);
+        case DirtranTrajectoryOptimization.DT_SYSTEM
+          n_vars = 2*nX + nU + 1;
+          cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.discrete_time_constraint_fun);
         otherwise
           error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
       end
@@ -61,6 +65,8 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
             dyn_inds{i} = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
           case DirtranTrajectoryOptimization.MIDPOINT
             dyn_inds{i} = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1)};
+          case DirtranTrajectoryOptimization.DT_SYSTEM
+            dyn_inds{i} = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
           otherwise
             error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
         end
@@ -92,6 +98,9 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
             running_cost = FunctionHandleObjective(1+2*nX+2*nU,...
               @(h,x0,x1,u0,u1) obj.midpoint_running_fun(running_cost_function,h,x0,x1,u0,u1));
             inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1)};
+          case DirtranTrajectoryOptimization.DT_SYSTEM
+            running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function);
+            inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.u_inds(:,i)};
           otherwise
             error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
         end
@@ -99,7 +108,14 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
         obj = obj.addCost(running_cost,inds_i);
       end
     end
-    
+
+    function [f,df] = discrete_time_constraint_fun(obj,h,x0,x1,u)
+      nX = obj.plant.getNumStates();
+      [x1_,dx1_] = obj.plant.updateConvexOpt(h,x0,u);
+      f = x1 - x1_;
+      df = [-dx1_(:,1), -dx1_(:,2:1+nX), eye(nX), -dx1_(:,nX+2:end)];
+    end
+
     function [f,df] = forward_constraint_fun(obj,h,x0,x1,u)
       nX = obj.plant.getNumStates();
       [xdot,dxdot] = obj.plant.dynamics(0,x0,u);

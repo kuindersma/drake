@@ -284,8 +284,16 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
            
     end
     
+    
+    function [xdn,df] = updateConvexOpt(obj,h,x,u)
+      
+      [xdn,df] = geval(@obj.updateConvex,h,x,u,struct('grad_method','numerical'));
+      
+    end
+    
+    
    
-    function [xdn,df] = updateConvex(obj,t,x,u,w)
+    function [xdn,df] = updateConvex(obj,h,x,u,w)
       % this function implement an update based on Todorov 2011, where
       % instead of solving the full SOCP, we make use of polyhedral
       % friction cone approximations and solve a QP.
@@ -751,7 +759,6 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           else
             [phiC,normal,d,xA,xB,idxA,idxB,mu,n,D] = obj.manip.contactConstraints(kinsol, obj.multiple_contacts);
           end
-          phiC
           
           if ~isempty(phiC)
               if isempty(possible_contact_indices)

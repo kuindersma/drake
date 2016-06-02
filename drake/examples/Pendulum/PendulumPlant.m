@@ -189,7 +189,7 @@ classdef PendulumPlant < SecondOrderSystem
       tf0 = 4;
 
       options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
-      traj_opt = DirtranTrajectoryOptimization(obj,N,[3 8]);
+      traj_opt = DirtranTrajectoryOptimization(obj,N,[3 8],options);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
       traj_opt = traj_opt.addRunningCost(@cost);
