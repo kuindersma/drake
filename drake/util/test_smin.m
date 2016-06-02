@@ -3,11 +3,11 @@ y = zeros(N);
 
 zs = linspace(0,1,N);
 
-tmp1 = @(x) smin(x,0.2,0.1);
+tmp1 = @(x) smin(x,0.5,0.1);
 
 for i=1:100
   x=randn();
-  [f1,df1] = geval(tmp1,x);
+  [f1,df1] = geval(tmp1,x,struct('grad_method','taylorvar'));
   [f2,df2] = tmp1(x);
   valuecheck(df1,df2);
 end
