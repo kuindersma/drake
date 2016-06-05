@@ -132,8 +132,6 @@ classdef AcrobotPlant < Manipulator
     
     
     
-    
-    
     function [utraj,xtraj]=robustSwingUpTrajectory(obj,N,M,disturbances)
       x0 = zeros(4,1); 
       xf = double(obj.xG);

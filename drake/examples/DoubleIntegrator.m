@@ -8,7 +8,7 @@ classdef DoubleIntegrator < LinearSystem
     end
     
     function g = mintime_cost(obj,x,u)
-      g = ((x(1,:) ~= 0) | (x(2,:) ~= 0));
+      g = ((x(1,:)~= 0) | (x(2,:) ~= 0));
     end
     
     function g = lqr_cost(obj,x,u)
@@ -244,7 +244,7 @@ classdef DoubleIntegrator < LinearSystem
       prog = prog.addDeltaXEqualsZeroConstraint();
         
       disp('constructor done');
-% 
+
 %       nx=2; nu=1; nw=1;
 %       for j=1:10
 %         hr = randn();
@@ -261,24 +261,24 @@ classdef DoubleIntegrator < LinearSystem
 %         [~,df1] = geval(@cost,hr,xr,ur,struct('grad_method','taylorvar'));
 %         [~,df2] = cost(hr,xr,ur);
 %       
-%         valuecheck(df1,df2,1e-5);
+%         valuecheck(df1,df2);
 %       
 %         [~,df1] = geval(@robust_cost,xr,ur,wr,struct('grad_method','taylorvar'));
 %         [~,df2] = robust_cost(xr,ur,wr);
 %       
-%         valuecheck(df1,df2,1e-5);        
+%         valuecheck(df1,df2);        
 %         
 %         [~,df1] = geval(@prog.forward_robust_dynamics_fun,hr,xr,ur,dur,wr,struct('grad_method','taylorvar'));
 %         [~,df2] = prog.forward_robust_dynamics_fun(hr,xr,ur,dur,wr);
 %       
-%         valuecheck(df1,df2,1e-5);
+%         valuecheck(df1,df2);
 %         
 %         tmp1 = @(gamma,h,x0,dx0,u,du,x1) prog.forward_robust_bound_fun(@robust_cost,1,gamma,h,x0,dx0,u,du,x1);
 % 
 %         [~,df1] = geval(tmp1,gr,hr,xr,dxr,ur,dur,x1r,struct('grad_method','taylorvar'));
 %         [~,df2] = tmp1(gr,hr,xr,dxr,ur,dur,x1r);
 %       
-%         valuecheck(df1,df2,1e-5);
+%         valuecheck(df1,df2);
 % 
 % 
 %         tmp1 = @(h,x0,dx0,x1,dx1,u,du,w) prog.forward_delta_x_constraint(h,x0,dx0,x1,dx1,u,du,w);
@@ -286,7 +286,7 @@ classdef DoubleIntegrator < LinearSystem
 %         [~,df1] = geval(tmp1,hr,xr,dxr,x1r,dx1r,ur,dur,wr,struct('grad_method','taylorvar'));
 %         [~,df2] = tmp1(hr,xr,dxr,x1r,dx1r,ur,dur,wr);
 %       
-%         valuecheck(df1,df2,1e-5);
+%         valuecheck(df1,df2);
 %         
 %         
 %         tmp1 = @(gamma,h,x0,dx0,u,du,x1,zi) prog.complementarity_fun(@robust_cost,gamma,h,x0,dx0,u,du,x1,zi);
@@ -294,7 +294,7 @@ classdef DoubleIntegrator < LinearSystem
 %         [~,df1] = geval(tmp1,gr,hr,xr,dxr,ur,dur,x1r,zr,struct('grad_method','numerical'));
 %         [~,df2] = tmp1(gr,hr,xr,dxr,ur,dur,x1r,zr);
 %       
-%         valuecheck(df1,df2,1e-3);
+%         valuecheck(df1,df2,5e-4);
 %         
 % 
 %         tmp1 = @(x) smin(x,0.5,0.1);
@@ -303,18 +303,36 @@ classdef DoubleIntegrator < LinearSystem
 %         [~,df1] = geval(tmp1,r,struct('grad_method','taylorvar'));
 %         [~,df2] = tmp1(r);
 %       
-%         valuecheck(df1,df2,1e-5);     
+%         valuecheck(df1,df2);     
 %         
 %               
-%         [~,df1] = geval(@prog.z_cost,zr,struct('grad_method','taylorvar'));
-%         [~,df2] = prog.z_cost(zr);
+% %         [~,df1] = geval(@prog.z_cost,zr,struct('grad_method','taylorvar'));
+% %         [~,df2] = prog.z_cost(zr);
+% %       
+% %         valuecheck(df1,df2);     
+% %       
+% 
+%         [~,df2] = prog.w_complementarity_constr(wr,zr);
+%         [~,df1] = geval(@prog.w_complementarity_constr,wr,zr,struct('grad_method','taylorvar'));
 %       
-%         valuecheck(df1,df2,1e-5);     
-%                    
-%         [~,df1] = geval(@prog.z_norm_constr,zr,struct('grad_method','taylorvar'));
-%         [~,df2] = prog.z_norm_constr(zr);
-%       
-%         valuecheck(df1,df2,1e-5);     
+%         valuecheck(df1,df2);     
+% 
+% 
+% %         z = rand(N*M,1);
+% % 
+% %         [~,df1] = geval(@prog.z_binary_constr,z,struct('grad_method','taylorvar'));
+% %         [~,df2] = prog.z_binary_constr(z);
+% %       
+% %         valuecheck(df1,df2);     
+% 
+% 
+% 
+% %         z = rand(N*M,1);
+% % 
+% %         [~,df1] = geval(@prog.z_binary_constr,z,struct('grad_method','taylorvar'));
+% %         [~,df2] = prog.z_binary_constr(z);
+% %       
+% %         valuecheck(df1,df2);     
 %         
 %         
 %       end

@@ -118,13 +118,13 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       obj = obj.addCost(running_cost,{obj.gamma_inds});
     end
     
-    function obj = addZCost(obj)
-      for i=1:obj.N-1
-        running_cost = FunctionHandleObjective(obj.M, @obj.z_cost);
-        inds_i = {obj.z_inds((i-1)*obj.M+(1:obj.M))};
-        obj = obj.addCost(running_cost,inds_i);
-      end
-    end
+%     function obj = addZCost(obj)
+%       for i=1:obj.N-1
+%         running_cost = FunctionHandleObjective(obj.M, @obj.z_cost);
+%         inds_i = {obj.z_inds((i-1)*obj.M+(1:obj.M))};
+%         obj = obj.addCost(running_cost,inds_i);
+%       end
+%     end
     
     function obj = addRobustConstraints(obj,robust_cost)
       nX = obj.nX;
@@ -168,13 +168,28 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
           
         end
         
-        %---------------------------------------------------------------
-        %---------------------------------------------------------------
-        %---------------------------------------------------------------        
-        % complementarity constraint: (gamma-ell)'z=0
-        %---------------------------------------------------------------
-        %---------------------------------------------------------------
-        n_vars = 2 + 3*nX + 2*nU + M;
+%         %---------------------------------------------------------------
+%         %---------------------------------------------------------------
+%         %---------------------------------------------------------------        
+%         % complementarity constraint: (gamma-ell)'z=0
+%         %---------------------------------------------------------------
+%         %---------------------------------------------------------------
+%         n_vars = 2 + 3*nX + 2*nU + M;
+%         inds = {obj.gamma_inds(i); ...
+%                 obj.h_inds(i); ...
+%                 obj.x_inds(:,i); ...
+%                 obj.dx_inds(:,i); ...
+%                 obj.u_inds(:,i); ...
+%                 obj.du_inds(:,i); ...
+%                 obj.x_inds(:,i+1); ...
+%                 obj.z_inds((i-1)*M+(1:M))};
+%               
+%         complementarity_fun = @(gamma,h,x0,dx0,u,du,x1,zi) obj.complementarity_fun(robust_cost,gamma,h,x0,dx0,u,du,x1,zi);
+%               
+%         constraint = FunctionHandleConstraint(0,0,n_vars,complementarity_fun);
+%         obj = obj.addConstraint(constraint, inds);
+        
+        n_vars = 2 + 3*nX + 2*nU + nW;
         inds = {obj.gamma_inds(i); ...
                 obj.h_inds(i); ...
                 obj.x_inds(:,i); ...
@@ -182,28 +197,28 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                 obj.u_inds(:,i); ...
                 obj.du_inds(:,i); ...
                 obj.x_inds(:,i+1); ...
-                obj.z_inds((i-1)*M+(1:M))};
-              
-        complementarity_fun = @(gamma,h,x0,dx0,u,du,x1,zi) obj.complementarity_fun(robust_cost,gamma,h,x0,dx0,u,du,x1,zi);
-              
-        constraint = FunctionHandleConstraint(0,0,n_vars,complementarity_fun);
+                obj.w_inds(:,i)};
+   
+        forward_w_bound_fun_i = @(gamma,h,x0,dx0,u,du,x1,w0) obj.forward_w_bound_fun(robust_cost,gamma,h,x0,dx0,u,du,x1,w0);
+
+        constraint = FunctionHandleConstraint(0,inf,n_vars,forward_w_bound_fun_i);
         obj = obj.addConstraint(constraint, inds);
- 
+
+
 %         % Sum constraint on z: \sum_j zij = 1
 %         inds = {obj.z_inds((i-1)*M+(1:M))};
 %         constraint = FunctionHandleConstraint(1,1,M,@obj.z_sum_constr);
 %         obj = obj.addConstraint(constraint, inds);
 
-        % norm constraints on zi
-        inds = {obj.z_inds((i-1)*M+(1:M))};
-        constraint = FunctionHandleConstraint(1,1,M,@obj.z_norm_constr);
-        obj = obj.addConstraint(constraint, inds);
+%         % complementarity constraints on zi
+%         inds = {obj.z_inds((i-1)*M+(1:M))};
+%         constraint = FunctionHandleConstraint(-eps,eps,M,@obj.z_complementarity_constr);
+%         obj = obj.addConstraint(constraint, inds);
         
-        % equality constraint on wi: wi - \sum_j zij = 0
-        inds = {obj.w_inds(:,i);obj.z_inds((i-1)*M+(1:M))};
-        constraint = FunctionHandleConstraint(zeros(nW,1),zeros(nW,1),nW+M,@obj.w_equality);
-        obj = obj.addConstraint(constraint, inds);        
-        
+%         % equality constraint on wi: wi - \sum_j zij = 0
+%         inds = {obj.w_inds(:,i);obj.z_inds((i-1)*M+(1:M))};
+%         constraint = FunctionHandleConstraint(zeros(nW,1),zeros(nW,1),nW+M,@obj.w_equality);
+%         obj = obj.addConstraint(constraint, inds);        
         
         
           
@@ -257,6 +272,11 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       end
     
           
+%       % binary constraint on z
+%       inds = {obj.z_inds};
+%       constraint = FunctionHandleConstraint(-0.1*ones(nZ,1),0.1*ones(nZ,1),nZ,@obj.z_binary_constr);
+%       obj = obj.addConstraint(constraint, inds);
+
       
       %---------------------------------------------------------------
       %---------------------------------------------------------------
@@ -287,17 +307,17 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       end
     end    
     
-    function [f,df] = complementarity_fun(obj,robust_cost,gamma,h,x0,dx0,u,du,x1,zi)
-      v = zeros(obj.M,1);
-      dv = [];
-      for j=1:obj.M
-        [g,dg] = forward_robust_bound_fun(obj,robust_cost,j,gamma,h,x0,dx0,u,du,x1);
-        v(j) = g;
-        dv = [dv;dg];
-      end
-      f = v'*zi;
-      df = [zi'*dv, v'];
-    end
+%     function [f,df] = complementarity_fun(obj,robust_cost,gamma,h,x0,dx0,u,du,x1,zi)
+%       v = zeros(obj.M,1);
+%       dv = [];
+%       for j=1:obj.M
+%         [g,dg] = forward_robust_bound_fun(obj,robust_cost,j,gamma,h,x0,dx0,u,du,x1);
+%         v(j) = g;
+%         dv = [dv;dg];
+%       end
+%       f = v'*zi;
+%       df = [zi'*dv, v'];
+%     end
     
     function [f,df] = linear_delta_u_constraint(obj,dx,du)
       f = du - obj.K*dx;
@@ -324,6 +344,26 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
             -dg(1:obj.nX)*dx1_w(:,1+obj.nX+(1:obj.nU)) - dg(obj.nX+(1:obj.nU)), ... du
             dg(1:obj.nX)]; %x1
     end
+    
+    
+    function [f,df] = forward_w_bound_fun(obj,robust_cost,gamma,h,x0,dx0,u,du,x1,w0)
+      [x1_w, dx1_w] = forward_robust_dynamics_fun(obj,h,x0+dx0,u,du,w0);
+     
+      dx = x1_w - x1;
+      [g,dg] = robust_cost(dx,du,w0);
+   
+      f = g - gamma;
+    
+      df = [-1, ... gamma
+            dg(1:obj.nX)*dx1_w(:,1), ... h
+            dg(1:obj.nX)*dx1_w(:,1+(1:obj.nX)), ... x0
+            dg(1:obj.nX)*dx1_w(:,1+(1:obj.nX)), ... dx0
+            dg(1:obj.nX)*dx1_w(:,1+obj.nX+(1:obj.nU)), ... u
+            dg(1:obj.nX)*dx1_w(:,1+obj.nX+(1:obj.nU)) + dg(obj.nX+(1:obj.nU)), ... du
+            -dg(1:obj.nX), ... x1
+            dg(1:obj.nX)*dx1_w(:,1+obj.nX+obj.nU+(1:obj.nW))]; 
+    end
+
     
     function [f,df] = forward_delta_x_constraint(obj,h,x0,dx0,x1,dx1,u,du,w)
 
@@ -416,17 +456,23 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       df = ones(1,obj.N-1);
     end
 
-    function [f,df] = delta_u_bound(obj,u,du)
+    function [f,df] = delta_u_bound(~,u,du)
       f = u+du;
       df = [eye(length(u)), eye(length(u))];
     end
     
-    function [f,df] = w_equality(obj,wi,zi)
-      f = wi - obj.disturbances*zi;
-      df = [eye(obj.nW), -obj.disturbances];
-    end
+%     function [f,df] = w_equality(obj,wi,zi)
+%       f = wi - obj.disturbances*zi;
+%       df = [eye(obj.nW), -obj.disturbances];
+%     end    
 
-%     function [f,df] = z_diff_constr(obj,z)
+    
+%     function [f,df] = z_binary_constr(obj,z)
+%       f = z.*(1-z);
+%       df = eye(length(z))-diag(2*z);      
+%     end
+    
+%     function [f,df] = z_complementarity_constr(obj,z)
 %       mf = factorial(obj.M-1);
 %       f = zeros(mf,1);
 %       df = zeros(mf,obj.M);
@@ -434,23 +480,22 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
 %       n=1;
 %       for i=1:obj.M
 %         for j=i+1:obj.M
-%           err = z(i)-z(j);
-%           f(n) = err'*err;
-%           df(n,[i,j]) = [2*err,-2*err];
+%           f(n) = z(i)*z(j);
+%           df(n,[i,j]) = [z(j),z(i)];
 %           n=n+1;
 %         end
 %       end
 %     end
+
+%     function [f,df] = z_sum_constr(~,zi)
+%       f = ones(1,length(zi))*zi;
+%       df = ones(1,length(zi));
+%     end
     
-    function [f,df] = z_sum_constr(~,zi)
-      f = ones(1,length(zi))*zi;
-      df = ones(1,length(zi));
-    end
-    
-    function [f,df] = z_norm_constr(~,zi)
-      f = zi'*zi;
-      df = 2*zi';
-    end
+%     function [f,df] = z_norm_constr(~,zi)
+%       f = zi'*zi;
+%       df = 2*zi';
+%     end
     
 %     function [f,df] = z_cost(obj,zi)      
 %       f = 0;
