@@ -235,7 +235,7 @@ classdef DoubleIntegrator < LinearSystem
       
       d = linspace(lb,ub,M);
       options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
-      prog = RobustDirtranTrajectoryOptimization(plant,N,M,[4 8],options);
+      prog = RobustDirtranTrajectoryOptimization(plant,N,M,lb,ub,[4 8],options);
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
@@ -348,7 +348,7 @@ classdef DoubleIntegrator < LinearSystem
       function [g,dg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
         Qw = 200*eye(2);
-        Rw = 0.1;
+        Rw = 1;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
       end
