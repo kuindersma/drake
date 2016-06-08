@@ -207,7 +207,7 @@ classdef PendulumPlant < SecondOrderSystem
 %         [~,df1] = geval(@integrationCost,h,x,u,struct('grad_method','numerical'));
 %         [~,df2] = integrationCost(h,x,u);
 %       
-%         valuecheck(df1,df2);
+%         valuecheck(df1,df2,1e-3);
 %       end
 %       
 %       keyboard
@@ -335,7 +335,7 @@ classdef PendulumPlant < SecondOrderSystem
 %       d(:,8) = [ub(1);ub(2);ub(3)];
       
       options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,M,[3 8],options);
+      prog = RobustDirtranTrajectoryOptimization(obj,N,M,lb,ub,[3 8],options);
       prog = prog.setDisturbances(d);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
@@ -343,65 +343,97 @@ classdef PendulumPlant < SecondOrderSystem
       prog = prog.addFinalCost(@finalCost);
       prog = prog.addRobustConstraints(@robust_cost);
       prog = prog.addLinearControlConstraint(K);
-%       prog = prog.addStateRegularization();
-      
       
       disp('constructor done');
 
-%     
 %       nx=2; nu=1; nw=1;
-%       for j=1:10
-%         hr = randn();
-%         xr = randn(nx,1);
-%         xr2 = randn(nx,1);
-%         dxr = randn(nx*M,1);
+%       for j=1:20
+%         hr = rand();
+%         xr = 2*randn(nx,1);
+%         x1r = 2*randn(nx,1);
+%         dx1r = 0.1*randn(nx,1);
+%         dxr = 0.1*randn(nx,1);
 %         ur = randn(nu,1);
-%         ur2 = randn(nu,1);
+%         dur = randn(nu,1);
+%         u1r = randn(nu,1);
 %         wr = randn(nw,1);
 %         gr = randn();
-%       
-%         [~,df1] = geval(@cost,hr,xr,ur,struct('grad_method','taylorvar'));
+%         
+%         [~,df1] = geval(@cost,hr,xr,ur,struct('grad_method','numerical'));
 %         [~,df2] = cost(hr,xr,ur);
 %       
-%         valuecheck(df1,df2);
+%         valuecheck(df1,df2,1e-3);
+% 
+%         [~,df1] = geval(@finalCost,hr,xr,struct('grad_method','numerical'));
+%         [~,df2] = finalCost(hr,xr);
 %       
-%         [~,df1] = geval(@robust_cost,xr,ur,wr,struct('grad_method','taylorvar'));
+%         valuecheck(df1,df2,1e-3);
+% 
+%         
+%         [~,df1] = geval(@robust_cost,xr,ur,wr,struct('grad_method','numerical'));
 %         [~,df2] = robust_cost(xr,ur,wr);
 %       
-%         valuecheck(df1,df2);
-% 
+%         valuecheck(df1,df2,1e-3);        
 %         
-%         [~,df1] = geval(@obj.dynamics_w,hr,xr,ur,wr,struct('grad_method','taylorvar'));
-%         [~,df2] = obj.dynamics_w(hr,xr,ur,wr);
+%         [~,df1] = geval(@prog.forward_robust_dynamics_fun,hr,xr,ur,dur,wr,struct('grad_method','numerical'));
+%         [~,df2] = prog.forward_robust_dynamics_fun(hr,xr,ur,dur,wr);
 %       
-%         valuecheck(df1,df2);
+%         valuecheck(df1,df2,1e-3);
 % 
-%         [~,df1] = geval(@prog.forward_robust_dynamics_fun,hr,xr,ur,ur2,wr,struct('grad_method','taylorvar'));
-%         [~,df2] = prog.forward_robust_dynamics_fun(hr,xr,ur,ur2,wr);
+%         [~,df1] = geval(@prog.midpoint_robust_dynamics_fun,hr,xr,dxr,x1r,ur,dur,u1r,wr,struct('grad_method','numerical'));
+%         [~,df2] = prog.midpoint_robust_dynamics_fun(hr,xr,dxr,x1r,ur,dur,u1r,wr);
 %       
-%         valuecheck(df1,df2);
+%         valuecheck(df1,df2,1e-3);
+% 
+%         tmp1 = @(gamma,h,x0,dx0,x1,u,du) prog.forward_robust_bound_fun(@robust_cost,1,gamma,h,x0,dx0,x1,u,du);
+%         [~,df1] = geval(tmp1,gr,hr,xr,dxr,x1r,ur,dur,struct('grad_method','numerical'));
+%         [~,df2] = tmp1(gr,hr,xr,dxr,x1r,ur,dur);
+%       
+%         valuecheck(df1,df2,1e-3);
+% 
+%         tmp1 = @(gamma,h,x0,dx0,x1,u,du,u1) prog.midpoint_robust_bound_fun(@robust_cost,1,gamma,h,x0,dx0,x1,u,du,u1);
+%         [~,df1] = geval(tmp1,gr,hr,xr,dxr,x1r,ur,dur,u1r,struct('grad_method','numerical'));
+%         [~,df2] = tmp1(gr,hr,xr,dxr,x1r,ur,dur,u1r);
+%       
+%         valuecheck(df1,df2,1e-3);
 %         
-%         tmp1 = @(gamma,dx,du) prog.robust_bound_fun(@robust_cost,1,gamma,dx,du);
-% 
-%         [~,df1] = geval(tmp1,gr,xr,ur,struct('grad_method','taylorvar'));
-%         [~,df2] = tmp1(gr,xr,ur);
-%       
-%         valuecheck(df1,df2);
-% 
-%         tmp2 = @(h,x0,dx0,x1,dx1j,u,du) prog.forward_delta_x_constraint(1,h,x0,dx0,x1,dx1j,u,du);
 %         
-%         [~,df1] = geval(tmp2,hr,xr,dxr,xr2,0.234*xr2,ur,ur2,struct('grad_method','taylorvar'));
-%         [~,df2] = tmp2(hr,xr,dxr,xr2,0.234*xr2,ur,ur2);
+%         tmp1 = @(gamma,h,x0,dx0,x1,u,du,w0) prog.forward_w_bound_fun(@robust_cost,gamma,h,x0,dx0,x1,u,du,w0);
+%         [~,df1] = geval(tmp1,gr,hr,xr,dxr,x1r,ur,dur,wr,struct('grad_method','numerical'));
+%         [~,df2] = tmp1(gr,hr,xr,dxr,x1r,ur,dur,wr);
 %       
-%         valuecheck(df1,df2);
+%         valuecheck(df1,df2,1e-3);
 % 
+%         tmp1 = @(gamma,h,x0,dx0,x1,u0,du0,u1,w0) prog.midpoint_w_bound_fun(@robust_cost,gamma,h,x0,dx0,x1,u0,du0,u1,w0);
+%         [~,df1] = geval(tmp1,gr,hr,xr,dxr,x1r,ur,dur,u1r,wr,struct('grad_method','numerical'));
+%         [~,df2] = tmp1(gr,hr,xr,dxr,x1r,ur,dur,u1r,wr);
+%       
+%         valuecheck(df1,df2,1e-3);
+%         
+% 
+%         tmp1 = @(h,x0,dx0,x1,dx1,u,du,w) prog.forward_delta_x_constraint(h,x0,dx0,x1,dx1,u,du,w);
+%         [~,df1] = geval(tmp1,hr,xr,dxr,x1r,dx1r,ur,dur,wr,struct('grad_method','numerical'));
+%         [~,df2] = tmp1(hr,xr,dxr,x1r,dx1r,ur,dur,wr);
+%       
+%         valuecheck(df1,df2,1e-3);
+% 
+%         tmp1 = @(h,x0,dx0,x1,dx1j,u0,du0,u1,w) prog.midpoint_delta_x_constraint(h,x0,dx0,x1,dx1j,u0,du0,u1,w);
+%         [~,df1] = geval(tmp1,hr,xr,dxr,x1r,dx1r,ur,dur,u1r,wr,struct('grad_method','numerical'));
+%         [~,df2] = tmp1(hr,xr,dxr,x1r,dx1r,ur,dur,u1r,wr);
+%       
+%         valuecheck(df1,df2,1e-3);        
+%         
+%         [~,df1] = geval(@prog.linear_delta_u_constraint,xr,ur,struct('grad_method','numerical'));
+%         [~,df2] = prog.linear_delta_u_constraint(xr,ur);
+%       
+%         valuecheck(df1,df2,1e-3);
+%         
+%         
+%         
 %       end
 % 
 %       keyboard
-
-      
-%       
-%             
+             
       % add a display function to draw the trajectory on every iteration
       function displayStateTrajectory(t,x,u)
         plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
@@ -441,7 +473,7 @@ classdef PendulumPlant < SecondOrderSystem
       
       function [g,dg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
-        Qw = 250*eye(2);
+        Qw = 1*eye(2);
         Rw = 1;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
