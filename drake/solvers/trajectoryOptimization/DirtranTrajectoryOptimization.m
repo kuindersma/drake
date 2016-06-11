@@ -70,6 +70,7 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
           otherwise
             error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
         end
+        cnstr = cnstr.setName(sprintf('dynamics_constr_%d_',i));
         constraints{i} = cnstr;
         
         obj = obj.addConstraint(constraints{i}, dyn_inds{i});

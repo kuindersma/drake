@@ -55,6 +55,8 @@ classdef NonlinearProgram
     % shared_data used by nonlinear constraints and cost functions
     nlcon_dataind
     cost_dataind
+    
+    binary_inds = [];
 
   end
 
@@ -155,7 +157,7 @@ classdef NonlinearProgram
       obj.bbcon_lb = [];
       obj.bbcon_ub = [];
 
-      obj = obj.setSolver('default');
+      obj = obj.setSolver('snopt');
       obj.solver_options.fmincon = optimset('Display','off');
       obj.solver_options.snopt = struct();
       obj.solver_options.snopt.MajorIterationsLimit = 1000;
@@ -599,6 +601,10 @@ classdef NonlinearProgram
 %      end
     end
 
+    function obj = setBinaryDecisionVariableIndices(obj,binary_inds)
+      obj.binary_inds = binary_inds;
+    end
+    
     function [obj,new_variable_idx] = addDecisionVariable(obj,num_new_vars,var_name)
       % appending new decision variables to the end of the current decision variables
       % @param num_new_vars      -- An integer. The newly added decision variable is an
@@ -760,6 +766,8 @@ classdef NonlinearProgram
         if(~checkDependency('ipopt'))
           error('Drake:NonlinearProgram:UnsupportedSolver',' IPOPT not found. IPOPT support will be disabled.');
         end
+        obj.solver = solver;
+      elseif(strcmp(solver,'knitro'))
         obj.solver = solver;
       elseif(strcmp(solver,'default'))
         if(checkDependency('snopt') || checkDependency('NonlinearProgramSnoptmex'))
@@ -985,6 +993,8 @@ classdef NonlinearProgram
             [x,objval,exitflag,infeasible_constraint_name] = fmincon(obj,x0);
           case 'ipopt'
             [x,objval,exitflag,infeasible_constraint_name] = ipopt(obj,x0);
+          case 'knitro'
+            [x,objval,exitflag,infeasible_constraint_name] = knitro(obj,x0);
           otherwise
             error('Drake:NonlinearProgram:UnknownSolver',['The requested solver, ',obj.solver,' is not known, or not currently supported']);
         end
@@ -1567,8 +1577,46 @@ classdef NonlinearProgram
     function obj = setVarBounds(obj,lb,ub)
       error('Drake:NonlinearProgram:setVarBounds is deprecated, use addConstraint instead');
     end
-  end
+   
+    function [x,objval,exitflag,infeasible_constraint_name] = knitro(obj,x0)
 
+      iJfun = [obj.iCinfun;obj.iCeqfun+obj.num_cin];
+      jJvar = [obj.jCinvar;obj.jCeqvar];
+      num_constraints = obj.num_cin+obj.num_ceq;
+
+      Jpattern = sparse(iJfun,jJvar,ones(length(iJfun),1),num_constraints,obj.num_vars);
+      
+      options = optimset('Algorithm', 'active-set', 'Display','iter','GradObj','on','GradConstr','on','MaxIter',5000, ...
+        'TolX', 1e-6, 'TolFun', 1e-6, 'TolCon', 1e-6);%, 'DerivativeCheck','On');
+      
+      
+
+      function [g,h,dg,dh] = nlcon(x)
+        [g,h,dg,dh] = nonlinearConstraints(obj,x);
+        dg = dg';
+        dh = dh';
+
+      end
+
+      [x,objval,exitflag] = ...
+         knitromatlab(@obj.objective,x0,obj.Ain,obj.bin,obj.Aeq,obj.beq, ...
+         obj.x_lb,obj.x_ub,@nlcon,[],options);
+%        
+%       xtype = zeros(obj.num_vars,1);
+%       xtype(obj.binary_inds) = 1;
+%       [x,objval,exitflag] = ...
+%          knitromatlab_mip(@obj.objective,x0,obj.Ain,obj.bin,obj.Aeq,obj.beq, ...
+%          obj.x_lb,obj.x_ub,@nlcon,xtype,[],[],[],options);
+       
+%       knitromatlab_mip(fun,x0,A,b,Aeq,beq,lb,ub,nonlcon,xType,objFnType,cineqFnType, ...
+%         extendedFeatures,options)
+       
+      infeasible_constraint_name = [];
+    
+    end
+
+  end
+ 
   methods(Access = protected)
     function [exitflag,infeasible_constraint_name] = mapSolverInfo(obj,exitflag,x)
       % Based on the solver information and solution, re-map the info

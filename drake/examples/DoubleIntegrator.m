@@ -234,18 +234,22 @@ classdef DoubleIntegrator < LinearSystem
       tf0 = 6;
       
       d = linspace(lb,ub,M);
-      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
+      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
       prog = RobustDirtranTrajectoryOptimization(plant,N,M,lb,ub,[4 8],options);
       prog = prog.setDisturbances(d);
-      prog = prog.addStateConstraint(ConstantConstraint(x0),1);
-      prog = prog.addStateConstraint(ConstantConstraint(xf),N);
+      constraint = ConstantConstraint(x0);
+      constraint = constraint.setName('x0_eq');
+      prog = prog.addStateConstraint(constraint,1);
+      constraint = ConstantConstraint(xf);
+      constraint = constraint.setName('xf_eq');
+      prog = prog.addStateConstraint(constraint,N);
       prog = prog.addRunningCost(@cost);
       prog = prog.addRobustConstraints(@robust_cost);
-      prog = prog.addDeltaXEqualsZeroConstraint();
+%       prog = prog.addDeltaXEqualsZeroConstraint();
         
       disp('constructor done');
 
-%       nx=2; nu=1; nw=1;
+      nx=2; nu=1; nw=1;
 %       for j=1:10
 %         hr = randn();
 %         xr = randn(nx,1);
@@ -303,6 +307,8 @@ classdef DoubleIntegrator < LinearSystem
 %       
 %         valuecheck(df1,df2);        
 %         
+%        
+%                 
 %         
 % %         tmp1 = @(gamma,h,x0,dx0,u,du,x1,zi) prog.complementarity_fun(@robust_cost,gamma,h,x0,dx0,u,du,x1,zi);
 % % 
@@ -357,15 +363,20 @@ classdef DoubleIntegrator < LinearSystem
       
 
       function [g,dg] = cost(dt,x,u)
-        g = dt; dg = [1,0*x',0*u']; % see geval.m for our gradient format
+        g = 0*dt; dg = 0*[1,0*x',0*u']; % see geval.m for our gradient format
       end
       
       function [g,dg] = robust_cost(dx,du,w)
-        W = 0*eye(length(w));
-        Qw = 200*eye(2);
+        W = .1*eye(length(w));
+        Qw = 20*eye(2);
         Rw = 1;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
+
+%         alpha = 0.2;
+%         g = sqrt(w'*w + alpha^2) - alpha;
+%         dg = [zeros(1,nx),zeros(1,nu),0.5/sqrt(w'*w + alpha^2) * 2*w'];
+      
       end
       
       % add a display function to draw the trajectory on every iteration
@@ -382,7 +393,7 @@ classdef DoubleIntegrator < LinearSystem
       for attempts=1:1
         disp('Running solve');
         tic
-        [xtraj,utraj,z,F,info] = prog.solveTraj(tf0,traj_init);
+        [xtraj,utraj,z,F,info,infeasible] = prog.solveTraj(tf0,traj_init);
         toc
         if info==1, break; end
       end
@@ -394,6 +405,7 @@ classdef DoubleIntegrator < LinearSystem
       u = z(prog.u_inds);
       du = z(prog.du_inds);
       w = z(prog.w_inds);
+      zz = z(prog.z_inds);
       
 %       i=3;
 %       w_bound = prog.forward_w_bound_fun(@robust_cost,gamma(i),h(i),x(:,i),dx(:,i),u(i),du(i),x(:,i+1),w(i));
