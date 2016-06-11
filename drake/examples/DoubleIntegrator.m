@@ -245,7 +245,7 @@ classdef DoubleIntegrator < LinearSystem
       prog = prog.addStateConstraint(constraint,N);
       prog = prog.addRunningCost(@cost);
       prog = prog.addRobustConstraints(@robust_cost);
-%       prog = prog.addDeltaXEqualsZeroConstraint();
+      prog = prog.addDeltaXEqualsZeroConstraint();
         
       disp('constructor done');
 
@@ -363,13 +363,13 @@ classdef DoubleIntegrator < LinearSystem
       
 
       function [g,dg] = cost(dt,x,u)
-        g = 0*dt; dg = 0*[1,0*x',0*u']; % see geval.m for our gradient format
+        g = dt; dg = [1,0*x',0*u']; % see geval.m for our gradient format
       end
       
       function [g,dg] = robust_cost(dx,du,w)
-        W = .1*eye(length(w));
-        Qw = 20*eye(2);
-        Rw = 1;
+        W = 1*eye(length(w));
+        Qw = 0*eye(2);
+        Rw = 0;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
 

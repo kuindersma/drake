@@ -1580,17 +1580,15 @@ classdef NonlinearProgram
    
     function [x,objval,exitflag,infeasible_constraint_name] = knitro(obj,x0)
 
-      iJfun = [obj.iCinfun;obj.iCeqfun+obj.num_cin];
-      jJvar = [obj.jCinvar;obj.jCeqvar];
-      num_constraints = obj.num_cin+obj.num_ceq;
+%       iJfun = [obj.iCinfun;obj.iCeqfun+obj.num_cin];
+%       jJvar = [obj.jCinvar;obj.jCeqvar];
+%       num_constraints = obj.num_cin+obj.num_ceq;
 
-      Jpattern = sparse(iJfun,jJvar,ones(length(iJfun),1),num_constraints,obj.num_vars);
+%       Jpattern = sparse(iJfun,jJvar,ones(length(iJfun),1),num_constraints,obj.num_vars);
       
-      options = optimset('Algorithm', 'active-set', 'Display','iter','GradObj','on','GradConstr','on','MaxIter',5000, ...
-        'TolX', 1e-6, 'TolFun', 1e-6, 'TolCon', 1e-6);%, 'DerivativeCheck','On');
+      options = optimset('Display','iter','GradObj','on','GradConstr','on','MaxIter',10000, ...
+        'TolX', 1e-15, 'TolFun', 1e-8, 'TolCon', 1e-8);%, 'DerivativeCheck','On');
       
-      
-
       function [g,h,dg,dh] = nlcon(x)
         [g,h,dg,dh] = nonlinearConstraints(obj,x);
         dg = dg';
@@ -1598,18 +1596,19 @@ classdef NonlinearProgram
 
       end
 
-      [x,objval,exitflag] = ...
-         knitromatlab(@obj.objective,x0,obj.Ain,obj.bin,obj.Aeq,obj.beq, ...
-         obj.x_lb,obj.x_ub,@nlcon,[],options);
-%        
-%       xtype = zeros(obj.num_vars,1);
-%       xtype(obj.binary_inds) = 1;
-%       [x,objval,exitflag] = ...
-%          knitromatlab_mip(@obj.objective,x0,obj.Ain,obj.bin,obj.Aeq,obj.beq, ...
-%          obj.x_lb,obj.x_ub,@nlcon,xtype,[],[],[],options);
-       
-%       knitromatlab_mip(fun,x0,A,b,Aeq,beq,lb,ub,nonlcon,xType,objFnType,cineqFnType, ...
-%         extendedFeatures,options)
+      if isempty(obj.binary_inds)
+        [x,objval,exitflag] = ...
+           knitromatlab(@obj.objective,x0,obj.Ain,obj.bin,obj.Aeq,obj.beq, ...
+           obj.x_lb,obj.x_ub,@nlcon,[],options);        
+      else
+
+        xtype = zeros(obj.num_vars,1);
+        xtype(obj.binary_inds) = 1;
+        [x,objval,exitflag] = ...
+           knitromatlab_mip(@obj.objective,x0,obj.Ain,obj.bin,obj.Aeq,obj.beq, ...
+           obj.x_lb,obj.x_ub,@nlcon,xtype,[],[],[],options);
+        
+      end
        
       infeasible_constraint_name = [];
     

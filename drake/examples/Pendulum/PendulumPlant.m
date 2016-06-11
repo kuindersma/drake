@@ -452,8 +452,23 @@ classdef PendulumPlant < SecondOrderSystem
         if info==1, break; end
       end
       
+      
 
-    
+      gamma = z(prog.gamma_inds);
+      h = z(prog.h_inds);
+      x = z(prog.x_inds);
+      dx = z(prog.dx_inds);
+      u = z(prog.u_inds);
+      du = z(prog.du_inds);
+      w = z(prog.w_inds);
+      zz = z(prog.z_inds);
+      
+      
+      
+      
+      keyboard
+      
+      
       
       function [g,dg] = cost(dt,x,u);
         R = 1;
@@ -474,7 +489,7 @@ classdef PendulumPlant < SecondOrderSystem
       function [g,dg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
         Qw = 1*eye(2);
-        Rw = 1;
+        Rw = 0;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
       end
