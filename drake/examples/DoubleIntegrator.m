@@ -236,7 +236,6 @@ classdef DoubleIntegrator < LinearSystem
       d = linspace(lb,ub,M);
       options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
       prog = RobustDirtranTrajectoryOptimization(plant,N,M,lb,ub,[4 8],options);
-      prog = prog.setDisturbances(d);
       constraint = ConstantConstraint(x0);
       constraint = constraint.setName('x0_eq');
       prog = prog.addStateConstraint(constraint,1);
@@ -398,14 +397,12 @@ classdef DoubleIntegrator < LinearSystem
         if info==1, break; end
       end
      
-      gamma = z(prog.gamma_inds);
       h = z(prog.h_inds);
       x = z(prog.x_inds);
       dx = z(prog.dx_inds);
       u = z(prog.u_inds);
       du = z(prog.du_inds);
       w = z(prog.w_inds);
-      zz = z(prog.z_inds);
       
 %       i=3;
 %       w_bound = prog.forward_w_bound_fun(@robust_cost,gamma(i),h(i),x(:,i),dx(:,i),u(i),du(i),x(:,i+1),w(i));
