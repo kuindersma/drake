@@ -225,7 +225,7 @@ classdef DoubleIntegrator < LinearSystem
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
-    function robustDirtran(N,M,lb,ub)
+    function robustDirtran()
 
       plant = DoubleIntegrator;
       
@@ -233,9 +233,11 @@ classdef DoubleIntegrator < LinearSystem
       xf = [0;0];
       tf0 = 6;
       
-      d = linspace(lb,ub,M);
+      N = 10;
+      D = 400;
+      
       options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
-      prog = RobustDirtranTrajectoryOptimization(plant,N,M,lb,ub,[4 8],options);
+      prog = RobustDirtranTrajectoryOptimization(plant,N,D,[4 8],options);
       constraint = ConstantConstraint(x0);
       constraint = constraint.setName('x0_eq');
       prog = prog.addStateConstraint(constraint,1);
@@ -365,12 +367,13 @@ classdef DoubleIntegrator < LinearSystem
         g = dt; dg = [1,0*x',0*u']; % see geval.m for our gradient format
       end
       
-      function [g,dg] = robust_cost(dx,du,w)
+      function [g,dg,ddg] = robust_cost(dx,du,w)
         W = 1*eye(length(w));
-        Qw = 0*eye(2);
-        Rw = 0;
+        Qw = eye(2);
+        Rw = .1;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
+        ddg = blkdiag(2*Qw, 2*Rw, 2*W);
 
 %         alpha = 0.2;
 %         g = sqrt(w'*w + alpha^2) - alpha;
