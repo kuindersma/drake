@@ -22,7 +22,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     % convex stuff below
     update_convex = true;
     phi_max = 0.1; % m, max contact force distance
-    active_threshold = 0.1; % height below which contact forces are calculated
+    active_threshold = inf; % height below which contact forces are calculated
     contact_threshold = 1e-3; % threshold where force penalties are eliminated (modulo regularization)
   end
 
@@ -312,7 +312,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         num_d = 4;
       end
       dim = 3;
-      h = obj.timestep;
+%       h = obj.timestep;
 
       num_q = obj.manip.getNumPositions;
       q=x(1:num_q); 
@@ -399,8 +399,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
 
         % contact smoothing matrix
-        R_min = 1e-1; 
-        R_max = 1e4;
+        R_min = 1e-3; 
+        R_max = 1e3;
         r = zeros(num_active,1);
         r(phiC>=obj.phi_max) = R_max;
         r(phiC<=obj.contact_threshold) = R_min;
@@ -486,9 +486,9 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         obj.LCP_cache.data.fastqp_active_set = active_set;
 
 %         vis=obj.constructVisualizer;
-%         figure(25)
+%         figure(26)
 %         clf
-%         vis.draw(t,x)
+%         vis.draw(0,x)
 %         hold on;
 %         plot(world_pts(1,:),world_pts(3,:),'mo');
 %         ff = f/norm(f);
@@ -501,11 +501,19 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %           line([world_pts(1,jj), world_pts(1,jj)+ff((jj-1)*dim+1)] ,[world_pts(3,jj), world_pts(3,jj)+ff((jj-1)*dim+3)],'LineWidth',2,'Color',[1 0 0]);
 %         end
 %         hold off;
-        
+%         
         vn = v + Hinv*((B*u-C)*h + vToqdot'*J'*f);
         qdn = vToqdot*vn;
         qn = q + qdn*h;
+
 %         
+%         figure(27)
+%         clf
+%         vis.draw(0,x);
+%         hold on;
+%         vis.draw(0,[qn;qdn]);
+%         hold off;
+        
 %         v = A*f + c
 %         v2 = Ain*result.x - bin + v_min
 %         

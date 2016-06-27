@@ -74,6 +74,14 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
         constraints{i} = cnstr;
         
         obj = obj.addConstraint(constraints{i}, dyn_inds{i});
+        
+        if 0
+        nc = obj.plant.getNumContactPairs;
+        inds = {obj.x_inds(:,i)};
+        constraint = FunctionHandleConstraint(zeros(nc,1),inf(nc,1),nX,@obj.phi_bound);
+        constraint = constraint.setName(sprintf('phi_bound_%d',i));
+        obj = obj.addConstraint(constraint, inds);
+            end
       end
     end
     
@@ -109,6 +117,14 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
         obj = obj.addCost(running_cost,inds_i);
       end
     end
+    
+    function [f,df] = phi_bound(obj,x)
+      nq = obj.plant.getNumPositions;
+      q = x(1:nq);
+      kinsol = doKinematics(obj.plant, q);
+      [f,~,~,~,~,~,~,~,dfdq] = obj.plant.contactConstraints(kinsol,obj.plant.multiple_contacts);
+      df = [dfdq,0*dfdq];
+    end
 
     function [f,df] = discrete_time_constraint_fun(obj,h,x0,x1,u)
       nX = obj.plant.getNumStates();
@@ -137,6 +153,7 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
       f = x1 - x0 - h*xdot;
       df = [-xdot (-eye(nX) - .5*h*dxdot(:,2:1+nX)) (eye(nX)- .5*h*dxdot(:,2:1+nX)) -.5*h*dxdot(:,nX+2:end) -.5*h*dxdot(:,nX+2:end)];
     end
+    
     
     function [f,df] = midpoint_running_fun(obj,running_handle,h,x0,x1,u0,u1)
       nX = obj.plant.getNumStates();
