@@ -219,9 +219,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     end  
    
     function [f,df] = forward_w_equality_constraint(obj,robust_cost,h,x0,dx0,u,du,w)
-      %[w_opt, dw] = solve_qcqp(obj,robust_cost,h,x0+dx0,u+du,obj.D);
-      option.grad_method = 'numerical';
-      [w_opt, dw] = geval(@(hq,xq,uq)solve_qcqp(obj,robust_cost,hq,xq,uq), h, x0+dx0, u+du, option);
+      [w_opt, dw] = solve_qcqp(obj, robust_cost, h, x0+dx0, u+du);
      
       f = w - w_opt;
 
@@ -233,33 +231,32 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
             eye(obj.nW)]; 
     end
     
-    function w = solve_qcqp(obj,robust_cost,h,x0,u0)
+    function [w,dw] = solve_qcqp(obj,robust_cost,h,x0,u0)
         %Setup QCQP
         
-        [~,dx1] = geval(@obj.forward_robust_dynamics_fun,h,x0,u0,zeros(obj.nW,1));
+        [~,dx1,ddx1] = geval(@obj.forward_robust_dynamics_fun,h,x0,u0,zeros(obj.nW,1));
         [~,dJ,ddJ] = robust_cost(zeros(obj.nX,1),zeros(obj.nU,1),zeros(obj.nW,1));
         
         %Dynamics derivatives
-        %A = dx1(:,2:n+1);
-        %B = dx1(:,n+2:n+m+1);
-        G = dx1(:,1+obj.nX+obj.nU + (1:obj.nW));
-        %T = reshape(full(ddx1),n,1+n+m+m+l,1+n+m+m+l);
+        G = dx1(:,1+obj.nX+obj.nU+(1:obj.nW));
+        T = reshape(full(ddx1),obj.nX,1+obj.nX+obj.nU+obj.nW,1+obj.nX+obj.nU+obj.nW); %3rd derivative
+        dG = T(:,1+obj.nX+obj.nU+(1:obj.nW), :);
         
-        
-        %Cost derivatives
+        %Cost derivatives for QP
         H = -G'*ddJ(1:obj.nX,1:obj.nX)*G;
         f = -G'*dJ(1:obj.nX)';
         
-        w = qcqp(H,f,obj.D);
+        [w,lambda] = qcqp(H,f,obj.D);
         
         %Evaluate derivatives
-%         drdw = dr(1:l,1:l);
-%         Tw = tvMult(T,[zeros(1+n+m+m); w],2);
-%         dwdh = drdw\(dGdh'*ddJ(1:n,1:n)*G + G'*ddJ(1:n,1:n)*dGdh)*w + dGdh'*dJ(1:n)';
-%         dwdx = drdw\tvMult(dGdx,2*ddJ(1:n,1:n)*G*w + dJ(1:n)',2);
-%         dwdu = drdw\tvMult(dGdu,2*ddJ(1:n,1:n)*G*w + dJ(1:n)',2);
-%         
-%         dw = [dwdh, dwdx, dwdu];
+        dw = -H\tvMult(dG,2*ddJ(1:obj.nX,1:obj.nX)*G*w + dJ(1:obj.nX)',1);
+        if lambda > 1e-7
+            %Project onto the constraint surface
+            n = obj.D*w;
+            n = n/norm(n);
+            P = (eye(obj.nW)-n*n');
+            dw = P*dw;
+        end   
         
         function y = tvMult(T,x,ind)
             if ind == 1

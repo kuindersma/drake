@@ -246,7 +246,7 @@ classdef DoubleIntegrator < LinearSystem
       prog = prog.addStateConstraint(constraint,N);
       prog = prog.addRunningCost(@cost);
       prog = prog.addRobustConstraints(@robust_cost);
-      prog = prog.addDeltaXEqualsZeroConstraint();
+      %prog = prog.addDeltaXEqualsZeroConstraint();
         
       disp('constructor done');
 
