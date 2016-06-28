@@ -118,9 +118,9 @@ classdef PendulumPlant < SecondOrderSystem
 %       end
 %     end
     
-    function [f,df] = dynamics_w(obj,~,x,u,w)
+    function [f,df] = dynamics_w(obj,x,u,w)
 
-      % w is damping
+      % w is mass
       
       q=x(1:obj.num_q); 
       qd=x((obj.num_q+1):end);
@@ -129,11 +129,11 @@ classdef PendulumPlant < SecondOrderSystem
       l_ = obj.lc;
       b_ = obj.b;
       
-      qdd = (u - m_*obj.g*l_*sin(q) - b_*qd)/obj.I;
+      qdd = (u - m_*obj.g*l_*sin(q) - b_*qd)/(m_*l_*l_);
       f = [qd;qdd];
       
       if nargout>1
-        ii = 1.0/obj.I;
+        ii = 1.0/(m_*l_*l_);
         dfdt = zeros(2,1);
         dfdx = [0, 1; -ii*m_*obj.g*l_*cos(q),-b_*ii];
         dfdu = [0;ii];
@@ -183,45 +183,22 @@ classdef PendulumPlant < SecondOrderSystem
       end
     end  
      
-    function [utraj,xtraj]=swingUpTrajectory(obj,N,options)
+function [utraj,xtraj]=swingUpTrajectory(obj,options)
       x0 = [0;0]; 
       xf = double(obj.xG);
       tf0 = 4;
 
-      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
-      traj_opt = DirtranTrajectoryOptimization(obj,N,[3 8],options);
+      N = 21;
+      traj_opt = DircolTrajectoryOptimization(obj,N,[2 6]);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
-      traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
+      %traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
       traj_opt = traj_opt.addRunningCost(@cost);
-%       traj_opt = traj_opt.addRunningCost(@obj.integrationCost);
       traj_opt = traj_opt.addFinalCost(@finalCost);
       traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
       
       
-%       nx=2; nu=1; nw=1;
-%       for j=1:10
-%         h = rand;
-%         x = randn(nx,1);
-%         u = randn(nu,1);
-%         
-%         [~,df1] = geval(@integrationCost,h,x,u,struct('grad_method','numerical'));
-%         [~,df2] = integrationCost(h,x,u);
-%       
-%         valuecheck(df1,df2,1e-3);
-%       end
-%       
-%       keyboard
-%       
-     % add a display function to draw the trajectory on every iteration
-      function displayStateTrajectory(t,x,u)
-        plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
-        drawnow;
-      end
-      traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
-      
-      function [g,dg] = cost(h,x,u)
+      function [g,dg] = cost(dt,x,u);
         R = 1;
-        
         g = (R*u).*u;
         
         if (nargout>1)
@@ -230,12 +207,12 @@ classdef PendulumPlant < SecondOrderSystem
       end
       
       function [h,dh] = finalCost(tf,x)
-        h = tf;
+        Qf = 100*eye(2);
+        h = (x-xf)'*Qf*(x-xf);
         if (nargout>1)
-          dh = [1, zeros(1,2)];
+          dh = [0, 2*(x-xf)'*Qf];
         end
       end
-   
       
       info=0;
       while (info~=1)
@@ -310,39 +287,20 @@ classdef PendulumPlant < SecondOrderSystem
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     
-    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,N,M,lb,ub,K)
+    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,N,D)
       x0 = [0;0]; 
       xf = double(obj.xG);
       tf0 = 4;
       
       nw=1;
       
-      if M>=2
-        d = linspace(ub,lb,M);
-%         d = rand(nw,M).*repmat(ub-lb,1,M) + repmat(lb,1,M);
-      elseif M==1
-        d = lb;
-      end
-
-%       d = zeros(nw,M);
-%       d(:,1) = [lb(1);lb(2);lb(3)];
-%       d(:,2) = [ub(1);lb(2);lb(3)];
-%       d(:,3) = [lb(1);ub(2);lb(3)];
-%       d(:,4) = [ub(1);ub(2);lb(3)];
-%       d(:,5) = [lb(1);lb(2);ub(3)];
-%       d(:,6) = [ub(1);lb(2);ub(3)];
-%       d(:,7) = [lb(1);ub(2);ub(3)];
-%       d(:,8) = [ub(1);ub(2);ub(3)];
-      
-      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,M,lb,ub,[3 8],options);
-      prog = prog.setDisturbances(d);
+      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
+      prog = RobustDirtranTrajectoryOptimization(obj,N,D,[3 8],options);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
       prog = prog.addRunningCost(@cost);
       prog = prog.addFinalCost(@finalCost);
       prog = prog.addRobustConstraints(@robust_cost);
-      prog = prog.addLinearControlConstraint(K);
       
       disp('constructor done');
 
@@ -440,7 +398,6 @@ classdef PendulumPlant < SecondOrderSystem
         drawnow;
       end
       prog = addTrajectoryDisplayFunction(prog,@displayStateTrajectory);
-   
       
       traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
       
@@ -452,23 +409,14 @@ classdef PendulumPlant < SecondOrderSystem
         if info==1, break; end
       end
       
-      
-
-      gamma = z(prog.gamma_inds);
-      h = z(prog.h_inds);
-      x = z(prog.x_inds);
-      dx = z(prog.dx_inds);
-      u = z(prog.u_inds);
-      du = z(prog.du_inds);
-      w = z(prog.w_inds);
-      zz = z(prog.z_inds);
-      
-      
-      
+%       h = z(prog.h_inds);
+%       x = z(prog.x_inds);
+%       dx = z(prog.dx_inds);
+%       u = z(prog.u_inds);
+%       du = z(prog.du_inds);
+%       w = z(prog.w_inds);
       
       keyboard
-      
-      
       
       function [g,dg] = cost(dt,x,u);
         R = 1;
@@ -486,12 +434,13 @@ classdef PendulumPlant < SecondOrderSystem
         end
       end
       
-      function [g,dg] = robust_cost(dx,du,w)
+      function [g,dg,ddg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
         Qw = 1*eye(2);
-        Rw = 0;
+        Rw = .1;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
-        dg = [2*dx'*Qw 2*du'*Rw, 2*w'*W];
+        dg = [2*dx'*Qw, 2*du'*Rw, 2*w'*W];
+        ddg = blkdiag(2*Qw, 2*Rw, 2*W);
       end
        
     end
