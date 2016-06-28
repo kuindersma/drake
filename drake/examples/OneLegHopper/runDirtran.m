@@ -17,6 +17,7 @@ r = r.setOutputFrame(OneLegHopperState(r));
 nq = r.getNumPositions;
 nx = r.getNumStates;
 nu = r.getNumInputs;
+nc = r.getNumContactPairs;
 
 v = r.constructVisualizer();
 
@@ -30,8 +31,9 @@ xG =  x0;
 xG(1) = x0(1) - 0.5;
 
 
-options.integration_method = DirtranTrajectoryOptimization.DT_SYSTEM;
-traj_opt = DirtranTrajectoryOptimization(r,N,tf0*[(1-0.2) (1+0.2)],options);
+options.integration_method = DirtranTrajectoryOptimization.SUBCLASS;
+% options.integration_method = DirtranTrajectoryOptimization.DT_SYSTEM;
+traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.2) (1+0.2)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
 traj_opt = traj_opt.addRunningCost(@cost);
@@ -39,24 +41,39 @@ traj_opt = traj_opt.addFinalCost(@finalCost);
 traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xG)]));
       
       
+
+% for i=1:10
+% h = rand;
+% x=randn(nx,1);
+% u=randn(nu,1);
+% l=rand(nc*2,1);
+% 
+% 
+% tmp1 = @(h,x,u,l,a) traj_opt.lambda_constraint_fun(h,x,u,l,a); 
+% 
+% [f1,df1] = tmp1(h,x,u,l,0.1*l);
+% [f2,df2] = geval(tmp1,h,x,u,l,0.1*l,struct('grad_method','numerical'));
+% 
+% valuecheck(df1,df2,1e-3);
+% 
+% end
+% 
+% keyboard
+
+      
 % add a display function to draw the trajectory on every iteration
 function displayStateTrajectory(t,x,u)
-  
   ts = [0,cumsum(t)'];
   xtraj = PPTrajectory(foh(ts,x));
   xtraj = xtraj.setOutputFrame(r.getStateFrame);
   v.playback(xtraj);
-  
 end
 traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
             
-info=0;
-while (info~=1)
-  tic
-  [xtraj,utraj,z,F,info] = traj_opt.solveTraj(tf0,traj_init);
-  toc
-end
 
+tic;
+[xtraj,utraj,z,F,info] = traj_opt.solveTraj(tf0,traj_init);
+toc
 
 v.playback(xtraj,struct('slider',true));
 
