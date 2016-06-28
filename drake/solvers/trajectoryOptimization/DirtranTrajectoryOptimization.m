@@ -75,13 +75,7 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
         
         obj = obj.addConstraint(constraints{i}, dyn_inds{i});
         
-        if 0
-        nc = obj.plant.getNumContactPairs;
-        inds = {obj.x_inds(:,i)};
-        constraint = FunctionHandleConstraint(zeros(nc,1),inf(nc,1),nX,@obj.phi_bound);
-        constraint = constraint.setName(sprintf('phi_bound_%d',i));
-        obj = obj.addConstraint(constraint, inds);
-            end
+      
       end
     end
     
@@ -118,14 +112,7 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
       end
     end
     
-    function [f,df] = phi_bound(obj,x)
-      nq = obj.plant.getNumPositions;
-      q = x(1:nq);
-      kinsol = doKinematics(obj.plant, q);
-      [f,~,~,~,~,~,~,~,dfdq] = obj.plant.contactConstraints(kinsol,obj.plant.multiple_contacts);
-      df = [dfdq,0*dfdq];
-    end
-
+   
     function [f,df] = discrete_time_constraint_fun(obj,h,x0,x1,u)
       nX = obj.plant.getNumStates();
       [x1_,dx1_] = obj.plant.updateConvexOpt(h,x0,u);
