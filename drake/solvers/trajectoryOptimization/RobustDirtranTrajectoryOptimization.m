@@ -219,6 +219,8 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     end  
    
     function [f,df] = forward_w_equality_constraint(obj,robust_cost,h,x0,dx0,u,du,w)
+      option.grad_method = 'numerical';
+      %[w_opt, dw] = geval(@(hq,xq,uq)solve_qcqp(obj, robust_cost, hq, xq, uq), h, x0+dx0, u+du, option);
       [w_opt, dw] = solve_qcqp(obj, robust_cost, h, x0+dx0, u+du);
      
       f = w - w_opt;
@@ -231,7 +233,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
             eye(obj.nW)]; 
     end
     
-    function [w,dw] = solve_qcqp(obj,robust_cost,h,x0,u0)
+    function [w, dw] = solve_qcqp(obj,robust_cost,h,x0,u0)
         %Setup QCQP
         
         [~,dx1,ddx1] = geval(@obj.forward_robust_dynamics_fun,h,x0,u0,zeros(obj.nW,1));
@@ -240,17 +242,17 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         %Dynamics derivatives
         G = dx1(:,1+obj.nX+obj.nU+(1:obj.nW));
         T = reshape(full(ddx1),obj.nX,1+obj.nX+obj.nU+obj.nW,1+obj.nX+obj.nU+obj.nW); %3rd derivative
-        dG = T(:,1+obj.nX+obj.nU+(1:obj.nW), :);
+        dG = T(:,1+obj.nX+obj.nU+(1:obj.nW),:);
         
         %Cost derivatives for QP
         H = -G'*ddJ(1:obj.nX,1:obj.nX)*G;
         f = -G'*dJ(1:obj.nX)';
         
-        [w,lambda] = qcqp(H,f,obj.D);
+        [w,lambda] = qcqp_mex(H,f,obj.D);
         
         %Evaluate derivatives
         dw = -H\tvMult(dG,2*ddJ(1:obj.nX,1:obj.nX)*G*w + dJ(1:obj.nX)',1);
-        if lambda > 1e-7
+        if lambda < 1e-4
             %Project onto the constraint surface
             n = obj.D*w;
             n = n/norm(n);
@@ -309,7 +311,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     end
     
     function [f,df] = forward_robust_dynamics_fun(obj,h,x,u,w)
-      [xdot,dxdot] = obj.plant.dynamics_w(0,x,u,w);
+      [xdot,dxdot] = obj.plant.dynamics_w(x,u,w);
       f = x + h*xdot;
       df = [xdot ... h
         eye(obj.nX) + h*dxdot(:,1+(1:obj.nX)) ... x0

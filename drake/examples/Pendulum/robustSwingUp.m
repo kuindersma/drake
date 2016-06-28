@@ -1,4 +1,4 @@
-function robustSwingUp(N,M,lb,ub)
+function robustSwingUp(N,D)
 
 p = PendulumPlant;
 v = PendulumVisualizer();
