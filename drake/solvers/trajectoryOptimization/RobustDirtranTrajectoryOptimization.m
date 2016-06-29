@@ -39,9 +39,9 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     
     function obj = setupVariables(obj, N)
       nH = N-1;
-      nx = plant.getNumStates();
-      nu = plant.getNumInputs();
-      nw = plant.getNumDisturbances();
+      nx = obj.plant.getNumStates();
+      nu = obj.plant.getNumInputs();
+      nw = obj.plant.getNumDisturbances();
       
       num_vars = nH + N*(2*nx+2*nu+nw);
       obj.h_inds = (1:nH)';
