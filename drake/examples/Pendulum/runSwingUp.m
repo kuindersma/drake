@@ -3,7 +3,7 @@ function runSwingUp()
 
 pd = PendulumPlant;
 pv = PendulumVisualizer();
-[utraj,xtraj] = swingUpTrajectory(pd);
+[utraj,xtraj] = pd.swingUpTrajectory();
 
 if (0) % open-loop playback
   sys = cascade(utraj,pd);

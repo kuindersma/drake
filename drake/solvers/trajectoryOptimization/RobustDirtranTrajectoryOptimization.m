@@ -248,7 +248,8 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         H = -G'*ddJ(1:obj.nX,1:obj.nX)*G;
         f = -G'*dJ(1:obj.nX)';
         
-        [w,lambda] = qcqp_mex(H,f,obj.D);
+        %[w,lambda] = qcqp_mex(H,f,obj.D);
+        [w,lambda] = qcqp(H,f,obj.D);
         
         %Evaluate derivatives
         dw = -H\tvMult(dG,2*ddJ(1:obj.nX,1:obj.nX)*G*w + dJ(1:obj.nX)',1);
