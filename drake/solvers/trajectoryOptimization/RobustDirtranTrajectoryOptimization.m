@@ -21,32 +21,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
       end
       obj = obj@DirtranTrajectoryOptimization(plant,N,duration,options);
-      obj.nX = plant.getNumStates();
-      obj.nU = plant.getNumInputs();
-      obj.nW = plant.getNumDisturbances();
-      obj.N = N;
       obj.D = D;
-      obj = obj.setupRobustVariables(N);
-      obj = obj.addDynamicConstraints;
-    
-      if ~isfield(options,'time_option')
-        options.time_option = 1;
-      end
-      
-      % Construct total time linear constraint
-      switch options.time_option
-        case 1 % all timesteps are constant
-          A_time = [ones(1,N-1);[eye(N-2) zeros(N-2,1)] - [zeros(N-2,1) eye(N-2)]];
-          time_constraint = LinearConstraint([duration(1);zeros(N-2,1)],[duration(2);zeros(N-2,1)],A_time);
-          obj = obj.addConstraint(time_constraint,obj.h_inds);
-        case 2 % all timesteps independent
-          A_time = ones(1,N-1);
-          time_constraint = LinearConstraint(duration(1),duration(2),A_time);
-          obj = obj.addConstraint(time_constraint,obj.h_inds);
-      end
-
-      % Ensure that all h values are non-negative
-      obj = obj.addConstraint(BoundingBoxConstraint(zeros(N-1,1),inf(N-1,1)),obj.h_inds);
 
       % add control inputs constraints
       if any(~isinf(plant.umin)) || any(~isinf(plant.umax))
@@ -62,39 +37,44 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       end        
     end
     
-    function obj = setupRobustVariables(obj, N)
+    function obj = setupVariables(obj, N)
       nH = N-1;
-      nX = obj.nX;
-      nU = obj.nU;
-      nW = obj.nW;
+      nx = obj.plant.getNumStates();
+      nu = obj.plant.getNumInputs();
+      nw = obj.plant.getNumDisturbances();
       
-      num_vars = nH + N*(2*nX+2*nU+nW);
+      num_vars = nH + N*(2*nx+2*nu+nw);
       obj.h_inds = (1:nH)';
-      obj.x_inds = reshape(nH + (1:nX*N),nX,N);
-      obj.u_inds = reshape(nH + nX*N + (1:nU*N),nU,N);
-      obj.dx_inds = reshape(nH + (nX+nU)*N +(1:nX*N),nX,N);
-      obj.du_inds = reshape(nH + (2*nX+nU)*N +(1:nU*N),nU,N);
-      obj.w_inds = reshape(nH + (2*nX+2*nU)*N +(1:nW*N),nW,N);
+      obj.x_inds = reshape(nH + (1:nx*N),nx,N);
+      obj.u_inds = reshape(nH + nx*N + (1:nu*N),nu,N);
+      obj.dx_inds = reshape(nH + (nx+nu)*N +(1:nx*N),nx,N);
+      obj.du_inds = reshape(nH + (2*nx+nu)*N +(1:nu*N),nu,N);
+      obj.w_inds = reshape(nH + (2*nx+2*nu)*N +(1:nw*N),nw,N);
       
       x_names = cell(num_vars,1);
       for i = 1:N
         if(i<N)
           x_names{i} = sprintf('h[%d]',i);
         end
-        for j = 1:nX
-          x_names{nH+(i-1)*nX+j}=sprintf('x%d[%d]',j,i);
-          x_names{nH+(nX+nU)*N+(i-1)*nX+j} = sprintf('dx%d[%d]',j,i);
+        for j = 1:nx
+          x_names{nH+(i-1)*nx+j}=sprintf('x%d[%d]',j,i);
+          x_names{nH+(nx+nu)*N+(i-1)*nx+j} = sprintf('dx%d[%d]',j,i);
         end
-        for j = 1:nU
-          x_names{nH+nX*N+(i-1)*nU+j} = sprintf('u%d[%d]',j,i);
-          x_names{nH+(2*nX+nU)*N+(i-1)*nU+j} = sprintf('du%d[%d]',j,i);
+        for j = 1:nu
+          x_names{nH+nx*N+(i-1)*nu+j} = sprintf('u%d[%d]',j,i);
+          x_names{nH+(2*nx+nu)*N+(i-1)*nu+j} = sprintf('du%d[%d]',j,i);
         end
-        for j = 1:nW
-          x_names{nH+(2*nX+2*nU)*N+(i-1)*nW+j} = sprintf('w%d[%d]',j,i);
+        for j = 1:nw
+          x_names{nH+(2*nx+2*nu)*N+(i-1)*nw+j} = sprintf('w%d[%d]',j,i);
         end
       end
 
       obj = obj.addDecisionVariable(num_vars,x_names);
+
+      obj.nX = nx;
+      obj.nU = nu;
+      obj.nW = nw;
+      obj.N = N;
     end
     
     function obj = addRobustConstraints(obj,robust_cost)

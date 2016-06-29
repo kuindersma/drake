@@ -6,7 +6,7 @@ v = PendulumVisualizer();
 K = [-100,-30]; % PD gains
 
 if 1
- [utraj,xtraj,z,prog] = robustSwingUpTrajectory(p,N,M,lb,ub,K);
+ [utraj,xtraj,z,prog] = robustSwingUpTrajectory(p,N,D);
     xs = z(prog.x_inds);
     dxs = z(prog.dx_inds);
     us = z(prog.u_inds);
