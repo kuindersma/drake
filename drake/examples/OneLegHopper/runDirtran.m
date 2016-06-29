@@ -28,11 +28,9 @@ x0 = [q0;0*q0];
 x0 = double(r.resolveConstraints(x0));
 
 xG =  x0; 
-xG(1) = x0(1) - 0.5;
+xG(1) = x0(1) - 0.2;
 
 
-options.integration_method = DirtranTrajectoryOptimization.SUBCLASS;
-% options.integration_method = DirtranTrajectoryOptimization.DT_SYSTEM;
 traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.2) (1+0.2)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);

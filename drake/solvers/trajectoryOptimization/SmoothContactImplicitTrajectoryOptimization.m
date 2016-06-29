@@ -16,12 +16,9 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       end
       if isscalar(duration), duration=[duration,duration]; end
 
-%       options.integration_method = DirtranTrajectoryOptimization.SUBCLASS;
       obj = obj@DirtranTrajectoryOptimization(plant,N,duration,options);
-
-      obj = obj.addDynamicConstraints;
       
-      % Ensure that all lambda values are non-negative
+      % Ensure that all lambda values and Lagrange multipliers are non-negative
       obj = obj.addConstraint(BoundingBoxConstraint(zeros(N*obj.nL,1),inf(N*obj.nL,1)),obj.l_inds);
       obj = obj.addConstraint(BoundingBoxConstraint(zeros(N*obj.nL,1),inf(N*obj.nL,1)),obj.alpha_inds);
     end
@@ -92,25 +89,31 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
         obj = obj.addConstraint(constraint, inds);
             
         
-%         % contact force dynamics constraints
-%         n_vars = 1 + nx + nu + 2*nl;
-%         inds = {obj.h_inds(i); ...
-%                 obj.x_inds(:,i); ...
-%                 obj.u_inds(:,i); ...
-%                 obj.l_inds(:,i); ...
-%                 obj.alpha_inds(:,i)};
-%         constraint = FunctionHandleConstraint(zeros(nl,1),zeros(nl,1),n_vars,@obj.lambda_constraint_fun);
-%         constraint = constraint.setName(sprintf('contact_dynamics_%d',i));
-%         obj = obj.addConstraint(constraint, inds);
-%         
+        % contact force dynamics constraints
+        n_vars = 1 + nx + nu + 2*nl;
+        inds = {obj.h_inds(i); ...
+                obj.x_inds(:,i); ...
+                obj.u_inds(:,i); ...
+                obj.l_inds(:,i); ...
+                obj.alpha_inds(:,i)};
+        constraint = FunctionHandleConstraint(zeros(nl,1),zeros(nl,1),n_vars,@obj.lambda_constraint_fun);
+        constraint = constraint.setName(sprintf('contact_dynamics_%d',i));
+        obj = obj.addConstraint(constraint, inds);
+        
         % non-penetration constraints
         nc = obj.nC;
         inds = {obj.x_inds(:,i)};
         constraint = FunctionHandleConstraint(zeros(nc,1),inf(nc,1),nx,@obj.phi_bound);
         constraint = constraint.setName(sprintf('phi_bound_%d',i));
         obj = obj.addConstraint(constraint, inds);
-        
       end
+      
+      % lagrange multiplier equality constraints
+      inds = {obj.l_inds(:),obj.alpha_inds(:)};
+      constraint = FunctionHandleConstraint(zeros(nl*N,1),zeros(nl*N,1),2*nl*N,@obj.lagrange_eq);
+      constraint = constraint.setName(sprintf('lagrange_eq_%d',i));
+      obj = obj.addConstraint(constraint, inds);
+      
     end
  
     
@@ -207,7 +210,12 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       [f,~,~,~,~,~,~,~,dfdq] = obj.plant.contactConstraints(kinsol,obj.plant.multiple_contacts);
       df = [dfdq,0*dfdq];
     end
-
+    
+    function [f,df] = lagrange_eq(~,l,alpha)
+      f = l.*alpha;
+      df = [diag(alpha),diag(l)];
+    end
+    
     function [f,df] = lambda_constraint_fun(obj,h,x,u,l,alpha)
       p = obj.plant;
       nq = obj.nQ;
@@ -268,27 +276,29 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       
       % contact smoothing matrix
       R_min = 1e-3; 
-      R_max = 1e3;
+      R_max = 1e4;
       k = 10;
-      y = (phiC-p.contact_threshold)./(p.phi_max - p.contact_threshold)*2 - 1; % scale 
-      dydq = 0.5*(p.phi_max - p.contact_threshold) * n;
+      y = 2*(phiC-p.contact_threshold)./(p.phi_max - p.contact_threshold) - 1; % scale 
+      dydq = 2/(p.phi_max - p.contact_threshold) * n;
       r = R_min + R_max./(1+exp(-k*y));
-      drdy = R_max * (1./(1+exp(-k*y).^2 .* k .* exp(-k*y)));
+      drdy = 1./(1+exp(-k*y)).^2 .* R_max*k .* exp(-k*y);
       drdq = repmat(drdy,1,nq).*dydq;
-      
+
       r = repmat(r,1,dim)';
       r = r(:);
 
       tmp = repmat(reshape(drdq',1,numel(drdq)),dim,1);
-      drdq = [];
+      drdq_cell = cell(1,nc*dim);
+      cnt = 1;
       for i=1:nc
-        drdq = vertcat(drdq,tmp(:,(i-1)*nq+(1:nq)));
+        for j=1:dim
+          drdq_cell{cnt} = tmp(j,(i-1)*nq+(1:nq));
+          cnt = cnt+1;
+        end
       end
       
-      
       R = diag(r);
-
-      R = 1e-3*eye(nc*dim);
+      dRdq = blkdiag(drdq_cell{:});
       
       tau = B*u-C;
       f = V'*R*V*l + V'*J*(qd + Hinv*(tau*h + J'*V*l)) - alpha;
@@ -298,7 +308,7 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       dtau_du = B;
       
       dfdh = V'*J*Hinv*tau;
-      dfdq = V'*(matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + matGradMult(dJtranspose,V*l))));
+      dfdq = V'*(matGradMult(dRdq',V*l)' + matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + matGradMult(dJtranspose,V*l))));
       dfdqd = V'*(J + J*Hinv*(dtau_dqd*h));
       dfdu = V'*J*Hinv*dtau_du*h;
       dfdl = V'*(R + J*Hinv*J')*V;
@@ -307,9 +317,7 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       df = [dfdh, dfdq, dfdqd, dfdu, dfdl,dfdalpha];
     end
     
-    
-    
-    
+   
       
   end
 

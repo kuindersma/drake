@@ -21,7 +21,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     gurobi_present = false;
     % convex stuff below
     update_convex = true;
-    phi_max = 0.5; % m, max contact force distance
+    phi_max = 0.1; % m, max contact force distance
     active_threshold = inf; % height below which contact forces are calculated
     contact_threshold = 1e-3; % threshold where force penalties are eliminated (modulo regularization)
   end
@@ -312,7 +312,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         num_d = 4;
       end
       dim = 3;
-%       h = obj.timestep;
+      h = obj.timestep;
 
       num_q = obj.manip.getNumPositions;
       q=x(1:num_q); 
