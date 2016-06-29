@@ -21,9 +21,12 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     gurobi_present = false;
     % convex stuff below
     update_convex = true;
-    phi_max = 0.1; % m, max contact force distance
-    active_threshold = inf; % height below which contact forces are calculated
-    contact_threshold = 1e-3; % threshold where force penalties are eliminated (modulo regularization)
+    contact_smoothing_params = struct('phi_max',0.1, ... m, max contact force distance
+                               'active_threshold',inf, ... height below which contact forces are calculated
+                               'contact_threshold',1e-3, ... threshold where force penalties are eliminated (modulo regularization)
+                               'R_max',1e3, ... regularization parameter at phi_max
+                               'R_min',1e-3, ... regularization parameter at contact_threshold
+                               'k',1); % exponential decay parameter
   end
 
   methods
@@ -330,7 +333,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         w = zeros(num_c*num_d,1);
       end
       
-      active = find(phiC + h*n*vToqdot*v < obj.active_threshold);
+      active = find(phiC + h*n*vToqdot*v < obj.contact_smoothing_params.active_threshold);
       phiC = phiC(active);
       normal = normal(:,active);
 
@@ -356,7 +359,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       J = JA-JB;
       
       [phiL,JL] = obj.manip.jointLimitConstraints(q);
-      possible_limit_indices = (phiL + h*JL*vToqdot*v) < obj.active_threshold;
+      possible_limit_indices = (phiL + h*JL*vToqdot*v) < obj.contact_smoothing_params.active_threshold;
       nL = sum(possible_limit_indices);
       JL = JL(possible_limit_indices,:);
       
@@ -399,40 +402,38 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
 
         % contact smoothing matrix
-        R_min = 1e-3; 
-        R_max = 1e4;
+        R_min = obj.contact_smoothing_params.R_min; 
+        R_max = obj.contact_smoothing_params.R_max;
         r = zeros(num_active,1);
-        r(phiC>=obj.phi_max) = R_max;
-        r(phiC<=obj.contact_threshold) = R_min;
-        ind = (phiC > obj.contact_threshold) & (phiC < obj.phi_max);
-        y = (phiC(ind)-obj.contact_threshold)./(obj.phi_max - obj.contact_threshold)*2 - 1; % scale between -1,1
-        r(ind) = R_min + R_max./(1+exp(-10*y));
+        r(phiC>=obj.contact_smoothing_params.phi_max) = R_max;
+        r(phiC<=obj.contact_smoothing_params.contact_threshold) = R_min;
+        ind = (phiC > obj.contact_smoothing_params.contact_threshold) & (phiC < obj.contact_smoothing_params.phi_max);
+        y = (phiC(ind)-obj.contact_smoothing_params.contact_threshold)./(obj.contact_smoothing_params.phi_max - obj.contact_smoothing_params.contact_threshold)*2 - 1; % scale between -1,1
+        r(ind) = R_min + R_max./(1+exp(-obj.contact_smoothing_params.k*y));
         r = repmat(r,1,dim)';
 %         R = diag([r(:)',r(:)']);
         R = diag(r(:));
 
         % joint limit smoothing matrix
-        W_min = 1e-3; 
-        W_max = 1e3;
         w = zeros(nL,1);
-        w(phiL>=obj.phi_max) = W_max;
-        w(phiL<=obj.contact_threshold) = W_min;
-        ind = (phiL > obj.contact_threshold) & (phiL < obj.phi_max);
-        y = (phiL(ind)-obj.contact_threshold)./(obj.phi_max - obj.contact_threshold)*2 - 1; % scale between -1,1
-        w(ind) = W_min + W_max./(1+exp(-10*y));
+        w(phiL>=obj.contact_smoothing_params.phi_max) = R_max;
+        w(phiL<=obj.contact_smoothing_params.contact_threshold) = R_min;
+        ind = (phiL > obj.contact_smoothing_params.contact_threshold) & (phiL < obj.contact_smoothing_params.phi_max);
+        y = (phiL(ind)-obj.contact_smoothing_params.contact_threshold)./(obj.contact_smoothing_params.phi_max - obj.contact_smoothing_params.contact_threshold)*2 - 1; % scale between -1,1
+        w(ind) = R_min + R_max./(1+exp(-obj.contact_smoothing_params.k*y));
         W = diag(w(:));
         
         R = blkdiag(R,W);
         
         num_params = num_beta+nL;
-        lambda_ub = zeros(num_params,1);
-        scale_fact = 1e3;
-        phiC_pos = phiC;
-        phiC_pos(phiC<0)=0;
-        lambda_ub(1:num_beta) = repmat(max(0.01, scale_fact*(obj.phi_max./phiC_pos - 1.0)),1,num_d)';
-        phiL_pos = phiL;
-        phiL_pos(phiL<0)=0;
-        lambda_ub(num_beta+(1:nL)) = max(0.01, scale_fact*(obj.phi_max./phiL_pos - 1.0));
+%         lambda_ub = zeros(num_params,1);
+%         scale_fact = 1e3;
+%         phiC_pos = phiC;
+%         phiC_pos(phiC<0)=0;
+%         lambda_ub(1:num_beta) = repmat(max(0.01, scale_fact*(obj.phi_max./phiC_pos - 1.0)),1,num_d)';
+%         phiL_pos = phiL;
+%         phiL_pos(phiL<0)=0;
+%         lambda_ub(num_beta+(1:nL)) = max(0.01, scale_fact*(obj.phi_max./phiL_pos - 1.0));
                 
         try
           Q = 0.5*V'*(A+R)*V + 1e-8*eye(num_params);
@@ -456,8 +457,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %         Ain = 0*Ain; % TMP DEBUG
 %         bin = 0*bin; % TMP DEBUG
         
-        Ain_fqp = full([-Ain; -eye(num_params); eye(num_params)]);
-        bin_fqp = [-bin; zeros(num_params,1); lambda_ub];
+%         Ain_fqp = full([-Ain; -eye(num_params); eye(num_params)]);
+%         bin_fqp = [-bin; zeros(num_params,1); lambda_ub];
  
 %         [result_qp,info_fqp] = fastQPmex({Q},V'*c,Ain_fqp,bin_fqp,[],[],obj.LCP_cache.data.fastqp_active_set);
         
@@ -474,7 +475,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
             model.rhs = bin;
             model.sense = repmat('>',length(bin),1);
             model.lb = zeros(num_params,1);
-            model.ub = lambda_ub;
+%             model.ub = lambda_ub;
             result = gurobi(model,gurobi_options);
             result_qp = result.x;
           catch
@@ -482,8 +483,8 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           end;
         end
         f = V*(result_qp + w_active);
-        active_set = find(abs(Ain_fqp*result_qp - bin_fqp)<1e-6);
-        obj.LCP_cache.data.fastqp_active_set = active_set;
+%         active_set = find(abs(Ain_fqp*result_qp - bin_fqp)<1e-6);
+%         obj.LCP_cache.data.fastqp_active_set = active_set;
 
 %         vis=obj.constructVisualizer;
 %         figure(26)
