@@ -183,41 +183,64 @@ classdef PendulumPlant < SecondOrderSystem
       end
     end  
      
-function [utraj,xtraj]=swingUpTrajectory(obj,options)
+function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       x0 = [0;0]; 
       xf = double(obj.xG);
-      tf0 = 4;
+      tf = 4;
 
-      N = 21;
-      traj_opt = DircolTrajectoryOptimization(obj,N,[2 6]);
+      if nargin == 1
+          N = 21;
+          options = struct();
+      elseif nargin == 2
+          options = struct();
+      end
+      traj_opt = DirtranTrajectoryOptimization(obj,N,tf,options);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
-      %traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
+      traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
       traj_opt = traj_opt.addRunningCost(@cost);
       traj_opt = traj_opt.addFinalCost(@finalCost);
-      traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
+      traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
       
       
       function [g,dg] = cost(dt,x,u);
-        R = 1;
-        g = (R*u).*u;
-        
+        xg = double(obj.xG);
+        R = .1;
+        Q = [.1 0; 0 .01];
+        pmpi = [pi; -pi];
+        [e1, i] = min(abs([x(1)+pi x(1)-pi]));
+        e = [e1; x(2)-xg(2)];
+        g = e'*Q*e + u'*R*u;
         if (nargout>1)
-          dg = [zeros(1,3),2*u'*R];
+          dg = [0, 2*[x(1)+pmpi(i), x(2)]*Q, 2*u'*R];
         end
       end
       
       function [h,dh] = finalCost(tf,x)
-        Qf = 100*eye(2);
-        h = (x-xf)'*Qf*(x-xf);
+        xg = double(obj.xG);
+        Qf = 0*eye(2);
+        pmpi = [pi; -pi];
+        [e1, i] = min(abs([x(1)+pi x(1)-pi]));
+        e = [e1; x(2)-xg(2)];
+        h = e'*Qf*e;
         if (nargout>1)
-          dh = [0, 2*(x-xf)'*Qf];
+          dh = [0, 2*[x(1)+pmpi(i), x(2)]*Qf];
         end
       end
+      
+      % add a display function to draw the trajectory on every iteration
+      function displayStateTrajectory(t,x,u)
+        subplot(2,1,1);
+        plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
+        subplot(2,1,2);
+        plot([0; cumsum(t(1:end-1))],u(1:end-1),'r.-','MarkerSize',10);
+        drawnow;
+      end
+      traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
       
       info=0;
       while (info~=1)
         tic
-        [xtraj,utraj,z,F,info] = traj_opt.solveTraj(tf0,traj_init);
+        [xtraj,utraj,z,F,info] = traj_opt.solveTraj(tf,traj_init);
         toc
       end
     end
@@ -290,16 +313,17 @@ function [utraj,xtraj]=swingUpTrajectory(obj,options)
     function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,N,D)
       x0 = [0;0]; 
       xf = double(obj.xG);
-      tf0 = 4;
+      tf = 4;
       
       nw=1;
       
       options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,D,[3 8],options);
+      prog = RobustDirtranTrajectoryOptimization(obj,N,D,tf,options);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
       prog = prog.addRunningCost(@cost);
       prog = prog.addFinalCost(@finalCost);
+      prog = prog.addRobustCost(@robust_cost);
       prog = prog.addRobustConstraints(@robust_cost);
       
       disp('constructor done');
@@ -394,17 +418,20 @@ function [utraj,xtraj]=swingUpTrajectory(obj,options)
              
       % add a display function to draw the trajectory on every iteration
       function displayStateTrajectory(t,x,u)
+        subplot(2,1,1);
         plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
+        subplot(2,1,2);
+        plot([0; cumsum(t(1:end-1))],u(1:end-1),'r.-','MarkerSize',10);
         drawnow;
       end
       prog = addTrajectoryDisplayFunction(prog,@displayStateTrajectory);
       
-      traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
+      traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
       
       for attempts=1:1
         disp('Running solve');
         tic
-        [xtraj,utraj,z,F,info] = prog.solveTraj(tf0,traj_init);
+        [xtraj,utraj,z,F,info] = prog.solveTraj(tf,traj_init);
         toc
         if info==1, break; end
       end
@@ -416,28 +443,37 @@ function [utraj,xtraj]=swingUpTrajectory(obj,options)
 %       du = z(prog.du_inds);
 %       w = z(prog.w_inds);
       
-      keyboard
+      %keyboard
       
       function [g,dg] = cost(dt,x,u);
-        R = 1;
-        g = (R*u).*u;
-        
+        xg = double(obj.xG);
+        R = .1;
+        Q = [.1 0; 0 .01];
+        pmpi = [pi; -pi];
+        [e1, i] = min(abs([x(1)+pi x(1)-pi]));
+        e = [e1; x(2)-xg(2)];
+        g = e'*Q*e + u'*R*u;
         if (nargout>1)
-          dg = [zeros(1,3),2*u'*R];
+          dg = [0, 2*[x(1)+pmpi(i), x(2)]*Q, 2*u'*R];
         end
       end
       
       function [h,dh] = finalCost(tf,x)
-        h = 1*tf;
+        xg = double(obj.xG);
+        Qf = 0*eye(2);
+        pmpi = [pi; -pi];
+        [e1, i] = min(abs([x(1)+pi x(1)-pi]));
+        e = [e1; x(2)-xg(2)];
+        h = e'*Qf*e;
         if (nargout>1)
-          dh = [1, zeros(1,2)];
+          dh = [0, 2*[x(1)+pmpi(i), x(2)]*Qf];
         end
       end
       
       function [g,dg,ddg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
-        Qw = 1*eye(2);
-        Rw = 1;
+        Qw = [3 0; 0 1];
+        Rw = .01;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw, 2*du'*Rw, 2*w'*W];
         ddg = blkdiag(2*Qw, 2*Rw, 2*W);

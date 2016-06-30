@@ -7,7 +7,8 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     nX
     nU
     nW
-    K
+    Qbar
+    Rbar
   end
   
   methods
@@ -34,7 +35,12 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         constraint = LinearConstraint(repmat(plant.umin,N,1),repmat(plant.umax,N,1),A);
         constraint = constraint.setName('u+du limit');
         obj = obj.addConstraint(constraint, inds);
-      end        
+      end
+      
+      % add LQR controller for delta-u
+      
+      
+      
     end
     
     function obj = setupVariables(obj, N)
@@ -77,93 +83,121 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       obj.N = N;
     end
     
-    function obj = addRobustConstraints(obj,robust_cost)
-      nx = obj.nX;
-      nu = obj.nU;
-      nw = obj.nW;
-      N = obj.N;
-      
-      for i=1:N-1
+    function obj = addRobustCost(obj,robust_cost)
+        nx = obj.nX;
+        nu = obj.nU;
+        nw = obj.nW;
+        N = obj.N;
         
         switch obj.options.integration_method
-          case DirtranTrajectoryOptimization.FORWARD_EULER
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            % Add constraint on delta_x for all i=1:N
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            n_vars = 1 + 4*nx + 2*nu + nw;
-            inds = {obj.h_inds(i); ...
-                    obj.x_inds(:,i); ...
-                    obj.dx_inds(:,i); ...
-                    obj.x_inds(:,i+1); ...
-                    obj.dx_inds(:,i+1); ...
-                    obj.u_inds(:,i); ...
-                    obj.du_inds(:,i); ...
-                    obj.w_inds(:,i)};
-            constraint = FunctionHandleConstraint(zeros(nx,1),zeros(nx,1),n_vars,@obj.forward_delta_x_constraint);
-            constraint = constraint.setName(sprintf('delta_x_%d',i));
-            obj = obj.addConstraint(constraint, inds);
-            
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            % Equality constraint on w_i
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            n_vars = 1 + 2*nx + 2*nu + nw;
-            inds = {obj.h_inds(i); ...
-                    obj.x_inds(:,i); ...
-                    obj.dx_inds(:,i); ...
-                    obj.u_inds(:,i); ...
-                    obj.du_inds(:,i); ...
-                    obj.w_inds(:,i)};
-
-            forward_w_equality_constraint_i = @(h,x0,dx0,u,du,w0) obj.forward_w_equality_constraint(robust_cost,h,x0,dx0,u,du,w0);
-
-            constraint = FunctionHandleConstraint(zeros(nw,1),zeros(nw,1),n_vars,forward_w_equality_constraint_i);
-            constraint = constraint.setName(sprintf('w_equality_%d',i));
-            obj = obj.addConstraint(constraint, inds);      
-            
-
-          case DirtranTrajectoryOptimization.MIDPOINT
-%             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%             % Add constraint on delta_x for all i=1:N
-%             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%             n_vars = 1 + 4*nx + 3*n + nw;
-%             inds = {obj.h_inds(i); ...
-%                     obj.x_inds(:,i); ...
-%                     obj.dx_inds(:,i); ...
-%                     obj.x_inds(:,i+1); ...
-%                     obj.dx_inds(:,i+1); ...
-%                     obj.u_inds(:,i); ... 
-%                     obj.du_inds(:,i); ...
-%                     obj.u_inds(:,i+1); ...
-%                     obj.w_inds(:,i)};
-% 
-%             constraint = FunctionHandleConstraint(zeros(nx,1),zeros(nx,1),n_vars,@obj.midpoint_delta_x_constraint);
-%             obj = obj.addConstraint(constraint, inds);
-%             
-%             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%             % Bound on robust cost of w_i
-%             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%             n_vars = 2 + 3*nX + 3*nU + nW;
-%             inds = {obj.gamma_inds(i); ...
-%                     obj.h_inds(i); ...
-%                     obj.x_inds(:,i); ...
-%                     obj.dx_inds(:,i); ...
-%                     obj.x_inds(:,i+1); ...
-%                     obj.u_inds(:,i); ...
-%                     obj.du_inds(:,i); ...
-%                     obj.u_inds(:,i+1); ...
-%                     obj.w_inds(:,i)};
-% 
-%             midpoint_w_bound_fun_i = @(gamma,h,x0,dx0,x1,u0,du0,u1,w0) obj.midpoint_w_bound_fun(robust_cost,gamma,h,x0,dx0,x1,u0,du0,u1,w0);
-%             constraint = FunctionHandleConstraint(0,inf,n_vars,midpoint_w_bound_fun_i);
-%             obj = obj.addConstraint(constraint, inds);            
-            
-          case DirtranTrajectoryOptimization.BACKWARD_EULER
-            error('not implemented yet');
-          
-          otherwise
-            error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
+            case DirtranTrajectoryOptimization.FORWARD_EULER
+                dim = nx+nu+nw;
+                for k = 1:N
+                    costObj = FunctionHandleObjective(dim,robust_cost,2);
+                    obj = obj.addCost(costObj, {obj.dx_inds(:,k); obj.du_inds(:,k); obj.w_inds(:,k)});
+                end
+            otherwise
+                error('not implemented yet');
         end
-      end
+        
+    end
+    
+    function obj = addRobustConstraints(obj,robust_cost)
+        nx = obj.nX;
+        nu = obj.nU;
+        nw = obj.nW;
+        N = obj.N;
+        
+        switch obj.options.integration_method
+            case DirtranTrajectoryOptimization.FORWARD_EULER
+                for i=1:N-1
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    % Add constraint on delta_x for all i=1:N
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    n_vars = 1 + 4*nx + 2*nu + nw;
+                    inds = {obj.h_inds(i); ...
+                        obj.x_inds(:,i); ...
+                        obj.dx_inds(:,i); ...
+                        obj.x_inds(:,i+1); ...
+                        obj.dx_inds(:,i+1); ...
+                        obj.u_inds(:,i); ...
+                        obj.du_inds(:,i); ...
+                        obj.w_inds(:,i)};
+                    constraint = FunctionHandleConstraint(zeros(nx,1),zeros(nx,1),n_vars,@obj.forward_delta_x_constraint);
+                    constraint = constraint.setName(sprintf('delta_x_%d',i));
+                    obj = obj.addConstraint(constraint, inds);
+                    
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    % Equality constraint on w_i
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    n_vars = 1 + 2*nx + 2*nu + nw;
+                    inds = {obj.h_inds(i); ...
+                        obj.x_inds(:,i); ...
+                        obj.dx_inds(:,i); ...
+                        obj.u_inds(:,i); ...
+                        obj.du_inds(:,i); ...
+                        obj.w_inds(:,i)};
+                    
+                    forward_w_equality_constraint_i = @(h,x0,dx0,u,du,w0) obj.forward_w_equality_constraint(robust_cost,h,x0,dx0,u,du,w0);
+                    
+                    constraint = FunctionHandleConstraint(zeros(nw,1),zeros(nw,1),n_vars,forward_w_equality_constraint_i);
+                    constraint = constraint.setName(sprintf('w_equality_%d',i));
+                    obj = obj.addConstraint(constraint, inds);
+                end
+                
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                % Equality constraint on delta-u
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                [~,~,ddJ] = robust_cost(zeros(nx,1),zeros(nu,1),zeros(nw,1));
+                obj.Qbar = sparse(kron(speye(N),ddJ(1:nx,1:nx)));
+                obj.Rbar = sparse(kron(speye(N),ddJ(nx+(1:nu),nx+(1:nu))));
+                lqrconst = FunctionHandleConstraint(zeros(N*nu,1), zeros(N*nu,1), obj.num_vars, @obj.lqr_constraint);
+                lqrconst.grad_level = 0; %need to add derivatives
+                lqrconst.grad_method = 'numerical';
+                obj = obj.addConstraint(lqrconst);
+                
+            case DirtranTrajectoryOptimization.MIDPOINT
+                %             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                %             % Add constraint on delta_x for all i=1:N
+                %             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                %             n_vars = 1 + 4*nx + 3*n + nw;
+                %             inds = {obj.h_inds(i); ...
+                %                     obj.x_inds(:,i); ...
+                %                     obj.dx_inds(:,i); ...
+                %                     obj.x_inds(:,i+1); ...
+                %                     obj.dx_inds(:,i+1); ...
+                %                     obj.u_inds(:,i); ...
+                %                     obj.du_inds(:,i); ...
+                %                     obj.u_inds(:,i+1); ...
+                %                     obj.w_inds(:,i)};
+                %
+                %             constraint = FunctionHandleConstraint(zeros(nx,1),zeros(nx,1),n_vars,@obj.midpoint_delta_x_constraint);
+                %             obj = obj.addConstraint(constraint, inds);
+                %
+                %             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                %             % Bound on robust cost of w_i
+                %             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                %             n_vars = 2 + 3*nX + 3*nU + nW;
+                %             inds = {obj.gamma_inds(i); ...
+                %                     obj.h_inds(i); ...
+                %                     obj.x_inds(:,i); ...
+                %                     obj.dx_inds(:,i); ...
+                %                     obj.x_inds(:,i+1); ...
+                %                     obj.u_inds(:,i); ...
+                %                     obj.du_inds(:,i); ...
+                %                     obj.u_inds(:,i+1); ...
+                %                     obj.w_inds(:,i)};
+                %
+                %             midpoint_w_bound_fun_i = @(gamma,h,x0,dx0,x1,u0,du0,u1,w0) obj.midpoint_w_bound_fun(robust_cost,gamma,h,x0,dx0,x1,u0,du0,u1,w0);
+                %             constraint = FunctionHandleConstraint(0,inf,n_vars,midpoint_w_bound_fun_i);
+                %             obj = obj.addConstraint(constraint, inds);
+                
+            case DirtranTrajectoryOptimization.BACKWARD_EULER
+                error('not implemented yet');
+                
+            otherwise
+                error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
+        end
       
           
       %---------------------------------------------------------------
@@ -196,13 +230,43 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         constraint = constraint.setName(sprintf('linear_control_%d',i));
         obj = obj.addConstraint(constraint, inds);  
       end
-    end  
+    end
+    
+    function f = lqr_constraint(obj,z)
+        nx = obj.nX;
+        nu = obj.nU;
+        N = obj.N;
+        
+        %Build linear system to define batch LQR problem
+        Ak = zeros(nx,nx,N);
+        Bk = zeros(nx,nu,N);
+        for k = 1:(N-1)
+            [~,dx] = obj.forward_robust_dynamics_fun(z(obj.h_inds(k)),z(obj.x_inds(:,k)),z(obj.u_inds(:,k)), zeros(1,obj.nW));
+            Ak(:,:,k) = dx(:,1+(1:nx));
+            Bk(:,:,k) = dx(:,1+nx+(1:nu));
+        end
+        
+        Bbar = zeros(N*nx, N*nu);
+        for k = 1:(N-1) %fill in 1st diagonal to get us started...
+            Bbar(k*nx+(1:nx),(k-1)*nu+(1:nu)) = Bk(:,:,k);
+        end
+        for j = 2:N-1 %recursively fill in successive (block) diagonals
+            for k = j:(N-1)
+                Bbar(k*nx+(1:nx),(k-j)*nu+(1:nu)) = Ak(:,:,k)*Bbar((k-1)*nx+(1:nx),(k-j)*nu+(1:nu));
+            end
+        end
+        
+        %Solve linear system to find LQR control moves
+        du = -5*(obj.Rbar + Bbar'*obj.Qbar*Bbar)\(Bbar'*obj.Qbar*z(obj.dx_inds(:)));
+        
+        f = z(obj.du_inds(:)) - du;
+    end
    
     function [f,df] = forward_w_equality_constraint(obj,robust_cost,h,x0,dx0,u,du,w)
-      option.grad_method = 'numerical';
+      %option.grad_method = 'numerical';
       %[w_opt, dw] = geval(@(hq,xq,uq)solve_qcqp(obj, robust_cost, hq, xq, uq), h, x0+dx0, u+du, option);
       [w_opt, dw] = solve_qcqp(obj, robust_cost, h, x0+dx0, u+du);
-     
+      
       f = w - w_opt;
 
       df = [-dw(:,1), ... h
@@ -215,7 +279,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     
     function [w, dw] = solve_qcqp(obj,robust_cost,h,x0,u0)
         %Setup QCQP
-        
         [~,dx1,ddx1] = geval(@obj.forward_robust_dynamics_fun,h,x0,u0,zeros(obj.nW,1));
         [~,dJ,ddJ] = robust_cost(zeros(obj.nX,1),zeros(obj.nU,1),zeros(obj.nW,1));
         
@@ -228,12 +291,12 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         H = -G'*ddJ(1:obj.nX,1:obj.nX)*G;
         f = -G'*dJ(1:obj.nX)';
         
-        %[w,lambda] = qcqp_mex(H,f,obj.D);
-        [w,lambda] = qcqp(H,f,obj.D);
+        w = qcqp_mex(H,f,obj.D);
+        %[w,lambda] = qcqp(H,f,obj.D);
         
         %Evaluate derivatives
         dw = -H\tvMult(dG,2*ddJ(1:obj.nX,1:obj.nX)*G*w + dJ(1:obj.nX)',1);
-        if lambda < 1e-4
+        if abs(.5*w'*obj.D*w - 1) < .01
             %Project onto the constraint surface
             n = obj.D*w;
             n = n/norm(n);
@@ -390,10 +453,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
 %       f = du+w;
 %       df = [eye(length(du)), eye(length(w))];
 %     end
-
-
-
-    
 
   end
 end
