@@ -472,8 +472,8 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       
       function [g,dg,ddg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
-        Qw = [3 0; 0 1];
-        Rw = .01;
+        Qw = [1 0; 0 1];
+        Rw = .1;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw, 2*du'*Rw, 2*w'*W];
         ddg = blkdiag(2*Qw, 2*Rw, 2*W);

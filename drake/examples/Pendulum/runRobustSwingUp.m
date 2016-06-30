@@ -7,7 +7,7 @@ p = PendulumPlant();
 v = PendulumVisualizer();
 
 N = 21;
-D = 200; %This corresponds to +/-0.1 uncertainty in mass
+D = 50; %This corresponds to +/-.2 uncertainty in mass (20%)
 
 options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
 [utraj1,xtraj1,z1,prog1] = p.swingUpTrajectory(N,options);
@@ -89,34 +89,28 @@ plot(t2,w);
 ylabel('w')
 
 % open-loop playback
-% x1_e = zeros(size(x1));
-% x1_e(:,1) = x1(:,1);
-% for k = 1:(length(t1)-1)
-%     x1_e(:,k+1) = x1_e(:,k) + h1(k)*p.dynamics(0,x1_e(:,k),u1(k));
-% end
-% figure();
-% plot(t1,x1_e(1,:));
-% hold on;
-% plot(t1,x1_e(2,:));
-% 
-% x2_e = zeros(size(x2));
-% x2_e(:,1) = x2(:,1);
-% for k = 1:(length(t2)-1)
-%     x2_e(:,k+1) = x2_e(:,k) + h2(k)*p.dynamics(0,x2_e(:,k),u2(k));
-% end
-% figure();
-% plot(t2,x2_e(1,:));
-% hold on;
-% plot(t2,x2_e(2,:));
+% olsys = cascade(utraj2,p);
+% [~,xol] = olsys.simulate([0 4], [0 0]');
+% v.playback(xol);
 
-% xtraj1_ol = PPTrajectory(foh(t1,x1_e));
-% xtraj1_ol = xtraj1_ol.setOutputFrame(p.getStateFrame);
-v.playback(xtraj1);
+% closed-loop
+Q = [3 0; 0 1];
+R = .1;
+p = p.setMass(1);
+c = tvlqr(p,xtraj1,utraj1,Q,R,Q);
+p = p.setMass(1.2);
+clsys = feedback(p,c);
+[~,xcl] = clsys.simulate([0 4], [0 0]');
+v.playback(xcl);
 
-% xtraj2_ol = PPTrajectory(foh(t2,x2_e));
-% xtraj2_ol = xtraj2_ol.setOutputFrame(p.getStateFrame);
-v.playback(xtraj2);
+keyboard
 
+p = p.setMass(1);
+c = tvlqr(p,xtraj2,utraj2,Q,R,Q);
+p = p.setMass(1.2);
+clsys = feedback(p,c);
+[~,xcl] = clsys.simulate([0 4], [0 0]');
+v.playback(xcl);
 
 
 
