@@ -32,7 +32,7 @@ xG(1) = x0(1) - 0.2;
 
 traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.2) (1+0.2)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
-traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
+% traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
 traj_opt = traj_opt.addRunningCost(@cost);
 traj_opt = traj_opt.addFinalCost(@finalCost);
       
@@ -87,7 +87,7 @@ function [g,dg] = cost(h,x,u)
 end
 
 function [g,dg] = finalCost(t,x)
-  Q = 0*diag([100*ones(nx/2,1); 1*ones(nx/2,1)]);
+  Q = diag([100*ones(nx/2,1); 10*ones(nx/2,1)]);
 
   g = (x-xG)'*Q*(x-xG);
   dg = [0,2*(x'*Q - xG'*Q)];

@@ -93,27 +93,31 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
         constraint = FunctionHandleConstraint(zeros(nx,1),zeros(nx,1),n_vars,@obj.forward_constraint_fun);
         constraint = constraint.setName(sprintf('dynamics_%d',i));
         obj = obj.addConstraint(constraint, inds);
-            
+
+        % contact force dynamics constraints
+        n_vars = 1 + nx + nu + 2*nl + nc;
+        inds = {obj.h_inds(i); ...
+                obj.x_inds(:,i); ...
+                obj.u_inds(:,i); ...
+                obj.l_inds(:,i); ...
+                obj.alpha_inds(:,i); ...
+                obj.beta_inds(:,i)};     
+        constraint = FunctionHandleConstraint(zeros(nl,1),zeros(nl,1),n_vars,@obj.lambda_constraint_fun);
+        constraint = constraint.setName(sprintf('contact_dynamics_%d',i));
+        obj = obj.addConstraint(constraint, inds);        
         
-%         % contact force dynamics constraints
-%         n_vars = 1 + nx + nu + 2*nl + nc;
-%         inds = {obj.h_inds(i); ...
-%                 obj.x_inds(:,i); ...
-%                 obj.u_inds(:,i); ...
-%                 obj.l_inds(:,i); ...
-%                 obj.alpha_inds(:,i); ...
-%                 obj.beta_inds(:,i)};     
-%         constraint = FunctionHandleConstraint(zeros(nl,1),zeros(nl,1),n_vars,@obj.lambda_constraint_fun);
-%         constraint = constraint.setName(sprintf('contact_dynamics_%d',i));
-%         obj = obj.addConstraint(constraint, inds);
-%         
+      end
+      
+      for i=1:N
 
-%         % non-penetration constraints
-%         inds = {obj.x_inds(:,i)};
-%         constraint = FunctionHandleConstraint(zeros(nc,1),inf(nc,1),nx,@obj.phi_bound);
-%         constraint = constraint.setName(sprintf('phi_bound_%d',i));
-%         obj = obj.addConstraint(constraint, inds);
+        
 
+        % non-penetration constraints
+        inds = {obj.x_inds(:,i)};
+        constraint = FunctionHandleConstraint(zeros(nc,1),inf(nc,1),nx,@obj.phi_bound);
+        constraint = constraint.setName(sprintf('phi_bound_%d',i));
+        obj = obj.addConstraint(constraint, inds);
+% 
 %         
 %         % vmin inequality
 %         n_vars = 1 + nx + nu + nl;
@@ -124,8 +128,8 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
 %         constraint = FunctionHandleConstraint(zeros(nc,1),inf(nc,1),n_vars,@obj.vmin_inequality);
 %         constraint = constraint.setName(sprintf('vmin_bound_%d',i));
 %         obj = obj.addConstraint(constraint, inds);
-
-        
+% 
+%         
 %         % lagrange multiplier equality constraint on vmin
 %         n_vars = 1 + nx + nu + nl + nc;
 %         inds = {obj.h_inds(i); ...
@@ -136,17 +140,16 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
 %         constraint = FunctionHandleConstraint(zeros(nc,1),zeros(nc,1),n_vars,@obj.vmin_lagrange_eq);
 %         constraint = constraint.setName(sprintf('vmin_lagrange_eq_%d',i));
 %         obj = obj.addConstraint(constraint, inds);
-%         
+        
       end
       
-%       % lagrange multiplier equality constraint on \lambda
-%       inds = {obj.l_inds(:),obj.alpha_inds(:)};
-%       constraint = FunctionHandleConstraint(zeros(nl*N,1),zeros(nl*N,1),2*nl*N,@obj.lagrange_eq);
-%       constraint = constraint.setName(sprintf('lagrange_eq_%d',i));
-%       obj = obj.addConstraint(constraint, inds);
+      % lagrange multiplier equality constraint on \lambda
+      inds = {obj.l_inds(:),obj.alpha_inds(:)};
+      constraint = FunctionHandleConstraint(zeros(nl*N,1),zeros(nl*N,1),2*nl*N,@obj.lagrange_eq);
+      constraint = constraint.setName(sprintf('lagrange_eq_%d',i));
+      obj = obj.addConstraint(constraint, inds);
       
-    end
-    
+    end 
     
     function [f,df] = vmin_lagrange_eq(obj,h,x,u,l,beta) 
       
@@ -176,7 +179,12 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       [phiC,normal,d,Apts,Bpts,Aidx,Bidx,mu,n] = contactConstraints(p,kinsol,p.multiple_contacts);
 
       V = computeV(obj,normal,mu,d);
-      [J,dJ,dJtranspose] = computeJ(obj,kinsol,Aidx,Apts,Bidx,Bpts);
+      [J,dJ] = computeJ(obj,kinsol,Aidx,Apts,Bidx,Bpts);
+
+      dJtVl = zeros(nq,nq);
+      for i=1:nq
+        dJtVl(:,i) = dJ(:,(i-1)*nq+(1:nq))'*V*l;
+      end
       
       [H,C,B,dH,dC] = manipulatorDynamics(p,q,qd);
       Hinv = inv(H);
@@ -190,25 +198,22 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       dtau_dqd = -dC(:,nq+(1:nq));
       dtau_du = B;
       
-      % N*(A*z + c) - v_min \ge 0
-      Ain = zeros(nc,nl);
-      bin = zeros(nc,1);
       ncell = cell(1,nc);
       for i=1:nc
-        idx = (i-1)*dim + (1:dim);
-        v_min = -phiC(i)/h;
-        Ain(i,:) = normal(:,i)'*A(idx,:)*V;
-        bin(i) = v_min - normal(:,i)'*c(idx);
         ncell{i} = normal(:,i)';
       end
-      
       normal_mat = blkdiag(ncell{:});
+      
+      % N*(A*z + c) - v_min \ge 0
+      Ain = normal_mat*A*V;
+      bin = -phiC./h - normal_mat*c;
+      
       f = Ain*l - bin;
       
-%     f = normal'*J*(Hinv*J'*V*l + qd + Hinv*tau*h) + phiC(i)/h 
+%     f = normal_mat*J*(Hinv*J'*V*l + qd + Hinv*tau*h) + phiC/h 
 
-      dfdh = normal_mat*J*Hinv*tau - phiC/(h*h);
-      dfdq = normal_mat*(matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + matGradMult(dJtranspose,V*l)))) + 1/h * n; 
+      dfdh = normal_mat*J*Hinv*tau - phiC./(h*h);
+      dfdq = normal_mat*(matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + dJtVl))) + 1/h * n; 
       dfdqd = normal_mat*(J + J*Hinv*(dtau_dqd*h));
       dfdu = normal_mat*J*Hinv*dtau_du*h;
       dfdl = normal_mat*J*Hinv*J'*V;
@@ -238,32 +243,23 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       nc = obj.nC;
       dim = 3;
       
-      kinsol = doKinematics(p, q, [], struct('compute_gradients', true));
+      options.kinematics_cache_ptr_to_use = [];
+      options.compute_gradients = true;
+      kinsol = doKinematics(p, q, [], options);
 
       [~,normal,d,Apts,Bpts,Aidx,Bidx,mu] = contactConstraints(p,kinsol,p.multiple_contacts);
       V = computeV(obj,normal,mu,d);
       [J,dJ] = computeJ(obj,kinsol,Aidx,Apts,Bidx,Bpts);
 
-      
-%       J = eye(6,5);      
-%       dJ = 0*dJ;
-      dJT = reshape(full(dJ),nc*dim,nq,nq); 
-      dJtVl = tvMult(dJT,V*l,1);
-
-%       dJtVl = zeros(nq,nq);
-%       for i=1:nq
-%         dJtVl(:,i) = dJ(:,(i-1)*nq+1:i*nq)'*V*l;
-%       end
+      dJtVl = zeros(nq,nq);
+      for i=1:nq
+        dJtVl(:,i) = dJ(:,(i-1)*nq+(1:nq))'*V*l;
+      end
       
       [H,C,B,dH,dC] = manipulatorDynamics(p,q,qd);
       Hinv = inv(H);
       dHdq = dH(:,1:nq);
-      
-      
-%       C=0*C;
-%       dC = 0*dC;
-%       B = 0*B;
-      
+       
       tau = (B*u-C);
       qdn = qd + Hinv*(tau*h + J'*V*l);
       qn = q + qd*h;  
@@ -280,8 +276,6 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       
       df = [dfdh, dfdq, dfdqd, dfdu, dfdl];
     end
-    
-    
     
     function [f,df] = phi_bound(obj,x)
       nq = obj.plant.getNumPositions;
@@ -310,8 +304,8 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       [phiC,normal,d,Apts,Bpts,Aidx,Bidx,mu,n] = contactConstraints(p,kinsol,p.multiple_contacts);
 
       V = computeV(obj,normal,mu,d);
-      [J,dJ,dJtranspose] = computeJ(obj,kinsol,Aidx,Apts,Bidx,Bpts);
-
+      [J,dJ] = computeJ(obj,kinsol,Aidx,Apts,Bidx,Bpts);
+      
       [H,C,B,dH,dC] = manipulatorDynamics(p,q,qd);
       Hinv = inv(H);
       dHdq = dH(:,1:nq);
@@ -329,20 +323,27 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       normal_mat = blkdiag(ncell{:});
       Ain_transpose = V'*A*normal_mat';
       
-      f = V'*R*V*l + V'*J*(qd + Hinv*(tau*h + J'*V*l)) - alpha - Ain_transpose*beta;
+      f = V'*R*V*l + V'*J*(qd + Hinv*(tau*h + J'*V*l)) - alpha ;%- Ain_transpose*beta;
+      
+      dJtnB = zeros(nq,nq);
+      dJtVl = zeros(nq,nq);
+      for i=1:nq
+        dJtnB(:,i) = dJ(:,(i-1)*nq+(1:nq))'*normal_mat'*beta;
+        dJtVl(:,i) = dJ(:,(i-1)*nq+(1:nq))'*V*l;
+      end
       
       dtau_dq = -dC(:,1:nq);
       dtau_dqd = -dC(:,nq+(1:nq));
       dtau_du = B;
       
       dfdh = V'*J*Hinv*tau;
-      dfdq = V'*(matGradMult(dR',V*l)' + matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + matGradMult(dJtranspose,V*l)))) ...
-      - V'* (matGradMult(dJ',Hinv*J'*normal_mat'*beta)' + J*(-Hinv*matGradMult(dHdq,Hinv*J'*normal_mat'*beta) + Hinv*(matGradMult(dJtranspose,normal_mat'*beta))));
+      dfdq = V'*(matGradMult(dR',V*l)' + matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + dJtVl)));% ...
+%       - V'* (matGradMult(dJ',Hinv*J'*normal_mat'*beta)' + J*(-Hinv*matGradMult(dHdq,Hinv*J'*normal_mat'*beta) + Hinv*dJtnB));
       dfdqd = V'*(J + J*Hinv*(dtau_dqd*h));
       dfdu = V'*J*Hinv*dtau_du*h;
       dfdl = V'*(R + J*Hinv*J')*V;
       dfdalpha = -eye(nl);
-      dfdbeta = -Ain_transpose;
+      dfdbeta = -0*Ain_transpose;
       
       df = [dfdh, dfdq, dfdqd, dfdu, dfdl, dfdalpha, dfdbeta];
     end
@@ -392,7 +393,6 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       J = JA-JB;
       dJ = dJA-dJB;
       
-      
     end
    
     function [R,dR] = computeSmoothingTerm(obj,phiC,n)
@@ -401,33 +401,33 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       nq = obj.nQ;
       dim = 3;
       
-%       % contact smoothing matrix
-%       R_min = p.contact_smoothing_params.R_min; 
-%       R_max = p.contact_smoothing_params.R_max;
-%       k = p.contact_smoothing_params.k;
-%       y = 2*(phiC-p.contact_smoothing_params.contact_threshold)./(p.contact_smoothing_params.phi_max - p.contact_smoothing_params.contact_threshold) - 1; % scale 
-%       dydq = 2/(p.contact_smoothing_params.phi_max - p.contact_smoothing_params.contact_threshold) * n;
-%       r = R_min + R_max./(1+exp(-k*y));
-%       drdy = 1./(1+exp(-k*y)).^2 .* R_max*k .* exp(-k*y);
-%       drdq = repmat(drdy,1,nq).*dydq;
-% 
-%       r = repmat(r,1,dim)';
-%       r = r(:);
-% 
-%       tmp = repmat(reshape(drdq',1,numel(drdq)),dim,1);
-%       drdq_cell = cell(1,nc*dim);
-%       cnt = 1;
-%       for i=1:nc
-%         for j=1:dim
-%           drdq_cell{cnt} = tmp(j,(i-1)*nq+(1:nq));
-%           cnt = cnt+1;
-%         end
-%       end
-%       R = diag(r);
-%       dR = blkdiag(drdq_cell{:});
+      % contact smoothing matrix
+      R_min = p.contact_smoothing_params.R_min; 
+      R_max = p.contact_smoothing_params.R_max;
+      k = p.contact_smoothing_params.k;
+      y = 2*(phiC-p.contact_smoothing_params.contact_threshold)./(p.contact_smoothing_params.phi_max - p.contact_smoothing_params.contact_threshold) - 1; % scale 
+      dydq = 2/(p.contact_smoothing_params.phi_max - p.contact_smoothing_params.contact_threshold) * n;
+      r = R_min + R_max./(1+exp(-k*y));
+      drdy = 1./(1+exp(-k*y)).^2 .* R_max*k .* exp(-k*y);
+      drdq = repmat(drdy,1,nq).*dydq;
+
+      r = repmat(r,1,dim)';
+      r = r(:);
+
+      tmp = repmat(reshape(drdq',1,numel(drdq)),dim,1);
+      drdq_cell = cell(1,nc*dim);
+      cnt = 1;
+      for i=1:nc
+        for j=1:dim
+          drdq_cell{cnt} = tmp(j,(i-1)*nq+(1:nq));
+          cnt = cnt+1;
+        end
+      end
+      R = diag(r);
+      dR = blkdiag(drdq_cell{:});
       
-      R = 100*eye(nc*dim);
-      dR = zeros(nc*dim,nc*dim*nq);
+%       R = 100*eye(nc*dim);
+%       dR = zeros(nc*dim,nc*dim*nq);
     end
 
   end
