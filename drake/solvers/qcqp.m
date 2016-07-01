@@ -1,4 +1,4 @@
-function [x, lambda] = qcqp(A,b,D)
+function [x, lambda] = qcqp(A,b,D,xguess)
 %QCQP solves the following problem:
 % min (1/2)*x'*A*x + b'*x
 % s.t. (1/2)*x'*D*x <= 1
@@ -6,29 +6,34 @@ function [x, lambda] = qcqp(A,b,D)
 % The algorithm is a primal-dual interior point method and uses several
 % heuristics to attempt to handle non-convex cases.
 
-%TODO: Change coordinates so that the constraint region becomes the unit ball
-% R = chol(D); % D = R'*R => x_new = R*x
-% A = R'*A*R;
-% b = R'*b;
-
 %Algorithm parameters
 mu = 10;
 alpha = 0.1;
 beta = 0.6;
-tol = 1e-14;
+tol = 1e-12;
 
-%Get feasible initial lambda using Gershgorin Circle Theorem
-[Amin, ind] = min(diag(A));
-lambda = max(1, 1.1*sum(abs(A(ind,:))));
-
-%Heuristic initial guess for x. If it looks like the minimum eigenvalue of
-%A is negative, start near the boundary. Otherwise, start at the origin.
-x = zeros(size(b));
-if Amin < 0
-    if b(ind) ~= 0
-        x(ind) = -sign(b(ind))/sqrt(max(diag(D)));
-    else
-        x(ind) = 1/sqrt(max(diag(D)));
+if nargin == 4 && ~isempty(xguess)
+    x = xguess;
+    lambda = -mean((A*x+b)./(D*x));
+    
+    %check residual
+    if ~any((A+lambda*D)*x + b > tol)
+        return
+    end
+else
+    %Get feasible initial lambda using Gershgorin Circle Theorem
+    [Amin, ind] = min(diag(A));
+    lambda = max(1, 1.1*sum(abs(A(ind,:))));
+    
+    %Heuristic initial guess for x. If it looks like the minimum eigenvalue of
+    %A is negative, start near the boundary. Otherwise, start at the origin.
+    x = zeros(size(b));
+    if Amin < 0
+        if b(ind) ~= 0
+            x(ind) = -sign(b(ind))/sqrt(max(diag(D)));
+        else
+            x(ind) = 1/sqrt(max(diag(D)));
+        end
     end
 end
 

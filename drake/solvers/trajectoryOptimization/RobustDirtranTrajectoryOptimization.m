@@ -1,4 +1,10 @@
 classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
+  
+  %TODO: Make LQR constraint faster - try exploiting sparsity in the
+  %solution and/or try the version with dynamics as equality constraint.
+  %Also, try warm-starting QCQP: check necessary conditions with answer
+  %from last time. Only run solver if the conditions are violated.
+    
   properties
     dx_inds  % n x N indices for delta state in disturbed trajectory
     du_inds  % m x N indices for delta inputs in disturbed trajectory
@@ -9,6 +15,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     nW
     Qbar
     Rbar
+    Hbar
   end
   
   methods
@@ -149,8 +156,9 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                 % Equality constraint on delta-u
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 [~,~,ddJ] = robust_cost(zeros(nx,1),zeros(nu,1),zeros(nw,1));
-                obj.Qbar = sparse(kron(speye(N),ddJ(1:nx,1:nx)));
-                obj.Rbar = sparse(kron(speye(N),ddJ(nx+(1:nu),nx+(1:nu))));
+                obj.Qbar = kron(speye(N),ddJ(1:nx,1:nx));
+                obj.Rbar = kron(speye(N),ddJ(nx+(1:nu),nx+(1:nu)));
+                obj.Hbar = kron(speye(N),inv(ddJ(1:(nx+nu),1:(nx+nu))));
                 lqrconst = FunctionHandleConstraint(zeros(N*nu,1), zeros(N*nu,1), obj.num_vars, @obj.lqr_constraint);
                 lqrconst.grad_level = 0; %need to add derivatives
                 lqrconst.grad_method = 'numerical';
@@ -232,32 +240,56 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       end
     end
     
-    function f = lqr_constraint(obj,z)
+    function f = lqr_constraint(obj,z,sp)
         nx = obj.nX;
         nu = obj.nU;
         N = obj.N;
         
-        %Build linear system to define batch LQR problem
-        Ak = zeros(nx,nx,N);
-        Bk = zeros(nx,nu,N);
+        %Get linearized dynamics along trajectory
+        Ak = zeros(nx,nx,N-1);
+        Bk = zeros(nx,nu,N-1);
         for k = 1:(N-1)
             [~,dx] = obj.forward_robust_dynamics_fun(z(obj.h_inds(k)),z(obj.x_inds(:,k)),z(obj.u_inds(:,k)), zeros(1,obj.nW));
             Ak(:,:,k) = dx(:,1+(1:nx));
             Bk(:,:,k) = dx(:,1+nx+(1:nu));
         end
         
-        Bbar = zeros(N*nx, N*nu);
-        for k = 1:(N-1) %fill in 1st diagonal to get us started...
-            Bbar(k*nx+(1:nx),(k-1)*nu+(1:nu)) = Bk(:,:,k);
-        end
-        for j = 2:N-1 %recursively fill in successive (block) diagonals
-            for k = j:(N-1)
-                Bbar(k*nx+(1:nx),(k-j)*nu+(1:nu)) = Ak(:,:,k)*Bbar((k-1)*nx+(1:nx),(k-j)*nu+(1:nu));
-            end
-        end
+%         if nargin == 3 %sparse formulation
+%             
+%             %Sparse constraint matrix to enforce dynamics
+%             Abar = spalloc(N*nx,N*(nx+nu),N*nx+(N-1)*(nx*nx+nu*nu));
+%             Abar(1:nx,1:nx) = speye(nx);
+%             for k = 1:(N-1)
+%                 Abar(k*nx+(1:nx),(k-1)*(nx+nu)+(1:nx+nu+nx)) = sparse([-Ak(:,:,k) -Bk(:,:,k) eye(nx)]);
+%             end
+%             
+%             %Constraint vector
+%             dx = z(obj.dx_inds(:));
+%             bbar = zeros(size(dx));
+%             bbar(1:nx) = dx(1:nx);
+%             for k = 1:(N-1)
+%                 bbar(k*nx+(1:nx)) = dx(k*nx+(1:nx)) - Ak(:,:,k)*dx((k-1)*nx+(1:nx));
+%             end
+%             
+%             du = obj.Hbar(kron(nx*(1:N)',ones(nu,1))+kron(ones(N,1),(1:nu)'),:)*Abar.'*((Abar*obj.Hbar*Abar.')\bbar);
+%             
+%         else %dense formulation
         
-        %Solve linear system to find LQR control moves
-        du = -5*(obj.Rbar + Bbar'*obj.Qbar*Bbar)\(Bbar'*obj.Qbar*z(obj.dx_inds(:)));
+            %Build linear system to define batch LQR problem
+            Bbar = zeros(N*nx, N*nu);
+            for k = 1:(N-1) %fill in 1st diagonal to get us started...
+                Bbar(k*nx+(1:nx),(k-1)*nu+(1:nu)) = Bk(:,:,k);
+            end
+            for j = 2:N-1 %recursively fill in successive (block) diagonals
+                for k = j:(N-1)
+                    Bbar(k*nx+(1:nx),(k-j)*nu+(1:nu)) = Ak(:,:,k)*Bbar((k-1)*nx+(1:nx),(k-j)*nu+(1:nu));
+                end
+            end
+            
+            %Solve linear system to find LQR control moves
+            du = -5*(obj.Rbar + Bbar'*obj.Qbar*Bbar)\(Bbar'*obj.Qbar*z(obj.dx_inds(:)));
+        
+%         end
         
         f = z(obj.du_inds(:)) - du;
     end
@@ -278,6 +310,9 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     end
     
     function [w, dw] = solve_qcqp(obj,robust_cost,h,x0,u0)
+        
+        persistent wstar; %keep last value for warm starting
+        
         %Setup QCQP
         [~,dx1,ddx1] = geval(@obj.forward_robust_dynamics_fun,h,x0,u0,zeros(obj.nW,1));
         [~,dJ,ddJ] = robust_cost(zeros(obj.nX,1),zeros(obj.nU,1),zeros(obj.nW,1));
@@ -291,8 +326,9 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         H = -G'*ddJ(1:obj.nX,1:obj.nX)*G;
         f = -G'*dJ(1:obj.nX)';
         
-        w = qcqp_mex(H,f,obj.D);
-        %[w,lambda] = qcqp(H,f,obj.D);
+        %wstar = qcqp_mex(H,f,obj.D,wstar);
+        w = qcqp(H,f,obj.D,wstar);
+        wstar = w;
         
         %Evaluate derivatives
         dw = -H\tvMult(dG,2*ddJ(1:obj.nX,1:obj.nX)*G*w + dJ(1:obj.nX)',1);
