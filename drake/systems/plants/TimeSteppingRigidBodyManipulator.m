@@ -24,7 +24,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     contact_smoothing_params = struct('phi_max',0.1, ... m, max contact force distance
                                'active_threshold',inf, ... height below which contact forces are calculated
                                'contact_threshold',1e-3, ... threshold where force penalties are eliminated (modulo regularization)
-                               'R_max',100, ... regularization parameter at phi_max
+                               'R_max',50, ... regularization parameter at phi_max
                                'R_min',0.01, ... regularization parameter at contact_threshold
                                'k',1); % exponential decay parameter
   end
@@ -294,7 +294,79 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       
     end
     
+    function [R,dR] = computeRegExponential(obj,phi,nc,n)
+      dim = 3;
+      
+      R_min = obj.contact_smoothing_params.R_min; 
+      R_max = obj.contact_smoothing_params.R_max;
+      phi_min = obj.contact_smoothing_params.contact_threshold;
+      phi_max = obj.contact_smoothing_params.phi_max;
+      
+      k = obj.contact_smoothing_params.k;
+      
+      [r,dr_dphi] = sig(phi,k,phi_min,phi_max,R_min,R_max);
+      r = repmat(r,1,dim)';
+      r = r(:);
+      R = diag(r);
     
+      if nargout > 1
+        nq = obj.getNumPositions;
+
+        drdq = repmat(dr_dphi,1,nq).*n;
+        tmp = repmat(reshape(drdq',1,numel(drdq)),dim,1);
+        drdq_cell = cell(1,nc*dim);
+        cnt = 1;
+        for i=1:nc
+          for j=1:dim
+            drdq_cell{cnt} = tmp(j,(i-1)*nq+(1:nq));
+            cnt = cnt+1;
+          end
+        end
+        dR = blkdiag(drdq_cell{:});
+      end
+    end
+
+    function [R,dR] = computeRegLinear(obj,phi,nc,n,R_max)
+      
+      if nargin < 4
+        R_max = obj.contact_smoothing_params.R_max;
+      end
+      
+      R_min = obj.contact_smoothing_params.R_min; 
+      phi_max = obj.contact_smoothing_params.phi_max;
+      dim = 3;
+      
+      y1 = R_min + (R_max - R_min)*(phi./phi_max);
+      dy1_dphi = (R_max - R_min)*(1./phi_max);
+
+      beta = 1.0;
+      [y2,dy2_dy1] = smax(y1,R_min,beta);
+
+      [r,dy_dy2] = smin(y2,R_max,beta);
+
+      dr_dphi = dy_dy2.*dy2_dy1.*dy1_dphi;
+
+      r = repmat(r,1,dim)';
+      r = r(:);
+      R = diag(r);        
+      
+      if nargout > 1
+        nq = obj.getNumPositions;
+      
+        drdq = repmat(dr_dphi,1,nq).*n;
+        tmp = repmat(reshape(drdq',1,numel(drdq)),dim,1);
+        drdq_cell = cell(1,nc*dim);
+        cnt = 1;
+        for i=1:nc
+          for j=1:dim
+            drdq_cell{cnt} = tmp(j,(i-1)*nq+(1:nq));
+            cnt = cnt+1;
+          end
+        end
+        dR = blkdiag(drdq_cell{:});
+      end
+    end
+
    
     function [xdn,df] = updateConvex(obj,h,x,u,w)
       % this function implement an update based on Todorov 2011, where
@@ -393,7 +465,6 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
           end
           w_active((i-1)*num_d+(1:num_d)) = w((active(i)-1)*num_d+(1:num_d));
           v_min(i) =-phi(i)/h;
-%           v_min(i) = 0;
         end
         V = blkdiag(V_cell{:},eye(nL));
                 
@@ -401,31 +472,16 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         A = J*vToqdot*Hinv*vToqdot'*J';
         c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
 
-        % contact smoothing matrix
-        R_min = obj.contact_smoothing_params.R_min; 
-        R_max = obj.contact_smoothing_params.R_max;
-        r = zeros(num_active,1);
-        r(phiC>=obj.contact_smoothing_params.phi_max) = R_max;
-        r(phiC<=obj.contact_smoothing_params.contact_threshold) = R_min;
-        ind = (phiC > obj.contact_smoothing_params.contact_threshold) & (phiC < obj.contact_smoothing_params.phi_max);
-        y = (phiC(ind)-obj.contact_smoothing_params.contact_threshold)./(obj.contact_smoothing_params.phi_max - obj.contact_smoothing_params.contact_threshold)*2 - 1; % scale between -1,1
-        r(ind) = R_min + R_max./(1+exp(-obj.contact_smoothing_params.k*y));
-        r = repmat(r,1,dim)';
-%         R = diag([r(:)',r(:)']);
-        R = diag(r(:));
-
-        % joint limit smoothing matrix
-        w = zeros(nL,1);
-        w(phiL>=obj.contact_smoothing_params.phi_max) = R_max;
-        w(phiL<=obj.contact_smoothing_params.contact_threshold) = R_min;
-        ind = (phiL > obj.contact_smoothing_params.contact_threshold) & (phiL < obj.contact_smoothing_params.phi_max);
-        y = (phiL(ind)-obj.contact_smoothing_params.contact_threshold)./(obj.contact_smoothing_params.phi_max - obj.contact_smoothing_params.contact_threshold)*2 - 1; % scale between -1,1
-        w(ind) = R_min + R_max./(1+exp(-obj.contact_smoothing_params.k*y));
-        W = diag(w(:));
-        
-        R = blkdiag(R,W);
+        R = computeRegLinear(obj,phi,num_active);
+      
+%         w = sig(phiL,k,phi_min,phi_max,R_min,R_max);
+%         w = repmat(w,1,dim)';
+%         w = w(:);
+%         W = diag(w);   
+%         R = blkdiag(R,W);
         
         num_params = num_beta+nL;
+        
 %         lambda_ub = zeros(num_params,1);
 %         scale_fact = 1e3;
 %         phiC_pos = phiC;
@@ -436,7 +492,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %         lambda_ub(num_beta+(1:nL)) = max(0.01, scale_fact*(obj.phi_max./phiL_pos - 1.0));
                 
         try
-          Q = 0.5*V'*(A+R)*V + 1e-8*eye(num_params);
+          Q = 0.5*V'*(.1*A+R)*V;
         catch
           keyboard
         end
@@ -470,7 +526,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 
           try
             model.Q = sparse(Q);
-            model.obj = V'*c;
+            model.obj = V'*.1*c;
             model.A = sparse(Ain);
             model.rhs = bin;
             model.sense = repmat('>',length(bin),1);

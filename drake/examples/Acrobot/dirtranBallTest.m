@@ -6,7 +6,7 @@ options.view = 'right';
 options.terrain = RigidBodyFlatTerrain();
 options.floating = true;
 
-r = TimeSteppingRigidBodyManipulator(PlanarRigidBodyManipulator('../../systems/plants/test/ball.urdf',options),.001,options);
+r = TimeSteppingRigidBodyManipulator(PlanarRigidBodyManipulator('ball.urdf',options),.001,options);
 options.floating = false;
 r = r.addRobotFromURDF('brick.urdf',[0;0;0.5],zeros(3,1), options);
 
@@ -16,7 +16,7 @@ nu = r.getNumInputs;
 v = r.constructVisualizer();
 
 ball_pos = [0;1.1;0];
-ball_vel = [0;0;0];
+ball_vel = [1;0;0];
 
 x0 = [ball_pos; ball_vel];
 
@@ -27,8 +27,15 @@ xf = [ball_goal_pos; ball_goal_vel];
 
 tf0 = 1.5;
 
-options.linc_slack = 0.00;
-traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.05) (1+0.05)],options);
+
+% traj = simulate(r,[0,tf0],x0);
+% 
+% v.playback(traj,struct('slider',true));
+% 
+% keyboard
+% 
+options.linc_slack = 0.0;
+traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.1) (1+0.1)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 % traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
 % traj_opt = traj_opt.addRunningCost(@cost);

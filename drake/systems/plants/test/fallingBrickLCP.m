@@ -1,6 +1,8 @@
 function fallingBrickLCP
 
 options.floating = true;
+options.twoD = true;
+options.floating = true;
 options.terrain = RigidBodyFlatTerrain();
 % options.ignore_self_collisions = true;
 options.use_bullet = false;
@@ -8,8 +10,8 @@ s = 'FallingBrickContactPoints.urdf';
 % s = 'FallingBrickBetterCollisionGeometry.urdf';
 p = TimeSteppingRigidBodyManipulator(s,.01,options);
 % p = p.addRobotFromURDF(s,[],[],options);
-% x0 = [0;1;2;rpy2quat(randn(3,1));randn(6,1)];
-x0 = [0;1;2;1.57;0;0;10;zeros(5,1)];
+% x0 = [0;1;2;1.57;0;0;10;zeros(5,1)];
+x0 = [0; 2; 1.57; 10; zeros(2,1)];
 
 % Forward simulate dynamics with visulazation, then playback at realtime
 v=p.constructVisualizer();
