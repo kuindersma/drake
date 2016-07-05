@@ -20,19 +20,19 @@ ball_vel = [0;0;0];
 
 x0 = [ball_pos; ball_vel];
 
-ball_goal_pos = [0;1;0];
+ball_goal_pos = [0;0.9;0];
 ball_goal_vel = [0;0;0];
 
 xf = [ball_goal_pos; ball_goal_vel];
 
-tf0 = 0.5;
+tf0 = 1.5;
 
-options.integration_method = DirtranTrajectoryOptimization.DT_SYSTEM;
-traj_opt = DirtranTrajectoryOptimization(r,N,tf0*[(1-0.05) (1+0.05)],options);
+options.linc_slack = 0.00;
+traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.05) (1+0.05)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 % traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
-traj_opt = traj_opt.addRunningCost(@cost);
-traj_opt = traj_opt.addFinalCost(@final_cost);
+% traj_opt = traj_opt.addRunningCost(@cost);
+% traj_opt = traj_opt.addFinalCost(@final_cost);
 traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
 
 % add a display function to draw the trajectory on every iteration
@@ -62,9 +62,15 @@ traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
 
 
 tic
-[xtraj,utraj,z,F,info] = traj_opt.solveTraj(tf0,traj_init);
+[xtraj,utraj,z,F,info,infeasible] = traj_opt.solveTraj(tf0,traj_init);
 toc
 
+h = z(traj_opt.h_inds);
+x = z(traj_opt.x_inds);
+u = z(traj_opt.u_inds);
+l = z(traj_opt.l_inds);
+a = z(traj_opt.alpha_inds);
+b = z(traj_opt.beta_inds);
 
 v.playback(xtraj,struct('slider',true));
 keyboard
