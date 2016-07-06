@@ -26,7 +26,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
                                'contact_threshold',1e-3, ... threshold where force penalties are eliminated (modulo regularization)
                                'R_max',50, ... regularization parameter at phi_max
                                'R_min',0.01, ... regularization parameter at contact_threshold
-                               'k',1); % exponential decay parameter
+                               'k',0.1); % exponential decay parameter
   end
 
   methods
@@ -328,7 +328,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 
     function [R,dR] = computeRegLinear(obj,phi,nc,n,R_max)
       
-      if nargin < 4
+      if nargin < 5
         R_max = obj.contact_smoothing_params.R_max;
       end
       
@@ -339,7 +339,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       y1 = R_min + (R_max - R_min)*(phi./phi_max);
       dy1_dphi = (R_max - R_min)*(1./phi_max);
 
-      beta = 1.0;
+      beta = obj.contact_smoothing_params.k;
       [y2,dy2_dy1] = smax(y1,R_min,beta);
 
       [r,dy_dy2] = smin(y2,R_max,beta);

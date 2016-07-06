@@ -9,9 +9,9 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
     nL
     nQ
     linc_mode = 1;
-    linc_slack = 0;
-    scale_factor = 0.1;
-    R_max = 100.0;
+    linc_slack = 0; % slack bound for complementarity constraints
+    scale_factor = 1; % scales the other terms in QP to keep R scaling reasonable
+    R_max = 50.0; % max R value
   end
   
   methods
@@ -23,26 +23,24 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
 
       obj = obj@DirtranTrajectoryOptimization(plant,N,duration,options);
       
-%       % Ensure that all lambda values and Lagrange multipliers are non-negative
-%       obj = obj.addConstraint(BoundingBoxConstraint(zeros(N*obj.nL,1),inf(N*obj.nL,1)),obj.l_inds);
-%       obj = obj.addConstraint(BoundingBoxConstraint(zeros(N*obj.nL,1),inf(N*obj.nL,1)),obj.alpha_inds);
-      obj = obj.addConstraint(BoundingBoxConstraint(zeros(N*obj.nC,1),inf(N*obj.nC,1)),obj.beta_inds);
- 
-      if ~isfield(options,'linc_mode')
-        options.linc_mode = 1;
+      if isfield(options,'linc_mode')
+        obj.linc_mode = options.linc_mode;
       end
-      if ~isfield(options,'linc_slack')
-        options.linc_slack = 0;
+      if isfield(options,'linc_slack')
+        obj.linc_slack = options.linc_slack;
       end
-      if ~isfield(options,'R_max')
-        options.R_max = 100;
+      if isfield(options,'R_max')
+        obj.R_max = options.R_max;
       end
-      obj.linc_mode = options.linc_mode;
-      obj.linc_slack = options.linc_slack;
-      obj.R_max = options.R_max;
+      if isfield(options,'scale_factor')
+        obj.scale_factor = options.scale_factor;
+      end
      
       obj = obj.addContactConstraints();
       obj = obj.addComplementarityConstraints();
+  
+%       % Ensure that all lambda values and Lagrange multipliers are non-negative
+      obj = obj.addConstraint(BoundingBoxConstraint(zeros(N*obj.nC,1),inf(N*obj.nC,1)),obj.beta_inds);
     end
     
     function obj = setupVariables(obj, N)
@@ -113,8 +111,7 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
         obj = obj.addConstraint(constraint, inds);
       end
     end 
-    
-      
+        
     function obj = addContactConstraints(obj)
       nx = obj.nX;
       nu = obj.nU;
@@ -144,7 +141,6 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
         constraint = FunctionHandleConstraint(zeros(nc,1),inf(nc,1),n_vars,@obj.vmin_inequality);
         constraint = constraint.setName(sprintf('vmin_bound_%d',i));
         obj = obj.addConstraint(constraint, inds);
- 
       end
         
 %       for i=1:N
@@ -184,63 +180,6 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
         obj = obj.addConstraint(constraint, inds);
       end    
     end
- 
-    function z0 = getInitialVars(obj,t_init,traj_init)
-      if isscalar(t_init)
-        t_init = linspace(0,t_init,obj.N);
-      elseif length(t_init) ~= obj.N
-        error('The initial sample times must have the same length as property N')
-      end
-      z0 = zeros(obj.num_vars,1);
-      z0(obj.h_inds) = diff(t_init);
-
-      if nargin<3, traj_init = struct(); end
-
-      nU = getNumInputs(obj.plant);
-      if isfield(traj_init,'u')
-        z0(obj.u_inds) = traj_init.u.eval(t_init);
-      else
-        z0(obj.u_inds) = 0.01*randn(nU,obj.N);
-      end
-
-      if isfield(traj_init,'x')
-        z0(obj.x_inds) = traj_init.x.eval(t_init);
-      else
-        if nU>0
-          if ~isfield(traj_init,'u')
-            traj_init.u = setOutputFrame(PPTrajectory(foh(t_init,reshape(z0(obj.u_inds),nU,obj.N))),getInputFrame(obj.plant));
-          end
-          
-          % todo: if x0 and xf are equality constrained, then initialize with
-          % a straight line from x0 to xf (this was the previous behavior)
-          
-          %simulate
-          sys_ol = cascade(traj_init.u,obj.plant);
-        else
-          sys_ol = obj.plant;
-        end
-        
-        if ~isfield(traj_init,'x0')
-          [~,x_sim] = sys_ol.simulate([t_init(1) t_init(end)]);
-        else
-          [~,x_sim] = sys_ol.simulate([t_init(1) t_init(end)],traj_init.x0);
-        end
-        
-        z0(obj.x_inds) = x_sim.eval(t_init);
-      end
-      
-      if isfield(traj_init,'l')
-        z0(obj.l_inds) = traj_init.l;
-      end
-
-      if isfield(traj_init,'alpha')
-        z0(obj.alpha_inds) = traj_init.alpha;
-      end
-    
-      if isfield(traj_init,'beta')
-        z0(obj.beta_inds) = traj_init.beta;
-      end
-    end
         
     function [f,df] = forward_constraint_fun(obj,h,x0,x1,u,l)
       [xn,dxn] = forward_dynamics_fun(obj,h,x0,u,l);
@@ -257,14 +196,10 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
     function [f,df] = forward_dynamics_fun(obj,h,x,u,l)
       p = obj.plant;
       nq = obj.nQ;
-      nu = obj.nU;
       q = x(1:nq);
       qd = x(nq+(1:nq));
-      nl = obj.nL;
       
-      options.kinematics_cache_ptr_to_use = [];
-      options.compute_gradients = true;
-      kinsol = doKinematics(p, q, [], options);
+      kinsol = doKinematics(p, q, [], struct('compute_gradients', true));
 
       [~,normal,d,Apts,Bpts,Aidx,Bidx,mu] = contactConstraints(p,kinsol,p.multiple_contacts);
       V = computeV(obj,normal,mu,d);
@@ -279,7 +214,7 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       Hinv = inv(H);
       dHdq = dH(:,1:nq);
        
-      tau = (B*u-C);
+      tau = B*u-C;
       qdn = qd + Hinv*(tau*h + J'*V*l);
       qn = q + qdn*h;  
       
@@ -296,19 +231,10 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       dqdn_dqd = eye(nq) + Hinv*(dtau_dqd*h);
       dfdqd = [dqdn_dqd*h; dqdn_dqd];
       
-      
       dfdu = [Hinv*dtau_du*h^2; Hinv*dtau_du*h];
       dfdl = [Hinv*J'*V*h; Hinv*J'*V];
       
       df = [dfdh, dfdq, dfdqd, dfdu, dfdl];
-    end
-    
-    function [f,df] = phi_bound(obj,x)
-      nq = obj.plant.getNumPositions;
-      q = x(1:nq);
-      kinsol = doKinematics(obj.plant, q);
-      [f,~,~,~,~,~,~,~,dfdq] = obj.plant.contactConstraints(kinsol,obj.plant.multiple_contacts);
-      df = [dfdq,0*dfdq];
     end
             
     function [f,df] = lambda_constraint_fun(obj,h,x,u,l,alpha,beta)
@@ -330,12 +256,12 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       Hinv = inv(H);
       dHdq = dH(:,1:nq);
      
-      [R,dR] = p.computeRegLinear(phiC,nc,n,obj.R_max);
-%       [R,dR] = computeSmoothingTerm(obj,phiC,n);
+      [R,dR] = p.computeRegLinear(phiC,nc,n);
+%       [R,dR] = p.computeRegLinear(phiC,nc,n,obj.R_max);
 
-      tau = B*u-C;
-      
       A = J*Hinv*J';
+      tau = B*u-C;
+      c = J*qd + J*Hinv*tau*h;
       
       ncell = cell(1,nc);
       for i=1:nc
@@ -344,7 +270,9 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       normal_mat = blkdiag(ncell{:});
       Ain_transpose = V'*A*normal_mat';
       
-      f = V'*R*V*l + obj.scale_factor*V'*J*(qd + Hinv*(tau*h + J'*V*l)) - alpha - Ain_transpose*beta;
+      s = obj.scale_factor;
+      
+      f = V'*(R + s*A)*V*l + s*V'*c - alpha - Ain_transpose * beta;
       
       dJtnB = zeros(nq,nq);
       dJtVl = zeros(nq,nq);
@@ -357,12 +285,12 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       dtau_dqd = -dC(:,nq+(1:nq));
       dtau_du = B;
       
-      dfdh = obj.scale_factor*V'*J*Hinv*tau;
-      dfdq = V'*(matGradMult(dR',V*l)' + obj.scale_factor*(matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + dJtVl)))) ...
+      dfdh = s*V'*J*Hinv*tau;
+      dfdq = V'*(matGradMult(dR',V*l)' + s*(matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + dJtVl)))) ...
            - V'* (matGradMult(dJ',Hinv*J'*normal_mat'*beta)' + J*(-Hinv*matGradMult(dHdq,Hinv*J'*normal_mat'*beta) + Hinv*dJtnB));
-      dfdqd = obj.scale_factor*V'*(J + J*Hinv*(dtau_dqd*h));
-      dfdu = obj.scale_factor*V'*J*Hinv*dtau_du*h;
-      dfdl = V'*(R + obj.scale_factor*J*Hinv*J')*V;
+      dfdqd = s*V'*(J + J*Hinv*(dtau_dqd*h));
+      dfdu = s*V'*J*Hinv*dtau_du*h;
+      dfdl = V'*(R + s*J*Hinv*J')*V;
       dfdalpha = -eye(nl);
       dfdbeta = -Ain_transpose;
 
@@ -483,42 +411,69 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       dJ = dJA-dJB;
     end
    
-%     function [R,dR] = computeSmoothingTerm(obj,phi,n)
-%       p = obj.plant;
-%       nc = obj.nC;
-%       nq = obj.nQ;
-%       dim = 3;
-%       
-%       R_min = p.contact_smoothing_params.R_min; 
-%       R_max = p.contact_smoothing_params.R_max;
-%       phi_min = p.contact_smoothing_params.contact_threshold;
-%       phi_max = p.contact_smoothing_params.phi_max;
-%       
-%       k = p.contact_smoothing_params.k;
-%       
-%       [r,dr_dphi] = sig(phi,k,phi_min,phi_max,R_min,R_max);
-%       
-%       % contact smoothing matrix
-%       drdq = repmat(dr_dphi,1,nq).*n;
-% 
-%       r = repmat(r,1,dim)';
-%       r = r(:);
-% 
-%       tmp = repmat(reshape(drdq',1,numel(drdq)),dim,1);
-%       drdq_cell = cell(1,nc*dim);
-%       cnt = 1;
-%       for i=1:nc
-%         for j=1:dim
-%           drdq_cell{cnt} = tmp(j,(i-1)*nq+(1:nq));
-%           cnt = cnt+1;
-%         end
-%       end
-%       R = diag(r);
-%       dR = blkdiag(drdq_cell{:});
-%       
-%       if any(isnan(dR))
-%         error('NaN in dR');
-%       end
+    function z0 = getInitialVars(obj,t_init,traj_init)
+      if isscalar(t_init)
+        t_init = linspace(0,t_init,obj.N);
+      elseif length(t_init) ~= obj.N
+        error('The initial sample times must have the same length as property N')
+      end
+      z0 = zeros(obj.num_vars,1);
+      z0(obj.h_inds) = diff(t_init);
+
+      if nargin<3, traj_init = struct(); end
+
+      nU = getNumInputs(obj.plant);
+      if isfield(traj_init,'u')
+        z0(obj.u_inds) = traj_init.u.eval(t_init);
+      else
+        z0(obj.u_inds) = 0.01*randn(nU,obj.N);
+      end
+
+      if isfield(traj_init,'x')
+        z0(obj.x_inds) = traj_init.x.eval(t_init);
+      else
+        if nU>0
+          if ~isfield(traj_init,'u')
+            traj_init.u = setOutputFrame(PPTrajectory(foh(t_init,reshape(z0(obj.u_inds),nU,obj.N))),getInputFrame(obj.plant));
+          end
+          
+          % todo: if x0 and xf are equality constrained, then initialize with
+          % a straight line from x0 to xf (this was the previous behavior)
+          
+          %simulate
+          sys_ol = cascade(traj_init.u,obj.plant);
+        else
+          sys_ol = obj.plant;
+        end
+        
+        if ~isfield(traj_init,'x0')
+          [~,x_sim] = sys_ol.simulate([t_init(1) t_init(end)]);
+        else
+          [~,x_sim] = sys_ol.simulate([t_init(1) t_init(end)],traj_init.x0);
+        end
+        
+        z0(obj.x_inds) = x_sim.eval(t_init);
+      end
+      
+      if isfield(traj_init,'l')
+        z0(obj.l_inds) = traj_init.l;
+      end
+
+      if isfield(traj_init,'alpha')
+        z0(obj.alpha_inds) = traj_init.alpha;
+      end
+    
+      if isfield(traj_init,'beta')
+        z0(obj.beta_inds) = traj_init.beta;
+      end
+    end
+    
+%     function [f,df] = phi_bound(obj,x)
+%       nq = obj.plant.getNumPositions;
+%       q = x(1:nq);
+%       kinsol = doKinematics(obj.plant, q);
+%       [f,~,~,~,~,~,~,~,dfdq] = obj.plant.contactConstraints(kinsol,obj.plant.multiple_contacts);
+%       df = [dfdq,0*dfdq];
 %     end
     
   end

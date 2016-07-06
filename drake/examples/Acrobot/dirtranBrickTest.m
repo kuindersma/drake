@@ -1,40 +1,34 @@
-function dirtranBallTest(N)
+function dirtranBrickTest(N)
 
-options.use_bullet = true;
+options.use_bullet = false;
 options.update_convex = true;
 options.view = 'right';
 options.terrain = RigidBodyFlatTerrain();
 options.floating = true;
 
-r = TimeSteppingRigidBodyManipulator(PlanarRigidBodyManipulator('ball.urdf',options),.001,options);
-options.floating = false;
-r = r.addRobotFromURDF('brick.urdf',[0;0;0.5],zeros(3,1), options);
+r = TimeSteppingRigidBodyManipulator(PlanarRigidBodyManipulator('brick_point_contact.urdf',options),.001,options);
 
 nx = r.getNumStates;
 nu = r.getNumInputs;
 
 v = r.constructVisualizer();
 
-ball_pos = [0;1.1;0];
-ball_vel = [0;0;0];
+brick_pos = [0;1.1;0];
+brick_vel = [0;0;0];
+x0 = [brick_pos; brick_vel];
 
-x0 = [ball_pos; ball_vel];
-
-ball_goal_pos = [0;0.9;0];
-ball_goal_vel = [0;0;0];
-
-xf = [ball_goal_pos; ball_goal_vel];
+brick_goal_pos = [0;0.9;0];
+brick_goal_vel = [0;0;0];
+xf = [brick_goal_pos; brick_goal_vel];
 
 tf0 = 1.5;
-
-
+% 
 % traj = simulate(r,[0,tf0],x0);
-% 
 % v.playback(traj,struct('slider',true));
-% 
 % keyboard
-% 
-options.linc_slack = 0.0;
+
+options.linc_slack = 0.0001;
+options.scale_factor = 10;
 traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.1) (1+0.1)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 % traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
@@ -49,7 +43,7 @@ function displayStateTrajectory(hs,x,u)
   v.playback(xtraj);
 end
   
-traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
+% traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
       
 % for j=1:10
 %   h = rand;
@@ -63,9 +57,6 @@ traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
 % end
 % 
 % keyboard
-     
-
-
 
 
 tic
