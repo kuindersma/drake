@@ -10,8 +10,6 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
     nQ
     linc_mode = 1;
     linc_slack = 0; % slack bound for complementarity constraints
-    scale_factor = 1; % scales the other terms in QP to keep R scaling reasonable
-    R_max = 50.0; % max R value
   end
   
   methods
@@ -28,12 +26,6 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       end
       if isfield(options,'linc_slack')
         obj.linc_slack = options.linc_slack;
-      end
-      if isfield(options,'R_max')
-        obj.R_max = options.R_max;
-      end
-      if isfield(options,'scale_factor')
-        obj.scale_factor = options.scale_factor;
       end
      
       obj = obj.addContactConstraints();
@@ -163,10 +155,7 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       constraint = LinearComplementarityConstraint(zeros(nl*N),zeros(nl*N,1),eye(nl*N),obj.linc_mode,obj.linc_slack);
       obj = obj.addConstraint(constraint, [obj.l_inds(:);obj.alpha_inds(:)]);
 
-%       % A*lambda - b >= 0, beta >= 0, beta'*(A*lambda - b) = 0
-%       constraint = LinearComplementarityConstraint(zeros(nl*N),zeros(nl*N,1),eye(nl*N),obj.linc_mode,obj.linc_slack);
-%       obj = obj.addConstraint(constraint, [obj.l_inds(:);obj.alpha_inds(:)]);
-
+      % A*lambda - b >= 0, beta >= 0, beta'*(A*lambda - b) = 0
       for i=1:N-1
         % lagrange multiplier equality constraint on vmin
         n_vars = 1 + nx + nu + nl + nc;
@@ -215,24 +204,25 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       dHdq = dH(:,1:nq);
        
       tau = B*u-C;
-      qdn = qd + Hinv*(tau*h + J'*V*l);
+      qdn = qd + Hinv*(tau + J'*V*l)*h;
       qn = q + qdn*h;  
       
       f = [qn;qdn];
       dtau_dq = -dC(:,1:nq);
       dtau_dqd = -dC(:,nq+(1:nq));
       dtau_du = B;
-      dfdh = [qdn + h*Hinv*tau; Hinv*tau];
       
-      dqdn_dq = -Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + dJtVl);
+      dfdh = [qdn + Hinv*(tau + J'*V*l)*h; Hinv*(tau + J'*V*l)];
+      
+      dqdn_dq = -Hinv*matGradMult(dHdq,Hinv*(tau + J'*V*l)*h) + Hinv*(dtau_dq + dJtVl)*h;
       dqndq = eye(nq) + h*dqdn_dq;
       dfdq = [dqndq; dqdn_dq];
       
-      dqdn_dqd = eye(nq) + Hinv*(dtau_dqd*h);
+      dqdn_dqd = eye(nq) + Hinv*dtau_dqd*h;
       dfdqd = [dqdn_dqd*h; dqdn_dqd];
       
       dfdu = [Hinv*dtau_du*h^2; Hinv*dtau_du*h];
-      dfdl = [Hinv*J'*V*h; Hinv*J'*V];
+      dfdl = [Hinv*J'*V*h^2; Hinv*J'*V*h];
       
       df = [dfdh, dfdq, dfdqd, dfdu, dfdl];
     end
@@ -257,9 +247,8 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       dHdq = dH(:,1:nq);
      
       [R,dR] = p.computeRegLinear(phiC,nc,n);
-%       [R,dR] = p.computeRegLinear(phiC,nc,n,obj.R_max);
 
-      A = J*Hinv*J';
+      A = J*Hinv*J'*h;
       tau = B*u-C;
       c = J*qd + J*Hinv*tau*h;
       
@@ -268,9 +257,9 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
         ncell{i} = normal(:,i)';
       end
       normal_mat = blkdiag(ncell{:});
-      Ain_transpose = V'*A*normal_mat';
+      Ain_transpose = h*V'*A*normal_mat';
       
-      s = obj.scale_factor;
+      s = det(H)*5;
       
       f = V'*(R + s*A)*V*l + s*V'*c - alpha - Ain_transpose * beta;
       
@@ -285,12 +274,12 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       dtau_dqd = -dC(:,nq+(1:nq));
       dtau_du = B;
       
-      dfdh = s*V'*J*Hinv*tau;
-      dfdq = V'*(matGradMult(dR',V*l)' + s*(matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + dJtVl)))) ...
-           - V'* (matGradMult(dJ',Hinv*J'*normal_mat'*beta)' + J*(-Hinv*matGradMult(dHdq,Hinv*J'*normal_mat'*beta) + Hinv*dJtnB));
+      dfdh = s*V'*J*Hinv*(J'*V*l + tau) - V'*A*normal_mat'*beta -  h*V'*J*Hinv*J'*normal_mat'*beta;
+      dfdq = V'*(matGradMult(dR',V*l)' + s*(matGradMult(dJ',qd + Hinv*(tau + J'*V*l)*h)' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau + J'*V*l)*h) + Hinv*(dtau_dq + dJtVl)*h))) ...
+           - V'* (matGradMult(dJ',Hinv*J'*normal_mat'*beta)' + J*(-Hinv*matGradMult(dHdq,Hinv*J'*normal_mat'*beta) + Hinv*dJtnB))*h^2;
       dfdqd = s*V'*(J + J*Hinv*(dtau_dqd*h));
       dfdu = s*V'*J*Hinv*dtau_du*h;
-      dfdl = V'*(R + s*J*Hinv*J')*V;
+      dfdl = V'*(R + h*s*J*Hinv*J')*V;
       dfdalpha = -eye(nl);
       dfdbeta = -Ain_transpose;
 
@@ -335,21 +324,22 @@ classdef SmoothContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimiza
       normal_mat = blkdiag(ncell{:});
       
       % N*(A*z + c) - v_min \ge 0
-      Ain = normal_mat*A*V;
-      bin = -phiC./h - normal_mat*c;
+      Ain = h*normal_mat*A*V;
+      bin = -phiC - h*normal_mat*c;
       
       f = Ain*l - bin;
       
 %     f = normal_mat*J*(Hinv*J'*V*l + qd + Hinv*tau*h) + phiC/h 
 
-      dfdh = normal_mat*J*Hinv*tau - phiC./(h*h);
-      dfdq = normal_mat*(matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + dJtVl))) + 1/h * n; 
-      dfdqd = normal_mat*(J + J*Hinv*(dtau_dqd*h));
-      dfdu = normal_mat*J*Hinv*dtau_du*h;
-      dfdl = normal_mat*J*Hinv*J'*V;
+      dfdh = normal_mat*(A*V*l + c + h*J*Hinv*tau);
+      dfdq = normal_mat*(matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + dJtVl)))*h + n; 
+      dfdqd = normal_mat*h*(J + J*Hinv*(dtau_dqd*h));
+      dfdu = normal_mat*h^2*J*Hinv*dtau_du;
+      dfdl = normal_mat*h*J*Hinv*J'*V;
 
       df = [dfdh, dfdq, dfdqd, dfdu, dfdl];
     end
+    
     
     function [f,df] = vmin_lagrange_eq(obj,h,x,u,l,beta) 
       

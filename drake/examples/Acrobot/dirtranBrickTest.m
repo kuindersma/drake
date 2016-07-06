@@ -22,14 +22,14 @@ brick_goal_vel = [0;0;0];
 xf = [brick_goal_pos; brick_goal_vel];
 
 tf0 = 1.5;
-% 
+
 % traj = simulate(r,[0,tf0],x0);
 % v.playback(traj,struct('slider',true));
 % keyboard
 
-options.linc_slack = 0.0001;
-options.scale_factor = 10;
-traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.1) (1+0.1)],options);
+options.linc_slack = 1e-3;
+options.time_option = 1;
+traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0) (1+0)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 % traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
 % traj_opt = traj_opt.addRunningCost(@cost);
@@ -68,7 +68,6 @@ x = z(traj_opt.x_inds);
 u = z(traj_opt.u_inds);
 l = z(traj_opt.l_inds);
 a = z(traj_opt.alpha_inds);
-b = z(traj_opt.beta_inds);
 
 v.playback(xtraj,struct('slider',true));
 keyboard
@@ -76,10 +75,10 @@ keyboard
   function [g,dg] = cost(h,x,u)
     Q = zeros(nx);
     R = zeros(nu);
-
+    herr = (h-tf0/N);
     xerr=(x-xf);
-    g = xerr'*Q*xerr + u'*R*u;
-    dg = [0,2*xerr'*Q, 2*u'*R];
+    g = xerr'*Q*xerr + u'*R*u + herr'*herr;
+    dg = [2*herr',2*xerr'*Q, 2*u'*R];
   end
 
   function [g,dg] = final_cost(tf,x)

@@ -51,8 +51,6 @@ alpha = zeros(nl*N,1);
 beta = zeros(nc*N,1);
 
 slack = 10.0;
-R_max = 5.0;
-
 [xtraj,utraj,z,F,info,infeasible,traj_opt] = doTrajopt(tf0,xtraj,utraj,l,alpha,beta,slack,R_max);
 v.playback(xtraj,struct('slider',true));
 

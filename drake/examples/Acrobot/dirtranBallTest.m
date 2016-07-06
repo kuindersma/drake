@@ -14,7 +14,7 @@ nx = r.getNumStates;
 nu = r.getNumInputs;
 
 v = r.constructVisualizer();
-
+v.display_dt=0.01;
 ball_pos = [0;1.1;0];
 ball_vel = [0;0;0];
 
@@ -28,13 +28,13 @@ xf = [ball_goal_pos; ball_goal_vel];
 tf0 = 1.5;
 
 
-% traj = simulate(r,[0,tf0],x0);
-% 
-% v.playback(traj,struct('slider',true));
-% 
-% keyboard
-% 
-options.linc_slack = 0.0;
+traj = simulate(r,[0,tf0],x0);
+
+v.playback(traj,struct('slider',true));
+
+keyboard
+
+options.linc_slack = 1e-4;
 traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.1) (1+0.1)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 % traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
@@ -49,7 +49,7 @@ function displayStateTrajectory(hs,x,u)
   v.playback(xtraj);
 end
   
-traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
+% traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
       
 % for j=1:10
 %   h = rand;

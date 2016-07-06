@@ -32,8 +32,9 @@ xf = [acrobot_goal_pos; ball_goal_pos; acrobot_goal_vel; ball_goal_vel];
 
 tf0 = 2;
 
-options.integration_method = DirtranTrajectoryOptimization.DT_SYSTEM;
-traj_opt = DirtranTrajectoryOptimization(r,N,tf0*[(1-0.1) (1+0.1)],options);
+options.linc_slack = 1e-3;
+options.scale_factor = 50;
+traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.1) (1+0.1)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 % traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
 traj_opt = traj_opt.addRunningCost(@cost);
@@ -87,8 +88,8 @@ keyboard
 
   function [g,dg] = final_cost(tf,x)
     Q = zeros(nx,1);
-    Q(3) = 500;
-    Q(4) = 500;
+    Q(3) = 100;
+    Q(4) = 100;
     Q = diag(Q);
 
     xerr=(x-xf);

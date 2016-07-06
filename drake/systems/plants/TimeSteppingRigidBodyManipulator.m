@@ -24,9 +24,9 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     contact_smoothing_params = struct('phi_max',0.1, ... m, max contact force distance
                                'active_threshold',inf, ... height below which contact forces are calculated
                                'contact_threshold',1e-3, ... threshold where force penalties are eliminated (modulo regularization)
-                               'R_max',50, ... regularization parameter at phi_max
-                               'R_min',0.01, ... regularization parameter at contact_threshold
-                               'k',0.1); % exponential decay parameter
+                               'R_max',10, ... regularization parameter at phi_max
+                               'R_min',1e-3, ... regularization parameter at contact_threshold
+                               'k',1); % exponential decay parameter
   end
 
   methods
@@ -469,11 +469,11 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         V = blkdiag(V_cell{:},eye(nL));
                 
         Hinv = inv(H);
-        A = J*vToqdot*Hinv*vToqdot'*J';
+        A = J*vToqdot*Hinv*vToqdot'*J'*h;
         c = J*vToqdot*v + J*vToqdot*Hinv*(B*u-C)*h;
 
         R = computeRegLinear(obj,phi,num_active);
-      
+              
 %         w = sig(phiL,k,phi_min,phi_max,R_min,R_max);
 %         w = repmat(w,1,dim)';
 %         w = w(:);
@@ -491,8 +491,11 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %         phiL_pos(phiL<0)=0;
 %         lambda_ub(num_beta+(1:nL)) = max(0.01, scale_fact*(obj.phi_max./phiL_pos - 1.0));
                 
+
+        s = det(H)*5;
+
         try
-          Q = 0.5*V'*(.1*A+R)*V;
+          Q = 0.5*V'*(s*A+R)*V;
         catch
           keyboard
         end
@@ -526,7 +529,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 
           try
             model.Q = sparse(Q);
-            model.obj = V'*.1*c;
+            model.obj = s*V'*c;
             model.A = sparse(Ain);
             model.rhs = bin;
             model.sense = repmat('>',length(bin),1);
@@ -559,7 +562,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
 %         end
 %         hold off;
 %         
-        vn = v + Hinv*((B*u-C)*h + vToqdot'*J'*f);
+        vn = v + h*Hinv*(B*u - C + vToqdot'*J'*f);
         qdn = vToqdot*vn;
         qn = q + qdn*h;
 
@@ -592,7 +595,6 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
         end
       end
       
-      
       xdn = [qn;vn];
       df =[];
     end
@@ -624,7 +626,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       kinsol = doKinematics(obj,q);
       vToqdot = obj.manip.vToqdot(kinsol);
       qdn = vToqdot*vn;
-      qn = q+ h*qdn;
+      qn = q + h*qdn;
       % Find quaternion indices
       quat_bodies = obj.manip.body([obj.manip.body.floating] == 2);      
       quat_positions = [quat_bodies.position_num];
