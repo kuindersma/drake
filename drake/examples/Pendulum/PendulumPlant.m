@@ -118,10 +118,9 @@ classdef PendulumPlant < SecondOrderSystem
 %       end
 %     end
     
-    function [f,df] = dynamics_w(obj,x,u,w)
+    function [f,df,d2f] = dynamics_w(obj,t,x,u,w)
 
       % w is mass
-      
       q=x(1:obj.num_q); 
       qd=x((obj.num_q+1):end);
       
@@ -129,17 +128,28 @@ classdef PendulumPlant < SecondOrderSystem
       l_ = obj.lc;
       b_ = obj.b;
       
-      qdd = (u - m_*obj.g*l_*sin(q) - b_*qd)/(m_*l_*l_);
+      qdd = u/(m_*l_*l_) - obj.g*sin(q)/l_ - b_*qd/(m_*l_*l_);
       f = [qd;qdd];
       
-      if nargout>1
-        ii = 1.0/(m_*l_*l_);
+      if nargout > 1
         dfdt = zeros(2,1);
-        dfdx = [0, 1; -ii*m_*obj.g*l_*cos(q),-b_*ii];
-        dfdu = [0;ii];
-        dfdw = [0;-ii*obj.g*l_*sin(q)];
+        dfdx = [0, 1; -(obj.g/l_)*cos(q),-b_/(m_*l_*l_)];
+        dfdu = [0;1/(m_*l_*l_)];
+        dfdw = [0;(b_*qd-u)/(m_*m_*l_*l_)];
         df = [dfdt, dfdx, dfdu, dfdw];
       end
+      
+      if nargout > 2
+        %d2f = sparse(2,25);
+        d2f = zeros(2,25);
+        d2f(2,7) = (obj.g/l_)*sin(q);
+        d2f(2,15) = b_/(m_*m_*l_*l_);
+        d2f(2,20) = -1/(m_*m_*l_*l_);
+        d2f(2,23) = b_/(m_*m_*l_*l_);
+        d2f(2,24) = -1/(m_*m_*l_*l_);
+        d2f(2,25) = -2*(b_*qd-u)/(m_*m_*m_*l_*l_);
+      end
+      
     end
     
     function [f,df,d2f,d3f]=dynamics(obj,t,x,u)
@@ -310,7 +320,7 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     
-    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,N,D)
+    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,N,D,xguess,uguess)
       x0 = [0;0]; 
       xf = double(obj.xG);
       tf = 4;
@@ -426,7 +436,15 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       end
       prog = addTrajectoryDisplayFunction(prog,@displayStateTrajectory);
       
-      traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
+      
+      if nargin == 4
+          traj_init.x = xguess;
+      elseif nargin == 5
+          traj_init.x = xguess;
+          traj_init.u = uguess;
+      else
+          traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
+      end
       
       for attempts=1:1
         disp('Running solve');

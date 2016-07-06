@@ -2,8 +2,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
   
   %TODO: Make LQR constraint faster - try exploiting sparsity in the
   %solution and/or try the version with dynamics as equality constraint.
-  %Also, try warm-starting QCQP: check necessary conditions with answer
-  %from last time. Only run solver if the conditions are violated.
     
   properties
     dx_inds  % n x N indices for delta state in disturbed trajectory
@@ -43,10 +41,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         constraint = constraint.setName('u+du limit');
         obj = obj.addConstraint(constraint, inds);
       end
-      
-      % add LQR controller for delta-u
-      
-      
       
     end
     
@@ -295,8 +289,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     end
    
     function [f,df] = forward_w_equality_constraint(obj,robust_cost,h,x0,dx0,u,du,w)
-      %option.grad_method = 'numerical';
-      %[w_opt, dw] = geval(@(hq,xq,uq)solve_qcqp(obj, robust_cost, hq, xq, uq), h, x0+dx0, u+du, option);
       [w_opt, dw] = solve_qcqp(obj, robust_cost, h, x0+dx0, u+du);
       
       f = w - w_opt;
@@ -314,12 +306,12 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         persistent wstar; %keep last value for warm starting
         
         %Setup QCQP
-        [~,dx1,ddx1] = geval(@obj.forward_robust_dynamics_fun,h,x0,u0,zeros(obj.nW,1));
+        [~,dx1,ddx1] = obj.forward_robust_dynamics_fun(h,x0,u0,zeros(obj.nW,1));
         [~,dJ,ddJ] = robust_cost(zeros(obj.nX,1),zeros(obj.nU,1),zeros(obj.nW,1));
         
         %Dynamics derivatives
         G = dx1(:,1+obj.nX+obj.nU+(1:obj.nW));
-        T = reshape(full(ddx1),obj.nX,1+obj.nX+obj.nU+obj.nW,1+obj.nX+obj.nU+obj.nW); %3rd derivative
+        T = reshape(full(ddx1),obj.nX,1+obj.nX+obj.nU+obj.nW,1+obj.nX+obj.nU+obj.nW); %2nd derivative
         dG = T(:,1+obj.nX+obj.nU+(1:obj.nW),:);
         
         %Cost derivatives for QP
@@ -365,13 +357,28 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       df = [df_dh, df_dx0, df_ddx0, df_dx1, df_ddx1, df_du, df_ddu, df_dw];
     end
     
-    function [f,df] = forward_robust_dynamics_fun(obj,h,x,u,w)
-      [xdot,dxdot] = obj.plant.dynamics_w(x,u,w);
-      f = x + h*xdot;
-      df = [xdot ... h
-        eye(obj.nX) + h*dxdot(:,1+(1:obj.nX)) ... x0
-        h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u
-        h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
+    function [f,df,d2f] = forward_robust_dynamics_fun(obj,h,x,u,w)
+      if nargout == 1
+          xdot = obj.plant.dynamics_w(0,x,u,w);
+          f = x + h*xdot;
+      elseif nargout == 2
+        [xdot,dxdot] = obj.plant.dynamics_w(0,x,u,w);
+        f = x + h*xdot;
+        df = [xdot ... h
+          eye(obj.nX) + h*dxdot(:,1+(1:obj.nX)) ... x0
+          h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u
+          h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
+      else %nargout == 3
+          [xdot,dxdot,d2xdot] = obj.plant.dynamics_w(0,x,u,w);
+          f = x + h*xdot;
+          df = [xdot ... h
+            eye(obj.nX) + h*dxdot(:,1+(1:obj.nX)) ... x0
+            h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u
+            h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
+          d2f = h*d2xdot;
+          d2f(:,1:(1+obj.nX+obj.nU+obj.nW)) = dxdot;
+          d2f(:,1:(1+obj.nX+obj.nU+obj.nW):end) = dxdot;
+      end
     end
     
 %      

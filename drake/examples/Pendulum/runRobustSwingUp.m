@@ -6,7 +6,7 @@ close all
 p = PendulumPlant();
 v = PendulumVisualizer();
 
-N = 21;
+N = 25;
 D = 50; %This corresponds to +/-.2 uncertainty in mass (20%)
 
 options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
@@ -30,7 +30,7 @@ plot(t1,x1(2,:));
 ylabel('x_{nominal}');
 
 figure(1);
-[utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D);
+[utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D,xtraj1,utraj1);
 
 %Plot robust trajectory
 h2 = z2(prog2.h_inds);
@@ -102,8 +102,6 @@ p = p.setMass(1.2);
 clsys = feedback(p,c);
 [~,xcl] = clsys.simulate([0 4], [0 0]');
 v.playback(xcl);
-
-keyboard
 
 p = p.setMass(1);
 c = tvlqr(p,xtraj2,utraj2,Q,R,Q);
