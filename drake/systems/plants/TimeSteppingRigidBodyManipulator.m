@@ -20,7 +20,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     multiple_contacts = false;
     gurobi_present = false;
     % convex stuff below
-    update_convex = true;
+    update_convex = false;
     contact_smoothing_params = struct('phi_max',0.1, ... m, max contact force distance
                                'active_threshold',inf, ... height below which contact forces are calculated
                                'contact_threshold',1e-3, ... threshold where force penalties are eliminated (modulo regularization)
