@@ -65,7 +65,7 @@ classdef PendulumPlant < SecondOrderSystem
     
     function qdd = sodynamics(obj,~,q,qd,u)
       % Implement the second-order dynamics
-      qdd = (u - obj.m*obj.g*obj.lc*sin(q) - obj.b*qd)/obj.I;
+      qdd = (u - obj.m*obj.g*obj.lc*sin(q) - obj.b*qd)/(obj.m*obj.lc*obj.lc);
     end
     
     function obj = addInputDisturbanceBound(obj,dist)
@@ -490,7 +490,7 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       
       function [g,dg,ddg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
-        Qw = [1 0; 0 1];
+        Qw = eye(2);
         Rw = .1;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw, 2*du'*Rw, 2*w'*W];

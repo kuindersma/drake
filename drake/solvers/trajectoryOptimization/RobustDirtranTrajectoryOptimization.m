@@ -243,47 +243,58 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         Ak = zeros(nx,nx,N-1);
         Bk = zeros(nx,nu,N-1);
         for k = 1:(N-1)
-            [~,dx] = obj.forward_robust_dynamics_fun(z(obj.h_inds(k)),z(obj.x_inds(:,k)),z(obj.u_inds(:,k)), zeros(1,obj.nW));
-            Ak(:,:,k) = dx(:,1+(1:nx));
-            Bk(:,:,k) = dx(:,1+nx+(1:nu));
+            [~,dx1] = obj.forward_robust_dynamics_fun(z(obj.h_inds(k)),z(obj.x_inds(:,k)),z(obj.u_inds(:,k)), zeros(1,obj.nW));
+            Ak(:,:,k) = dx1(:,1+(1:nx));
+            Bk(:,:,k) = dx1(:,1+nx+(1:nu));
         end
         
-%         if nargin == 3 %sparse formulation
-%             
-%             %Sparse constraint matrix to enforce dynamics
-%             Abar = spalloc(N*nx,N*(nx+nu),N*nx+(N-1)*(nx*nx+nu*nu));
-%             Abar(1:nx,1:nx) = speye(nx);
-%             for k = 1:(N-1)
-%                 Abar(k*nx+(1:nx),(k-1)*(nx+nu)+(1:nx+nu+nx)) = sparse([-Ak(:,:,k) -Bk(:,:,k) eye(nx)]);
-%             end
-%             
-%             %Constraint vector
-%             dx = z(obj.dx_inds(:));
-%             bbar = zeros(size(dx));
-%             bbar(1:nx) = dx(1:nx);
-%             for k = 1:(N-1)
-%                 bbar(k*nx+(1:nx)) = dx(k*nx+(1:nx)) - Ak(:,:,k)*dx((k-1)*nx+(1:nx));
-%             end
-%             
-%             du = obj.Hbar(kron(nx*(1:N)',ones(nu,1))+kron(ones(N,1),(1:nu)'),:)*Abar.'*((Abar*obj.Hbar*Abar.')\bbar);
-%             
-%         else %dense formulation
+        %----- Riccati Formulation -----%
+        Q = full(obj.Qbar(1:nx,1:nx));
+        R = full(obj.Rbar(1:nu,1:nu));
+        S = Q;
+        dx = z(obj.dx_inds(:));
+        du = zeros(N*nu,1);
+        for k = (N-1):-1:1
+            K = (Bk(:,:,k)'*S*Bk(:,:,k)+R)\(Bk(:,:,k)'*S*Ak(:,:,k));
+            du(k) = -K*dx((k-1)*nx+(1:nx));
+            S = Q + K'*R*K + (Ak(:,:,k) - Bk(:,:,k)*K)'*S*(Ak(:,:,k) - Bk(:,:,k)*K);
+        end
         
-            %Build linear system to define batch LQR problem
-            Bbar = zeros(N*nx, N*nu);
-            for k = 1:(N-1) %fill in 1st diagonal to get us started...
-                Bbar(k*nx+(1:nx),(k-1)*nu+(1:nu)) = Bk(:,:,k);
-            end
-            for j = 2:N-1 %recursively fill in successive (block) diagonals
-                for k = j:(N-1)
-                    Bbar(k*nx+(1:nx),(k-j)*nu+(1:nu)) = Ak(:,:,k)*Bbar((k-1)*nx+(1:nx),(k-j)*nu+(1:nu));
-                end
-            end
-            
-            %Solve linear system to find LQR control moves
-            du = -5*(obj.Rbar + Bbar'*obj.Qbar*Bbar)\(Bbar'*obj.Qbar*z(obj.dx_inds(:)));
-        
+%         %----- Sparse Formulation -----%
+%         
+%         %Sparse constraint matrix to enforce dynamics
+%         Abar = spalloc(N*nx,N*(nx+nu),N*nx+(N-1)*(nx*nx+nu*nu));
+%         Abar(1:nx,1:nx) = speye(nx);
+%         for k = 1:(N-1)
+%             Abar(k*nx+(1:nx),(k-1)*(nx+nu)+(1:nx+nu+nx)) = sparse([-Ak(:,:,k) -Bk(:,:,k) eye(nx)]);
 %         end
+%         
+%         %Constraint vector
+%         dx = z(obj.dx_inds(:));
+%         bbar = zeros(size(dx));
+%         bbar(1:nx) = dx(1:nx);
+%         for k = 1:(N-1)
+%             bbar(k*nx+(1:nx)) = dx(k*nx+(1:nx)) - Ak(:,:,k)*dx((k-1)*nx+(1:nx));
+%         end
+%         
+%         du = obj.Hbar(kron(nx*(1:N)',ones(nu,1))+kron(ones(N,1),(1:nu)'),:)*Abar.'*((Abar*obj.Hbar*Abar.')\bbar);
+%         
+%         %----- Dense Formulation -----%
+%         
+%         %Build linear system to define batch LQR problem
+%         Bbar = zeros(N*nx, N*nu);
+%         for k = 1:(N-1) %fill in 1st diagonal to get us started...
+%             Bbar(k*nx+(1:nx),(k-1)*nu+(1:nu)) = Bk(:,:,k);
+%         end
+%         for j = 2:N-1 %recursively fill in successive (block) diagonals
+%             for k = j:(N-1)
+%                 Bbar(k*nx+(1:nx),(k-j)*nu+(1:nu)) = Ak(:,:,k)*Bbar((k-1)*nx+(1:nx),(k-j)*nu+(1:nu));
+%             end
+%         end
+%         
+%         %Solve linear system to find LQR control moves
+%         du = -*(obj.Rbar + Bbar'*obj.Qbar*Bbar)\(Bbar'*obj.Qbar*z(obj.dx_inds(:)));
+            
         
         f = z(obj.du_inds(:)) - du;
     end
