@@ -7,7 +7,9 @@ r = TimeSteppingRigidBodyManipulator('urdf/iiwa14.urdf',0.001,options);
 warning(w);
 
 v = r.constructVisualizer;
-v.display_dt = .05;
+v.display_dt = .02;
+
+v.inspector 
 
 xtraj = simulate(r,[0 2],zeros(r.getNumStates,1));
 

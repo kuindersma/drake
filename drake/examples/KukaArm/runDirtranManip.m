@@ -2,9 +2,11 @@ function runDirtranManip(N)
 
 options.floating = false;
 options.terrain = RigidBodyFlatTerrain();
-w = warning('off','Drake:RigidBodyManipulator:UnsupportedVelocityLimits');
+warning('off','Drake:RigidBodyManipulator:UnsupportedVelocityLimits');
+warning('off','Drake:RigidBodyManipulator:UnsupportedContactPoints');
+warning('off','Drake:RigidBodyManipulator:WeldedLinkInd');
+warning('off','Drake:RigidBodyManipulator:UnsupportedJointLimits');
 r = RigidBodyManipulator('urdf/iiwa14.urdf',options);
-warning(w);
 
 nx = r.getNumStates;
 nq = r.getNumPositions;
@@ -12,10 +14,10 @@ nu = r.getNumInputs;
 
 v=r.constructVisualizer;
 
-x0 = double(r.resolveConstraints(zeros(nx,1)));
-xG = x0;
-xG(1) = xG(1)+0.1;
-xG(4) = xG(4)+0.3;
+q0 = [0;1.57;0;0;0;0;1.57];
+x0 = [q0;zeros(nq,1)];
+xG = double(r.resolveConstraints(zeros(nx,1)));
+
 
 tf0 = 1.0;
 
@@ -24,16 +26,20 @@ traj_init.u = ConstantTrajectory(zeros(nu,1));
   
 traj_opt = DirtranTrajectoryOptimization(r,N,tf0*[(1-0) (1+0)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
-traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
+% traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
 traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
 % traj_opt = traj_opt.addRunningCost(@cost);
-% traj_opt = traj_opt.addFinalCost(@finalCost);
+traj_opt = traj_opt.addFinalCost(@finalCost);
 
 [jlmin,jlmax] = r.getJointLimits;
 xmin = [jlmin;-inf(nq,1)];
 xmax = [jlmax;inf(nq,1)];
 traj_opt = traj_opt.addConstraint(BoundingBoxConstraint(repmat(xmin,N,1),repmat(xmax,N,1)),traj_opt.x_inds);
 
+
+constraint = FunctionHandleConstraint(-1e-1*ones(3,1),1e-1*ones(3,1),nx,@l_hand_constraint);
+constraint = constraint.setName('left_hand_constraint');
+traj_opt = traj_opt.addConstraint(constraint, {traj_opt.x_inds(:,N)});
 
 tic;
 [xtraj,utraj,z,F,info,infeasible] = traj_opt.solveTraj(tf0,traj_init);
@@ -46,6 +52,25 @@ v.playback(xtraj,struct('slider','true'))
 
 keyboard
 
+Q = diag([100*ones(nq,1);10*ones(nq,1)]);
+R = 0.01*eye(nu);
+Qf = 2*Q;
+c = tvlqr(r,xtraj,utraj,Q,R,Qf);
+
+sys = feedback(r,c);
+
+if 1
+  % Forward simulate dynamics with visulazation, then playback at realtime
+  S=warning('off','Drake:DrakeSystem:UnsupportedSampleTime');
+  output_select(1).system=1;
+  output_select(1).output=1;
+  sys = mimoCascade(sys,v,[],[],output_select);
+  warning(S);
+end
+traj=simulate(sys,[0,utraj.tspan(2)],xtraj.eval(xtraj.tspan(1)));
+v.playback(traj,struct('slider',true));
+
+
   % add a display function to draw the trajectory on every iteration
   function displayStateTrajectory(t,x,u)
     ts = [0,cumsum(t)'];
@@ -55,19 +80,28 @@ keyboard
   end
 
   function [g,dg] = cost(h,x,u)
-    Q = diag(xcost);
-    R = 0.0*eye(nu);
+    Q = 0*diag([zeros(nq,1);ones(nq,1)]);
+    R = 0.01*eye(nu);
 
     g = (x-xG)'*Q*(x-xG) + u'*R*u;
     dg = [0, 2*(x'*Q -xG'*Q), 2*u'*R];
   end
 
   function [g,dg] = finalCost(T,x)
-    Q = 10*eye(nx);
-
+    Q = diag([zeros(nq,1);ones(nq,1)]);
+    
     g = (x-xG)'*Q*(x-xG);
     dg = [0, 2*(x'*Q -xG'*Q)];
   end
 
+
+  function [f,df] = l_hand_constraint(x)
+    q = x(1:nq);
+    kinsol = doKinematics(r, q);
+    [pl,Jl] = forwardKin(r,kinsol,r.findLinkId('iiwa_link_ee'),[0;0;0]);
+
+    f = pl-[0.0;0.0;1.36];
+    df = [Jl,zeros(length(f),nq)];
+  end
 
 end
