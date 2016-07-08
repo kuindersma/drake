@@ -320,21 +320,28 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     
-    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,N,D,xguess,uguess)
+    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,N,D,Q,R,Qf,xguess,uguess)
       x0 = [0;0]; 
       xf = double(obj.xG);
       tf = 4;
       
-      nw=1;
-      
-      options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,D,tf,options);
+      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
+      prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,tf,options);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
       prog = prog.addRunningCost(@cost);
-      prog = prog.addFinalCost(@finalCost);
+      %prog = prog.addFinalCost(@finalCost);
       prog = prog.addRobustCost(@robust_cost);
       prog = prog.addRobustConstraints(@robust_cost);
+      
+      if nargin == 7
+          traj_init.x = xguess;
+      elseif nargin == 8
+          traj_init.x = xguess;
+          traj_init.u = uguess;
+      else
+          traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
+      end
       
       disp('constructor done');
 
@@ -435,16 +442,6 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
         drawnow;
       end
       prog = addTrajectoryDisplayFunction(prog,@displayStateTrajectory);
-      
-      
-      if nargin == 4
-          traj_init.x = xguess;
-      elseif nargin == 5
-          traj_init.x = xguess;
-          traj_init.u = uguess;
-      else
-          traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
-      end
       
       for attempts=1:1
         disp('Running solve');

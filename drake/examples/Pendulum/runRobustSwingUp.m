@@ -8,8 +8,11 @@ v = PendulumVisualizer();
 
 N = 41;
 D = (2/.2^2); %This corresponds to +/-.2 uncertainty in mass (20%)
+Q = [10 0; 0 1];
+R = .1;
+Qf = 100*eye(2);
 
-options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
+options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
 [utraj1,xtraj1,z1,prog1] = p.swingUpTrajectory(N,options);
 
 %Plot nominal trajectory
@@ -30,7 +33,8 @@ plot(t1,x1(2,:));
 ylabel('x_{nominal}');
 
 figure(1);
-[utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D);
+
+[utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D,Q,R,Qf);
 
 %Plot robust trajectory
 h2 = z2(prog2.h_inds);
@@ -89,52 +93,46 @@ plot(t2,w);
 ylabel('w')
 
 %Get linearized dynamics along trajectory
-Ak = zeros(2,2,N-1);
-Bk = zeros(2,1,N-1);
-for k = 1:(N-1)
-    [~,dx1] = prog2.forward_robust_dynamics_fun(h2(k),x2(:,k),u2(k),0);
-    Ak(:,:,k) = dx1(:,2:3);
-    Bk(:,:,k) = dx1(:,4);
-end
+% Ak = zeros(2,2,N-1);
+% Bk = zeros(2,1,N-1);
+% for k = 1:(N-1)
+%     [~,dx1] = prog2.forward_robust_dynamics_fun(h2(k),x2(:,k),u2(k),0);
+%     Ak(:,:,k) = dx1(:,2:3);
+%     Bk(:,:,k) = dx1(:,4);
+% end
 
 %Calculate LQR gains
-Q = diag([3 1]);
-R = .1;
-S = Q;
-K = zeros(1,2,N);
-for k = (N-1):-1:1
-    K(:,:,k) = (Bk(:,:,k)'*S*Bk(:,:,k)+R)\(Bk(:,:,k)'*S*Ak(:,:,k));
-    S = Q + K(:,:,k)'*R*K(:,:,k) + (Ak(:,:,k) - Bk(:,:,k)*K(:,:,k))'*S*(Ak(:,:,k) - Bk(:,:,k)*K(:,:,k));
-end
+% S = Qf;
+% K = zeros(1,2,N);
+% for k = (N-1):-1:1
+%     K(:,:,k) = (Bk(:,:,k)'*S*Bk(:,:,k)+R)\(Bk(:,:,k)'*S*Ak(:,:,k));
+%     S = Q + K(:,:,k)'*R*K(:,:,k) + (Ak(:,:,k) - Bk(:,:,k)*K(:,:,k))'*S*(Ak(:,:,k) - Bk(:,:,k)*K(:,:,k));
+% end
 
-c = tvlqr(p,xtraj2,utraj2,Q,R,Q);
+% %open-loop playback
+% xsim = zeros(2,N);
+% xsim(:,1) = x2(:,1);
+% for k = 1:(N-1)
+%     xsim(:,k+1) = xsim(:,k) + h2(k)*p.dynamics_w(0,xsim(:,k),u2(k)-K(:,:,k)*(xsim(:,k)-x2(:,k)),.4);
+% end
+% xol = PPTrajectory(foh(t2,xsim));
+% xol = xol.setOutputFrame(p.getStateFrame);
+% v.playback(xol);
 
-%open-loop playback
-xsim = zeros(2,N);
-xsim(:,1) = x2(:,1);
-for k = 1:(N-1)
-    xsim(:,k+1) = xsim(:,k) + h2(k)*p.dynamics_w(0,xsim(:,k),u2(k)-K(:,:,k)*(xsim(:,k)-x2(:,k)),.4);
-end
-xol = PPTrajectory(foh(t2,xsim));
-xol = xol.setOutputFrame(p.getStateFrame);
-v.playback(xol);
+%closed-loop
+p = p.setMass(1);
+c = tvlqr(p,xtraj1,utraj1,Q,R,Qf);
+p = p.setMass(1.4);
+clsys = feedback(p,c);
+[~,xcl] = clsys.simulate([0 4], [0 0]');
+v.playback(xcl);
 
-% closed-loop
-% Q = diag([3 1]);
-% R = .1;
-% p = p.setMass(1);
-% c = tvlqr(p,xtraj1,utraj1,Q,R,Q);
-% p = p.setMass(1.2);
-% clsys = feedback(p,c);
-% [~,xcl] = clsys.simulate([0 4], [0 0]');
-% v.playback(xcl);
-% 
-% p = p.setMass(1);
-% c = tvlqr(p,xtraj2,utraj2,Q,R,Q);
-% p = p.setMass(1.2);
-% clsys = feedback(p,c);
-% [~,xcl] = clsys.simulate([0 4], [0 0]');
-% v.playback(xcl);
+p = p.setMass(1);
+c = tvlqr(p,xtraj2,utraj2,Q,R,Qf);
+p = p.setMass(1.4);
+clsys = feedback(p,c);
+[~,xcl] = clsys.simulate([0 4], [0 0]');
+v.playback(xcl);
 
 
 
