@@ -11,8 +11,8 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
   %    dynamics constraints are: x(k+1) = x(k) + h(k)*f(x(k+1),u(k))
   %    integrated cost is sum of g(h(k),x(k+1),u(k))
   %  For midpoint integration:
-  %    dynamics constraints are: x(k+1) = x(k) + h(k)*f(.5*x(k)+.5*x(k+1),.5*u(k)+.5*u(k+1))
-  %    integrated cost is sum of g(h(k),.5*x(k)+.5*x(k+1),.5*u(k)+.5*u(k+1))
+  %    dynamics constraints are: x(k+1) = x(k) + h(k)*f(.5*x(k)+.5*x(k+1),u(k))
+  %    integrated cost is sum of g(h(k),.5*x(k)+.5*x(k+1),u(k))
   properties (Constant)
     FORWARD_EULER = 1;
     BACKWARD_EULER = 2;
@@ -48,7 +48,7 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
           n_vars = 2*nX + nU + 1;
           cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.backward_constraint_fun);
         case DirtranTrajectoryOptimization.MIDPOINT
-          n_vars = 2*nX + 2*nU + 1;
+          n_vars = 2*nX + nU + 1;
           cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.midpoint_constraint_fun);
         case DirtranTrajectoryOptimization.DT_SYSTEM
           n_vars = 2*nX + nU + 1;
@@ -64,7 +64,7 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
           case DirtranTrajectoryOptimization.BACKWARD_EULER
             dyn_inds{i} = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
           case DirtranTrajectoryOptimization.MIDPOINT
-            dyn_inds{i} = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1)};
+            dyn_inds{i} = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
           case DirtranTrajectoryOptimization.DT_SYSTEM
             dyn_inds{i} = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
           otherwise
@@ -98,9 +98,9 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
             running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function);
             inds_i = {obj.h_inds(i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
           case DirtranTrajectoryOptimization.MIDPOINT
-            running_cost = FunctionHandleObjective(1+2*nX+2*nU,...
-              @(h,x0,x1,u0,u1) obj.midpoint_running_fun(running_cost_function,h,x0,x1,u0,u1));
-            inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i);obj.u_inds(:,i+1)};
+            running_cost = FunctionHandleObjective(1+2*nX+nU,...
+              @(h,x0,x1,u0) obj.midpoint_running_fun(running_cost_function,h,x0,x1,u0));
+            inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
           case DirtranTrajectoryOptimization.DT_SYSTEM
             running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function);
             inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.u_inds(:,i)};
@@ -134,20 +134,19 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
       df = [-xdot -eye(nX) (eye(nX) - h*dxdot(:,2:1+nX)) -h*dxdot(:,nX+2:end)];
     end
     
-    function [f,df] = midpoint_constraint_fun(obj,h,x0,x1,u0,u1)
+    function [f,df] = midpoint_constraint_fun(obj,h,x0,x1,u0)
       nX = obj.plant.getNumStates();
-      [xdot,dxdot] = obj.plant.dynamics(0,.5*(x0+x1),.5*(u0+u1));
+      [xdot,dxdot] = obj.plant.dynamics(0,.5*(x0+x1),u0);
       f = x1 - x0 - h*xdot;
-      df = [-xdot (-eye(nX) - .5*h*dxdot(:,2:1+nX)) (eye(nX)- .5*h*dxdot(:,2:1+nX)) -.5*h*dxdot(:,nX+2:end) -.5*h*dxdot(:,nX+2:end)];
+      df = [-xdot (-eye(nX) - .5*h*dxdot(:,2:1+nX)) (eye(nX)- .5*h*dxdot(:,2:1+nX)) -h*dxdot(:,nX+2:end)];
     end
     
-    
-    function [f,df] = midpoint_running_fun(obj,running_handle,h,x0,x1,u0,u1)
+    function [f,df] = midpoint_running_fun(obj,running_handle,h,x0,x1,u0)
       nX = obj.plant.getNumStates();
       nU = obj.plant.getNumInputs();
-      [f,dg] = running_handle(h,.5*(x0+x1),.5*(u0+u1));
+      [f,dg] = running_handle(h,.5*(x0+x1),u0);
       
-      df = [dg(:,1) .5*dg(:,2:1+nX) .5*dg(:,2:1+nX) .5*dg(:,2+nX:1+nX+nU) .5*dg(:,2+nX:1+nX+nU)];
+      df = [dg(:,1) .5*dg(:,2:1+nX) .5*dg(:,2:1+nX) dg(:,2+nX:1+nX+nU)];
     end
   end
 end
