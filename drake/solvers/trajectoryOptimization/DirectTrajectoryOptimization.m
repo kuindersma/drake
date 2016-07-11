@@ -285,12 +285,16 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
       obj = obj.addCost(initial_cost,obj.x_inds(:,1));
     end
 
-    function obj = addFinalCost(obj,final_cost_function)
+    function obj = addFinalCost(obj,final_cost_function,grad_level)
       % adds a cost to the final state and total time
       % @param final_cost_function a function handle f(T,xf)
+
+     if nargin < 3
+        grad_level = -1;
+      end
       nX = obj.plant.getNumStates();
       nH = obj.N-1;
-      cost = FunctionHandleObjective(nH+nX,@(h,x) obj.final_cost(final_cost_function,h,x));
+      cost = FunctionHandleObjective(nH+nX,@(h,x) obj.final_cost(final_cost_function,h,x),grad_level);
       obj = obj.addCost(cost,{obj.h_inds;obj.x_inds(:,end)});
     end
 
