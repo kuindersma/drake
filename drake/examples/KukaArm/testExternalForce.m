@@ -14,7 +14,7 @@ for i=1:10
   [f,df] = r.dynamics_w(0,x,u,w);
   [f2,df2] = geval(@r.dynamics_w,0,x,u,w,struct('grad_method','numerical'));
   
-  valuecheck(df2,df,1e-2); %SK: not sure why the tolerance is so bad 
+  valuecheck(df2,df,1e-2); %SK: not sure why the tolerance is so bad---true for vanilla dynamics too
 end
 
 
