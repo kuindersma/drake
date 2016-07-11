@@ -144,8 +144,8 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                 % Equality constraint on delta-u
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 lqrconst = FunctionHandleConstraint(zeros(N*nu,1), zeros(N*nu,1), obj.num_vars, @obj.lqr_constraint);
-                lqrconst.grad_level = 0; %need to add derivatives
-                lqrconst.grad_method = 'numerical';
+                lqrconst.grad_level = 1;
+                %lqrconst.grad_method = 'numerical';
                 obj = obj.addConstraint(lqrconst);
                 
             case DirtranTrajectoryOptimization.MIDPOINT
@@ -188,8 +188,8 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                 % Equality constraint on delta-u
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 lqrconst = FunctionHandleConstraint(zeros(N*nu,1), zeros(N*nu,1), obj.num_vars, @obj.lqr_constraint);
-                lqrconst.grad_level = 0; %need to add derivatives
-                lqrconst.grad_method = 'numerical';
+                lqrconst.grad_level = 1;
+                %lqrconst.grad_method = 'numerical';
                 obj = obj.addConstraint(lqrconst);
                 
             case DirtranTrajectoryOptimization.BACKWARD_EULER
@@ -199,8 +199,9 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                 error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
         end
       
-      %Constrain first dx=0
       obj = obj.addConstraint(ConstantConstraint(zeros(nx,1)),obj.dx_inds(:,1)); % first dx=0
+      %obj = obj.addConstraint(ConstantConstraint(zeros(nu,1)),obj.u_inds(:,end)); % last u=0
+      %obj = obj.addConstraint(ConstantConstraint(zeros(nu,1)),obj.du_inds(:,end)); % last du=0
     end
        
     function obj = addDeltaXEqualsZeroConstraint(obj)
@@ -209,7 +210,46 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       obj = obj.addConstraint(constraint,obj.dx_inds(:)); 
     end
     
-    function f = lqr_constraint(obj,z,sp)
+    function [f,df] = lqr_constraint(obj,z,~)
+        nx = obj.nX;
+        nu = obj.nU;
+        nw = obj.nW;
+        N = obj.N;
+        
+        %[du, ddu] = geval(@(h,x,u,dx)lqrController(obj,h,x,u,dx),z(obj.h_inds(:)),z(obj.x_inds(:)),z(obj.u_inds(:)),z(obj.dx_inds(:)),struct('grad_method','numerical'));
+        [du,K] = lqrController(obj,z(obj.h_inds(:)),z(obj.x_inds(:)),z(obj.u_inds(:)),z(obj.dx_inds(:)));
+        
+        %Finite diff myself for speed
+        dif = 1e-7;
+        ddu = zeros(N*nu,N-1+N*(nx+nu+nx));
+        hdif = zeros(size(z(obj.h_inds(:))));
+        for k = 1:(N-1)
+            hdif(k) = dif;
+            ddu(:,k) = (lqrController(obj,z(obj.h_inds(:))+hdif,z(obj.x_inds(:)),z(obj.u_inds(:)),z(obj.dx_inds(:)))-du)./dif;
+            hdif(k) = 0;
+        end
+        xdif = zeros(size(z(obj.x_inds(:))));
+        for k = 1:N*nx
+            xdif(k) = dif;
+            ddu(:,N-1+k) = (lqrController(obj,z(obj.h_inds(:)),z(obj.x_inds(:))+xdif,z(obj.u_inds(:)),z(obj.dx_inds(:)))-du)./dif;
+            xdif(k) = 0;
+        end
+        udif = zeros(size(z(obj.u_inds(:))));
+        for k = 1:N*nu
+            udif(k) = dif;
+            ddu(:,N-1+N*nx+k) = (lqrController(obj,z(obj.h_inds(:)),z(obj.x_inds(:)),z(obj.u_inds(:))+udif,z(obj.dx_inds(:)))-du)./dif;
+            udif(k) = 0;
+        end
+        
+        %the derivatives w.r.t. dx are easy
+        ddu(:,N-1+N*nx+N*nu+(1:N*nx)) = -blkdiag(K{:});
+        
+        f = z(obj.du_inds(:)) - du;
+        df = [-ddu, eye(N*nu), zeros(N*nu,N*nw)];
+        
+    end
+    
+    function [du,K] = lqrController(obj,h,x,u,dx)
         nx = obj.nX;
         nu = obj.nU;
         N = obj.N;
@@ -220,13 +260,13 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         switch obj.options.integration_method
             case DirtranTrajectoryOptimization.FORWARD_EULER
                 for k = 1:(N-1)
-                    [~,dx1] = obj.forward_robust_dynamics_fun(z(obj.h_inds(k)),z(obj.x_inds(:,k)),z(obj.u_inds(:,k)), zeros(1,obj.nW));
+                    [~,dx1] = obj.forward_robust_dynamics_fun(h(k),x((k-1)*nx+(1:nx)),u((k-1)*nu+(1:nu)), zeros(1,obj.nW));
                     Ak(:,:,k) = dx1(:,1+(1:nx));
                     Bk(:,:,k) = dx1(:,1+nx+(1:nu));
                 end
             case DirtranTrajectoryOptimization.MIDPOINT
                 for k = 1:(N-1)
-                    [~,dx1] = obj.forward_robust_dynamics_fun(z(obj.h_inds(k)),.5*(z(obj.x_inds(:,k))+z(obj.x_inds(:,k+1))),z(obj.u_inds(:,k)), zeros(1,obj.nW));
+                    [~,dx1] = obj.forward_robust_dynamics_fun(h(k),.5*(x((k-1)*nx+(1:nx))+x(k*nx+(1:nx))),u((k-1)*nu+(1:nu)), zeros(1,obj.nW));
                     Ak(:,:,k) = dx1(:,1+(1:nx));
                     Bk(:,:,k) = dx1(:,1+nx+(1:nu));
                 end
@@ -234,16 +274,14 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         
         %Solve Riccati Equation
         S = obj.Qf;
-        dx = z(obj.dx_inds(:));
         du = zeros(N*nu,1);
+        K = zeros(nu,nx,N);
         for k = (N-1):-1:1
-            K = (Bk(:,:,k)'*S*Bk(:,:,k)+obj.R)\(Bk(:,:,k)'*S*Ak(:,:,k));
-            du(k) = -K*dx((k-1)*nx+(1:nx));
-            S = obj.Q + K'*obj.R*K + (Ak(:,:,k) - Bk(:,:,k)*K)'*S*(Ak(:,:,k) - Bk(:,:,k)*K);
+            K(:,:,k) = (Bk(:,:,k).'*S*Bk(:,:,k)+obj.R)\(Bk(:,:,k).'*S*Ak(:,:,k));
+            du(k) = -K(:,:,k)*dx((k-1)*nx+(1:nx));
+            S = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (Ak(:,:,k) - Bk(:,:,k)*K(:,:,k)).'*S*(Ak(:,:,k) - Bk(:,:,k)*K(:,:,k));
         end
-        
-        f = z(obj.du_inds(:)) - du;
-        
+        K = num2cell(K,[1 2]);
     end
    
     function [f,df] = forward_w_equality_constraint(obj,robust_cost,h,x0,dx0,u,du,w)
@@ -368,7 +406,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     end
 
     function [f,df] = midpoint_robust_dynamics_fun(obj,h,x0,dx0,x1,dx1,u0,du0,w)
-      %2nd order midpoint on dynamics, FOH on control and disturbance inputs
+      %2nd order midpoint on dynamics, ZOH on control and disturbance inputs
       if nargout == 1
           xdot = obj.plant.dynamics_w(0,.5*(x0+dx0+x1+dx1),u0+du0,w);
           f = x0 + dx0 + h*xdot;

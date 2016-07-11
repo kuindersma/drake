@@ -9,6 +9,8 @@ classdef PendulumPlant < SecondOrderSystem
     I = .25; % m*l^2; % kg*m^2
     g = 9.81; % m/s^2
     
+    limit_torque = 0;
+    
     xG;
     uG;
     u_pert_max = 0; % input disturbance bound
@@ -158,6 +160,10 @@ classdef PendulumPlant < SecondOrderSystem
       else
         w=zeros(obj.getNumInputs,1);
       end
+      if obj.limit_torque
+        u = min(obj.umax,u);
+        u = max(obj.umin,u);
+      end
       f = dynamics@SecondOrderSystem(obj,t,x,u+w);
       if (nargout>1)
         [df,d2f,d3f]= dynamicsGradients(obj,t,x,u,nargout-1);
@@ -204,18 +210,18 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       elseif nargin == 2
           options = struct();
       end
-      traj_opt = DirtranTrajectoryOptimization(obj,N,tf,options);
+      traj_opt = DirtranTrajectoryOptimization(obj,N,[1 8],options);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
-      traj_opt = traj_opt.addRunningCost(@cost);
+      %traj_opt = traj_opt.addRunningCost(@cost);
       traj_opt = traj_opt.addFinalCost(@finalCost);
       traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
       
       
       function [g,dg] = cost(dt,x,u);
         xg = double(obj.xG);
-        R = .1;
-        Q = [.1 0; 0 .01];
+        R = 0;
+        Q = [0 0; 0 0];
         pmpi = [pi; -pi];
         [e1, i] = min(abs([x(1)+pi x(1)-pi]));
         e = [e1; x(2)-xg(2)];
@@ -226,14 +232,9 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       end
       
       function [h,dh] = finalCost(tf,x)
-        xg = double(obj.xG);
-        Qf = 0*eye(2);
-        pmpi = [pi; -pi];
-        [e1, i] = min(abs([x(1)+pi x(1)-pi]));
-        e = [e1; x(2)-xg(2)];
-        h = e'*Qf*e;
+        h = tf;
         if (nargout>1)
-          dh = [0, 2*[x(1)+pmpi(i), x(2)]*Qf];
+          dh = [1, 0, 0];
         end
       end
       
@@ -326,13 +327,17 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       tf = 4;
       
       options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,tf,options);
+      prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,[1 8],options);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
-      prog = prog.addRunningCost(@cost);
-      %prog = prog.addFinalCost(@finalCost);
+      %prog = prog.addRunningCost(@cost);
+      prog = prog.addFinalCost(@finalCost);
       prog = prog.addRobustCost(@robust_cost);
       prog = prog.addRobustConstraints(@robust_cost);
+      
+      prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-3);
+      prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-5);
+      prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-5);
       
       if nargin == 7
           traj_init.x = xguess;
@@ -462,33 +467,28 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       
       function [g,dg] = cost(dt,x,u);
         xg = double(obj.xG);
-        R = .1;
-        Q = [.1 0; 0 .01];
+        Rt = 0;
+        Qt = [0 0; 0 0];
         pmpi = [pi; -pi];
         [e1, i] = min(abs([x(1)+pi x(1)-pi]));
         e = [e1; x(2)-xg(2)];
-        g = e'*Q*e + u'*R*u;
+        g = e'*Qt*e + u'*Rt*u;
         if (nargout>1)
-          dg = [0, 2*[x(1)+pmpi(i), x(2)]*Q, 2*u'*R];
+          dg = [0, 2*[x(1)+pmpi(i), x(2)]*Qt, 2*u'*Rt];
         end
       end
       
       function [h,dh] = finalCost(tf,x)
-        xg = double(obj.xG);
-        Qf = 0*eye(2);
-        pmpi = [pi; -pi];
-        [e1, i] = min(abs([x(1)+pi x(1)-pi]));
-        e = [e1; x(2)-xg(2)];
-        h = e'*Qf*e;
+        h = tf;
         if (nargout>1)
-          dh = [0, 2*[x(1)+pmpi(i), x(2)]*Qf];
+          dh = [1, 0, 0];
         end
       end
       
       function [g,dg,ddg] = robust_cost(dx,du,w)
         W = 0*eye(length(w));
-        Qw = eye(2);
-        Rw = .1;
+        Qw = [10 0; 0 10];
+        Rw = 10;
         g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
         dg = [2*dx'*Qw, 2*du'*Rw, 2*w'*W];
         ddg = blkdiag(2*Qw, 2*Rw, 2*W);

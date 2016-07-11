@@ -6,8 +6,7 @@ close all
 p = PendulumPlant();
 v = PendulumVisualizer();
 
-N = 41;
-D = (2/.2^2); %This corresponds to +/-.2 uncertainty in mass (20%)
+N = 51;
 Q = [10 0; 0 1];
 R = .1;
 Qf = 100*eye(2);
@@ -34,6 +33,7 @@ ylabel('x_{nominal}');
 
 figure(1);
 
+D = (2/.2^2); %This corresponds to +/-.2 uncertainty in mass (20%)
 [utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D,Q,R,Qf);
 
 %Plot robust trajectory
@@ -122,16 +122,18 @@ ylabel('w')
 %closed-loop
 p = p.setMass(1);
 c = tvlqr(p,xtraj1,utraj1,Q,R,Qf);
-p = p.setMass(1.4);
+p = p.setMass(1.2);
+p.limit_torque = 1;
 clsys = feedback(p,c);
-[~,xcl] = clsys.simulate([0 4], [0 0]');
+[~,xcl] = clsys.simulate(utraj1.tspan, [0 0]');
 v.playback(xcl);
 
 p = p.setMass(1);
 c = tvlqr(p,xtraj2,utraj2,Q,R,Qf);
-p = p.setMass(1.4);
+p = p.setMass(1.2);
+p.limit_torque = 1;
 clsys = feedback(p,c);
-[~,xcl] = clsys.simulate([0 4], [0 0]');
+[~,xcl] = clsys.simulate(utraj2.tspan, [0 0]');
 v.playback(xcl);
 
 

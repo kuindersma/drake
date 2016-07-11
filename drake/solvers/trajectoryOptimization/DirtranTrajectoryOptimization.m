@@ -98,9 +98,8 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
             running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function);
             inds_i = {obj.h_inds(i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
           case DirtranTrajectoryOptimization.MIDPOINT
-            running_cost = FunctionHandleObjective(1+2*nX+nU,...
-              @(h,x0,x1,u0) obj.midpoint_running_fun(running_cost_function,h,x0,x1,u0));
-            inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
+            running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function);
+            inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.u_inds(:,i)};
           case DirtranTrajectoryOptimization.DT_SYSTEM
             running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function);
             inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.u_inds(:,i)};
@@ -141,12 +140,12 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
       df = [-xdot (-eye(nX) - .5*h*dxdot(:,2:1+nX)) (eye(nX)- .5*h*dxdot(:,2:1+nX)) -h*dxdot(:,nX+2:end)];
     end
     
-    function [f,df] = midpoint_running_fun(obj,running_handle,h,x0,x1,u0)
-      nX = obj.plant.getNumStates();
-      nU = obj.plant.getNumInputs();
-      [f,dg] = running_handle(h,.5*(x0+x1),u0);
-      
-      df = [dg(:,1) .5*dg(:,2:1+nX) .5*dg(:,2:1+nX) dg(:,2+nX:1+nX+nU)];
-    end
+%     function [f,df] = midpoint_running_fun(obj,running_handle,h,x0,x1,u0)
+%       nX = obj.plant.getNumStates();
+%       nU = obj.plant.getNumInputs();
+%       [f,dg] = running_handle(h,.5*(x0+x1),u0);
+%       
+%       df = [dg(:,1) .5*dg(:,2:1+nX) .5*dg(:,2:1+nX) dg(:,2+nX:1+nX+nU)];
+%     end
   end
 end
