@@ -1,14 +1,7 @@
 function runDirtranManip(N)
 
-options.floating = false;
-% options.terrain = RigidBodyFlatTerrain();
-warning('off','Drake:RigidBodyManipulator:UnsupportedVelocityLimits');
-warning('off','Drake:RigidBodyManipulator:UnsupportedContactPoints');
-warning('off','Drake:RigidBodyManipulator:WeldedLinkInd');
-warning('off','Drake:RigidBodyManipulator:UnsupportedJointLimits');
-r = RigidBodyManipulator('urdf/iiwa14_with_weight.urdf',options);
-options_hand.weld_to_link = findLinkId(r,'iiwa_link_ee');
-r = r.addRobotFromURDF('urdf/robotiq_simple.urdf', [0;0;0.099], [pi/2;0;0], options_hand);
+options.with_weight = true;
+r = KukaArm(options);
 
 nx = r.getNumStates;
 nq = r.getNumPositions;
@@ -30,8 +23,8 @@ options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
 traj_opt = DirtranTrajectoryOptimization(r,N,tf0*[(1-0.5) (1+0.5)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 % traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
-traj_opt = traj_opt.addRunningCost(@cost);
-traj_opt = traj_opt.addFinalCost(@finalCost);
+traj_opt = traj_opt.addRunningCost(@cost,2);
+traj_opt = traj_opt.addFinalCost(@finalCost,2);
 % traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
 
 [jlmin,jlmax] = r.getJointLimits;
@@ -76,7 +69,8 @@ traj=simulate(sys,[0,utraj.tspan(2)],xtraj.eval(xtraj.tspan(1)));
 v.playback(traj,struct('slider',true));
 
 keyboard
-  % add a display function to draw the trajectory on every iteration
+
+
   function displayStateTrajectory(t,x,u)
     ts = [0,cumsum(t)'];
     xtraj = PPTrajectory(foh(ts,x));
@@ -84,19 +78,21 @@ keyboard
     v.playback(xtraj);
   end
 
-  function [g,dg] = cost(h,x,u)
-    Q = diag([zeros(nq,1);1e-8*ones(nq,1)]);
+  function [g,dg,ddg] = cost(h,x,u)
+    Q = diag([zeros(nq,1);1e-6*ones(nq,1)]);
     R = 0.0*eye(nu);
 
     g = (x-xG)'*Q*(x-xG) + u'*R*u;
     dg = [0, 2*(x'*Q -xG'*Q), 2*u'*R];
+    ddg = blkdiag(0, 2*Q, 2*R);
   end
 
-  function [g,dg] = finalCost(T,x)
+  function [g,dg,ddg] = finalCost(T,x)
     Q = diag([zeros(nq,1);ones(nq,1)]);
     
     g = (x-xG)'*Q*(x-xG);
     dg = [0, 2*(x'*Q -xG'*Q)];
+    ddg = blkdiag(0, 2*Q);
   end
 
 
