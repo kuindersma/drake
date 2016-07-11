@@ -102,14 +102,9 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
             running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function,grad_level);
             inds_i = {obj.h_inds(i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
           case DirtranTrajectoryOptimization.MIDPOINT
-<<<<<<< HEAD
-            running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function);
-            inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.u_inds(:,i)};
-=======
             running_cost = FunctionHandleObjective(1+2*nX+nU,...
               @(h,x0,x1,u0) obj.midpoint_running_fun(running_cost_function,h,x0,x1,u0),grad_level);
             inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
->>>>>>> origin/robust-ddp
           case DirtranTrajectoryOptimization.DT_SYSTEM
             running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function,grad_level);
             inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.u_inds(:,i)};
