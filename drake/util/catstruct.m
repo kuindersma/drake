@@ -41,9 +41,8 @@ function A = catstruct(varargin)
 %   2.2 (oct 2008) fixed error when dealing with empty structs (Thanks to
 %                  Lars Barring)
 
-N = nargin ;
-
-error(nargchk(1,Inf,N)) ;
+narginchk(1,Inf);
+N = nargin;
 
 if ~isstruct(varargin{end}),
     if isequal(varargin{end},'sorted'),
