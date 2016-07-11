@@ -1,16 +1,11 @@
 function runPassive
 
-options.floating = false;
 options.terrain = RigidBodyFlatTerrain();
-w = warning('off','Drake:RigidBodyManipulator:UnsupportedVelocityLimits');
-r = TimeSteppingRigidBodyManipulator('urdf/iiwa14.urdf',0.001,options);
-warning(w);
+r = TimeSteppingRigidBodyManipulator(KukaArm(options),0.01,options);
 
 v = r.constructVisualizer;
 v.display_dt = .02;
 
-v.inspector 
-
-xtraj = simulate(r,[0 2],zeros(r.getNumStates,1));
+xtraj = simulate(r,[0 1],zeros(r.getNumStates,1));
 
 v.playback(xtraj,struct('slider',true));
