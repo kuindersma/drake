@@ -87,13 +87,12 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     function obj = addRobustCost(obj,robust_cost)
         nx = obj.nX;
         nu = obj.nU;
-        nw = obj.nW;
         N = obj.N;
         
-        dim = nx+nu+nw;
-        for k = 1:N
+        dim = 1+nx+nu;
+        for k = 1:N-1
             costObj = FunctionHandleObjective(dim,robust_cost,2);
-            obj = obj.addCost(costObj, {obj.dx_inds(:,k); obj.du_inds(:,k); obj.w_inds(:,k)});
+            obj = obj.addCost(costObj, {obj.h_inds(k); obj.dx_inds(:,k); obj.du_inds(:,k)});
         end
     end
     
@@ -145,7 +144,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 lqrconst = FunctionHandleConstraint(zeros(N*nu,1), zeros(N*nu,1), obj.num_vars, @obj.lqr_constraint);
                 lqrconst.grad_level = 1;
-                %lqrconst.grad_method = 'numerical';
                 obj = obj.addConstraint(lqrconst);
                 
             case DirtranTrajectoryOptimization.MIDPOINT
@@ -189,7 +187,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 lqrconst = FunctionHandleConstraint(zeros(N*nu,1), zeros(N*nu,1), obj.num_vars, @obj.lqr_constraint);
                 lqrconst.grad_level = 1;
-                %lqrconst.grad_method = 'numerical';
                 obj = obj.addConstraint(lqrconst);
                 
             case DirtranTrajectoryOptimization.BACKWARD_EULER
@@ -303,7 +300,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         
         %Setup QCQP
         [~,dx1,ddx1] = obj.forward_robust_dynamics_fun(h,x0,u0,zeros(obj.nW,1));
-        [~,dJ,ddJ] = robust_cost(zeros(obj.nX,1),zeros(obj.nU,1),zeros(obj.nW,1));
+        [~,dJ,ddJ] = robust_cost(h,zeros(obj.nX,1),zeros(obj.nU,1));
         
         %Dynamics derivatives
         G = dx1(:,1+obj.nX+obj.nU+(1:obj.nW));

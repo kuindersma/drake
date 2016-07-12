@@ -216,7 +216,7 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       %traj_opt = traj_opt.addRunningCost(@cost);
       traj_opt = traj_opt.addFinalCost(@finalCost);
       traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
-      
+      traj_opt = traj_opt.addInputConstraint(ConstantConstraint(0),N);
       
       function [g,dg] = cost(dt,x,u);
         xg = double(obj.xG);
@@ -485,13 +485,16 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
         end
       end
       
-      function [g,dg,ddg] = robust_cost(dx,du,w)
-        W = 0*eye(length(w));
-        Qw = [10 0; 0 10];
-        Rw = 10;
-        g = dx'*Qw*dx + du'*Rw*du + w'*W*w;
-        dg = [2*dx'*Qw, 2*du'*Rw, 2*w'*W];
-        ddg = blkdiag(2*Qw, 2*Rw, 2*W);
+      function [g,dg,ddg] = robust_cost(h,dx,du)
+        nx = length(dx);
+        nu = length(du);
+        Qw = [100 0; 0 100];
+        Rw = 100;
+        g = h*dx'*Qw*dx + h*du'*Rw*du;
+        dg = [dx'*Qw*dx+du'*Rw*du, 2*h*dx'*Qw, 2*h*du'*Rw];
+        ddg = [0, 2*dx'*Qw, 2*du'*Rw;
+               2*Qw*dx, 2*h*Qw, zeros(nx,nu);
+               2*Rw*du, zeros(nu,nx), 2*h*Rw];
       end
        
     end
