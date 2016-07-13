@@ -23,7 +23,7 @@ c = tvlqr(p,xtraj1,utraj1,Q,R,Qf);
 p = p.setMass(1.2);
 p.limit_torque = 1;
 clsys = feedback(p,c);
-[~,xcl1] = clsys.simulate([0 4], [0 0]');
+[~,xcl1] = clsys.simulate([0 3], [0 0]');
 v.playback(xcl1);
 
 p = p.setMass(1);
@@ -33,13 +33,14 @@ p.limit_torque = 1;
 clsys = feedback(p,c);
 [~,xcl2] = clsys.simulate([0 4], [0 0]');
 v.playback(xcl2);
-v.playbackSWF(xcl2, 'swing2.swf');
 
 %Write movie files
-setenv('PATH', [getenv('PATH') ':/usr/local/bin']);
-setenv('PATH', [getenv('PATH') ':/Library/TeX/texbin']);
-v.playbackSWF(xcl1, 'swing1.swf');
-v.playbackSWF(xcl2, 'swing2.swf');
+v.playbackAVI(xcl1, 'swing1.avi');
+v.playbackAVI(xcl2, 'swing2.avi');
+% setenv('PATH', [getenv('PATH') ':/usr/local/bin']);
+% setenv('PATH', [getenv('PATH') ':/Library/TeX/texbin']);
+% v.playbackSWF(xcl1, 'swing1.swf');
+% v.playbackSWF(xcl2, 'swing2.swf');
 
 %Plots
 h1 = z1(prog1.h_inds);
