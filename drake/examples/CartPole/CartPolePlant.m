@@ -5,7 +5,10 @@ classdef CartPolePlant < Manipulator
     mp = 1;    % mass of the pole (point mass at the end) in kg
     l = 0.5;   % length of the pole in m
     g = 9.81;  % gravity m/s^2
-
+    
+    mu = 0.05;
+    friction_on = 0;
+    
     xG;
     uG;
   end
@@ -13,7 +16,7 @@ classdef CartPolePlant < Manipulator
   methods
     function obj = CartPolePlant
       obj = obj@Manipulator(2,1);
-      obj = setInputLimits(obj,-30,30);
+      obj = setInputLimits(obj,-50,50);
       obj = setOutputFrame(obj,obj.getStateFrame);  % allow full-state feedback
 
       obj.xG = Point(obj.getStateFrame,[0;pi;0;0]);
@@ -33,14 +36,41 @@ classdef CartPolePlant < Manipulator
     end
 
     function [f,df,d2f,d3f] = dynamics(obj,t,x,u)
+        
+      if obj.friction_on
+          u = u - obj.mu*(obj.mc+obj.mp)*obj.g*tanh(1000*x(3));
+      end
+        
       f = dynamics@Manipulator(obj,t,x,u);
       if (nargout>1)
         [df,d2f,d3f]= dynamicsGradients(obj,t,x,u,nargout-1);
       end
     end
+    
+    function [f,df,d2f] = dynamics_w(obj,t,x,u,w)
+      f = dynamics(obj,t,x,u+w);
+      if nargout==2
+        df = dynamicsGradients(obj,t,x,u+w,1);
+        df = [df, df(:,6)];
+      else %nargout==3
+        [df,d2f] = dynamicsGradients(obj,t,x,u+w,2);
+        df = [df, df(:,6)];
+        d2f = [d2f(:,1:6), d2f(:,6),...
+               d2f(:,7:12), d2f(:,12),...
+               d2f(:,13:18), d2f(:,18),...
+               d2f(:,19:24), d2f(:,24),...
+               d2f(:,25:30), d2f(:,30),...
+               d2f(:,31:36), d2f(:,36),...
+               d2f(:,31:36), d2f(:,36)];
+      end
+    end
 
     function x0 = getInitialState(obj)
       x0 = randn(4,1);
+    end
+    
+    function n = getNumDisturbances(~)
+      n = 1;
     end
 
   end
@@ -83,31 +113,97 @@ classdef CartPolePlant < Manipulator
 
     function [utraj,xtraj]=swingUpTrajectory(obj)
       x0 = zeros(4,1); tf0 = 4; xf = double(obj.xG);
-      N = 41; % This controls the number of time samples (knot points) used
+      N = 51; % This controls the number of time samples (knot points) used
               % for trajectory optimization. The more time samples you have
               % the more accurate the trajectory will be. But the
               % computation time will increase as you increase this. I've
               % increased the number of time samples to make it more
               % accurate.
 
-      obj = setInputLimits(obj,-inf,inf);
-      prog = DircolTrajectoryOptimization(obj,N,[2 6]);
+      prog = DirtranTrajectoryOptimization(obj,N,[2 8]);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
-      prog = prog.addRunningCost(@cost);
+      %prog = prog.addRunningCost(@cost);
       prog = prog.addFinalCost(@finalCost);
 
       function [g,dg] = cost(dt,x,u)
-        R = 1;
-        g = sum((R*u).*u,1);
-        dg = [zeros(1,1+size(x,1)),2*u'*R];
+        R = 3e-5;
+        g = dt*R*u*u;
+        dg = [R*u*u,0,0,0,0,2*dt*R*u];
       end
 
       function [h,dh] = finalCost(t,x)
         h = t;
-        dh = [1,zeros(1,size(x,1))];
+        dh = [1,0,0,0,0];
       end
 
+      % add a display function to draw the trajectory on every iteration
+      function displayStateTrajectory(h,x,u)
+        subplot(2,1,1);
+        plot(x(2,:),x(4,:),'b.-','MarkerSize',10);
+        subplot(2,1,2);
+        plot([0; cumsum(h(1:end))],u,'r.-','MarkerSize',10);
+        drawnow;
+      end
+      prog = prog.addTrajectoryDisplayFunction(@displayStateTrajectory);
+      
+      traj_init.x = PPTrajectory(foh([0,tf0],[x0,xf]));
+      for attempts=1:10
+        tic
+        [xtraj,utraj,z,F,info] = prog.solveTraj(tf0,traj_init);
+        toc
+        if info==1, break; end
+      end
+    end
+    
+    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,D,Q,R,Qf)
+      x0 = zeros(4,1); tf0 = 4; xf = double(obj.xG);
+      N = 51; % This controls the number of time samples (knot points) used
+              % for trajectory optimization. The more time samples you have
+              % the more accurate the trajectory will be. But the
+              % computation time will increase as you increase this. I've
+              % increased the number of time samples to make it more
+              % accurate.
+
+      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
+      prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,[2 8],options);
+      prog = prog.addStateConstraint(ConstantConstraint(x0),1);
+      prog = prog.addStateConstraint(ConstantConstraint(xf),N);
+      prog = prog.addFinalCost(@finalCost);
+      prog = prog.addRobustCost(@robust_cost);
+      prog = prog.addRobustConstraints(@robust_cost);
+      
+      prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-3);
+      prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-5);
+      prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-5);
+
+      function [g,dg,ddg] = robust_cost(h,dx,du)
+        nx = 4;
+        nu = 1;
+        Qw = 100*eye(nx);
+        Rw = 100;
+        g = h*dx'*Qw*dx + h*du'*Rw*du;
+        dg = [dx'*Qw*dx+du'*Rw*du, 2*h*dx'*Qw, 2*h*du'*Rw];
+        ddg = [0, 2*dx'*Qw, 2*du'*Rw;
+               2*Qw*dx, 2*h*Qw, zeros(nx,nu);
+               2*Rw*du, zeros(nu,nx), 2*h*Rw];
+      end
+
+      function [h,dh] = finalCost(t,x)
+        h = t;
+        dh = [1,0,0,0,0];
+      end
+
+      % add a display function to draw the trajectory on every iteration
+      function displayStateTrajectory(h,x,u)
+        subplot(2,1,1);
+        plot(x(2,:),x(4,:),'b.-','MarkerSize',10);
+        subplot(2,1,2);
+        plot([0; cumsum(h(1:end))],u,'r.-','MarkerSize',10);
+        drawnow;
+      end
+      prog = prog.addTrajectoryDisplayFunction(@displayStateTrajectory);
+      
       traj_init.x = PPTrajectory(foh([0,tf0],[x0,xf]));
       for attempts=1:10
         tic

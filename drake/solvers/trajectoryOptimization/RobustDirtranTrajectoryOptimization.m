@@ -120,31 +120,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                     constraint = FunctionHandleConstraint(zeros(nx,1),zeros(nx,1),n_vars,@obj.forward_delta_x_constraint);
                     constraint = constraint.setName(sprintf('delta_x_%d',i));
                     obj = obj.addConstraint(constraint, inds);
-                    
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                    % Equality constraint on w_i
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                    n_vars = 1 + 2*nx + 2*nu + nw;
-                    inds = {obj.h_inds(i); ...
-                        obj.x_inds(:,i); ...
-                        obj.dx_inds(:,i); ...
-                        obj.u_inds(:,i); ...
-                        obj.du_inds(:,i); ...
-                        obj.w_inds(:,i)};
-                    
-                    forward_w_equality_constraint_i = @(h,x0,dx0,u,du,w0) obj.forward_w_equality_constraint(robust_cost,h,x0,dx0,u,du,w0);
-                    
-                    constraint = FunctionHandleConstraint(zeros(nw,1),zeros(nw,1),n_vars,forward_w_equality_constraint_i);
-                    constraint = constraint.setName(sprintf('w_equality_%d',i));
-                    obj = obj.addConstraint(constraint, inds);
                 end
-                
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                % Equality constraint on delta-u
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                lqrconst = FunctionHandleConstraint(zeros(N*nu,1), zeros(N*nu,1), obj.num_vars, @obj.lqr_constraint);
-                lqrconst.grad_level = 1;
-                obj = obj.addConstraint(lqrconst);
                 
             case DirtranTrajectoryOptimization.MIDPOINT
                 for i=1:N-1
@@ -162,32 +138,9 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                         obj.w_inds(:,i)};
                     
                     constraint = FunctionHandleConstraint(zeros(nx,1),zeros(nx,1),n_vars,@obj.midpoint_delta_x_constraint);
-                    obj = obj.addConstraint(constraint, inds);
-                    
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                    % Equality constraint on w_i
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                    n_vars = 1 + 2*nx + 2*nu + nw;
-                    inds = {obj.h_inds(i); ...
-                        obj.x_inds(:,i); ...
-                        obj.dx_inds(:,i); ...
-                        obj.u_inds(:,i); ...
-                        obj.du_inds(:,i); ...
-                        obj.w_inds(:,i)};
-                    
-                    forward_w_equality_constraint_i = @(h,x0,dx0,u,du,w0) obj.forward_w_equality_constraint(robust_cost,h,x0,dx0,u,du,w0);
-                    
-                    constraint = FunctionHandleConstraint(zeros(nw,1),zeros(nw,1),n_vars,forward_w_equality_constraint_i);
-                    constraint = constraint.setName(sprintf('w_equality_%d',i));
+                    constraint = constraint.setName(sprintf('delta_x_%d',i));
                     obj = obj.addConstraint(constraint, inds);
                 end
-                
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                % Equality constraint on delta-u
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                lqrconst = FunctionHandleConstraint(zeros(N*nu,1), zeros(N*nu,1), obj.num_vars, @obj.lqr_constraint);
-                lqrconst.grad_level = 1;
-                obj = obj.addConstraint(lqrconst);
                 
             case DirtranTrajectoryOptimization.BACKWARD_EULER
                 error('not implemented yet');
@@ -195,24 +148,26 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
             otherwise
                 error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
         end
+        
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      % Equality constraint on w and delta-u
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      rconst = FunctionHandleConstraint(zeros(N*(nu+nw),1), zeros(N*(nu+nw),1), obj.num_vars, @(z)obj.robust_constraint(robust_cost,z));
+      rconst.grad_level = 1;
+      obj = obj.addConstraint(rconst);
       
       obj = obj.addConstraint(ConstantConstraint(zeros(nx,1)),obj.dx_inds(:,1)); % first dx=0
-      %obj = obj.addConstraint(ConstantConstraint(zeros(nu,1)),obj.u_inds(:,end)); % last u=0
+      obj = obj.addConstraint(ConstantConstraint(zeros(nu,1)),obj.u_inds(:,end)); % last u=0
       %obj = obj.addConstraint(ConstantConstraint(zeros(nu,1)),obj.du_inds(:,end)); % last du=0
     end
-       
-    function obj = addDeltaXEqualsZeroConstraint(obj)
-      constraint = ConstantConstraint(zeros(obj.nX*obj.N,1));
-      constraint = constraint.setName('dx_eq_0');      
-      obj = obj.addConstraint(constraint,obj.dx_inds(:)); 
-    end
     
-    function [f,df] = lqr_constraint(obj,z,~)
+    function [f,df] = robust_constraint(obj,robust_cost,z)
         nx = obj.nX;
         nu = obj.nU;
         nw = obj.nW;
         N = obj.N;
         
+        %---------- LQR Stuff ----------%
         %[du, ddu] = geval(@(h,x,u,dx)lqrController(obj,h,x,u,dx),z(obj.h_inds(:)),z(obj.x_inds(:)),z(obj.u_inds(:)),z(obj.dx_inds(:)),struct('grad_method','numerical'));
         [du,K] = lqrController(obj,z(obj.h_inds(:)),z(obj.x_inds(:)),z(obj.u_inds(:)),z(obj.dx_inds(:)));
         
@@ -241,9 +196,26 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         %the derivatives w.r.t. dx are easy
         ddu(:,N-1+N*nx+N*nu+(1:N*nx)) = -blkdiag(K{:});
         
-        f = z(obj.du_inds(:)) - du;
-        df = [-ddu, eye(N*nu), zeros(N*nu,N*nw)];
+        %---------- Disturbance Stuff ----------%
+        w = zeros(N*nw,1);
+        dfw = zeros(N*nw, obj.num_vars);
+        for k = 1:N-1
+            [wk, dwk] = solve_qcqp(obj, robust_cost, z(obj.h_inds(k)), z(obj.x_inds(:,k))+z(obj.dx_inds(:,k)), z(obj.u_inds(:,k))+z(obj.du_inds(:,k)));
+            
+            w((k-1)*nw+(1:nw)) = wk;
+            
+            dfw((k-1)*nw+(1:nw), [obj.h_inds(k);obj.x_inds(:,k);obj.u_inds(:,k);obj.dx_inds(:,k);obj.du_inds(:,k);obj.w_inds(:,k)]) = ...
+                       [-dwk(:,1), ... h
+                        -dwk(:,1+(1:nx)), ... x0
+                        -dwk(:,1+nx+(1:nu)), ... u
+                        -dwk(:,1+(1:nx)), ... dx0
+                        -dwk(:,1+nx+(1:nu)), ... % du
+                        eye(nw)];
+        end
+        dfw((N-1)*nw+(1:nw), obj.w_inds(:,k)) = eye(nw);
         
+        f = [z(obj.du_inds(:)) - du; z(obj.w_inds(:)) - w];
+        df = [-ddu, eye(N*nu), zeros(N*nu,N*nw); dfw];
     end
     
     function [du,K] = lqrController(obj,h,x,u,dx)
@@ -280,23 +252,10 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         end
         K = num2cell(K,[1 2]);
     end
-   
-    function [f,df] = forward_w_equality_constraint(obj,robust_cost,h,x0,dx0,u,du,w)
-      [w_opt, dw] = solve_qcqp(obj, robust_cost, h, x0+dx0, u+du);
-      
-      f = w - w_opt;
-
-      df = [-dw(:,1), ... h
-            -dw(:,1+(1:obj.nX)), ... x0
-            -dw(:,1+(1:obj.nX)), ... dx0
-            -dw(:,1+obj.nX+(1:obj.nU)), ... u
-            -dw(:,1+obj.nX+(1:obj.nU)), ... % du
-            eye(obj.nW)]; 
-    end
     
     function [w, dw] = solve_qcqp(obj,robust_cost,h,x0,u0)
         
-        persistent wstar; %keep last value for warm starting
+        %persistent wstar; %keep last value for warm starting
         
         %Setup QCQP
         [~,dx1,ddx1] = obj.forward_robust_dynamics_fun(h,x0,u0,zeros(obj.nW,1));
@@ -311,9 +270,9 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         H = -G'*ddJ(1:obj.nX,1:obj.nX)*G;
         f = -G'*dJ(1:obj.nX)';
         
-        %wstar = qcqp_mex(H,f,obj.D,wstar);
-        w = qcqp(H,f,obj.D,wstar);
-        wstar = w;
+        w = qcqp(H,f,obj.D);
+        %w = qcqp(H,f,obj.D,wstar);
+        %wstar = w;
         
         %Evaluate derivatives
         dw = -H\tvMult(dG,2*ddJ(1:obj.nX,1:obj.nX)*G*w + dJ(1:obj.nX)',1);
@@ -407,7 +366,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       if nargout == 1
           xdot = obj.plant.dynamics_w(0,.5*(x0+dx0+x1+dx1),u0+du0,w);
           f = x0 + dx0 + h*xdot;
-      elseif nargout == 2
+      else %nargout == 2
           [xdot,dxdot] = obj.plant.dynamics_w(0,.5*(x0+dx0+x1+dx1),u0+du0,w);
           f = x0 + dx0 + h*xdot;
           df = [xdot ... h
@@ -418,33 +377,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
               h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u0
               h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du0
               h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
-%       else %nargout == 3
-%           [xdot,dxdot,d2xdot] = obj.plant.dynamics_w(0,.5*(x0+dx0+x1+dx1),u0+du0,w);
-%           
-%           f = x0 + dx0 + h*xdot;
-%           
-%           df = [xdot ... h
-%               (eye(obj.nX) + .5*h*dxdot(:,1+(1:obj.nX))) ... x0
-%               (eye(obj.nX) + .5*h*dxdot(:,1+(1:obj.nX))) ... dx0
-%               .5*h*dxdot(:,1+(1:obj.nX))... x1
-%               .5*h*dxdot(:,1+(1:obj.nX))... dx1
-%               h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u0
-%               h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du0
-%               h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
-%           
-%           nVars = 1+4*obj.nX+2*obj.nU+obj.nW;
-%           dxdotdx = dxdot(:,1+(1:obj.nX));
-%           dxdotdu = dxdot(:,1+obj.nX+(1:obj.nU));
-%           dxdotdw = dxdot(:,1+obj.nX+obj.nU+(1:obj.nW));
-%           d2f = zeros(obj.nX,(1+4*obj.nX+2*obj.nU+obj.nW).^2);
-%           d2f(:,1:nVars) = [zeros(obj.nX,1), ... h
-%                             .5*dxdotdx, ... x0
-%                             .5*dxdotdx, ... dx0
-%                             .5*dxdotdx, ... x1
-%                             .5*dxdotdx, ... dx1
-%                             dxdotdu, ... u0
-%                             dxdotdu, ... du0
-%                             dxdotdw]; % w
       end
       
     end 
@@ -458,6 +390,19 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
 %         h*dxdot(:,1+obj.nX+(1:obj.nU)) ... u
 %         h*dxdot(:,1+obj.nX+(1:obj.nU)) ... du
 %         h*dxdot(:,1+obj.nX+obj.nU+(1:obj.nW))]; % w
+%     end
+
+%     function [f,df] = forward_w_equality_constraint(obj,robust_cost,h,x0,dx0,u,du,w)
+%       [w_opt, dw] = solve_qcqp(obj, robust_cost, h, x0+dx0, u+du);
+%       
+%       f = w - w_opt;
+% 
+%       df = [-dw(:,1), ... h
+%             -dw(:,1+(1:obj.nX)), ... x0
+%             -dw(:,1+(1:obj.nX)), ... dx0
+%             -dw(:,1+obj.nX+(1:obj.nU)), ... u
+%             -dw(:,1+obj.nX+(1:obj.nU)), ... % du
+%             eye(obj.nW)]; 
 %     end
 
   end

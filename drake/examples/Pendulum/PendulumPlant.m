@@ -243,7 +243,7 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
         subplot(2,1,1);
         plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
         subplot(2,1,2);
-        plot([0; cumsum(t(1:end-1))],u(1:end-1),'r.-','MarkerSize',10);
+        plot([0; cumsum(t)],u,'r.-','MarkerSize',10);
         drawnow;
       end
       traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
@@ -443,7 +443,7 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
         subplot(2,1,1);
         plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
         subplot(2,1,2);
-        plot([0; cumsum(t(1:end-1))],u(1:end-1),'r.-','MarkerSize',10);
+        plot([0; cumsum(t)],u,'r.-','MarkerSize',10);
         drawnow;
       end
       prog = addTrajectoryDisplayFunction(prog,@displayStateTrajectory);
@@ -486,8 +486,8 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       end
       
       function [g,dg,ddg] = robust_cost(h,dx,du)
-        nx = length(dx);
-        nu = length(du);
+        nx = 2;
+        nu = 1;
         Qw = [100 0; 0 100];
         Rw = 100;
         g = h*dx'*Qw*dx + h*du'*Rw*du;

@@ -26,7 +26,7 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
         options = struct();
       end
       if ~isfield(options,'integration_method')
-        options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
+        options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
       end
       
       obj = obj@DirectTrajectoryOptimization(plant,N,duration,options);
@@ -145,12 +145,12 @@ classdef DirtranTrajectoryOptimization < DirectTrajectoryOptimization
       df = [-xdot (-eye(nX) - .5*h*dxdot(:,2:1+nX)) (eye(nX)- .5*h*dxdot(:,2:1+nX)) -h*dxdot(:,nX+2:end)];
     end
     
-%     function [f,df] = midpoint_running_fun(obj,running_handle,h,x0,x1,u0)
-%       nX = obj.plant.getNumStates();
-%       nU = obj.plant.getNumInputs();
-%       [f,dg] = running_handle(h,.5*(x0+x1),u0);
-%       
-%       df = [dg(:,1) .5*dg(:,2:1+nX) .5*dg(:,2:1+nX) dg(:,2+nX:1+nX+nU)];
-%     end
+    function [f,df] = midpoint_running_fun(obj,running_handle,h,x0,x1,u0)
+      nX = obj.plant.getNumStates();
+      nU = obj.plant.getNumInputs();
+      [f,dg] = running_handle(h,.5*(x0+x1),u0);
+      
+      df = [dg(:,1) .5*dg(:,2:1+nX) .5*dg(:,2:1+nX) dg(:,2+nX:1+nX+nU)];
+    end
   end
 end
