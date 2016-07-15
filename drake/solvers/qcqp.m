@@ -30,9 +30,9 @@ else
     x = zeros(size(b));
     if Amin < 0
         if b(ind) ~= 0
-            x(ind) = -sign(b(ind))/sqrt(max(diag(D)));
+            x(ind) = -sign(b(ind))/sqrt(.5*max(diag(D)));
         else
-            x(ind) = 1/sqrt(max(diag(D)));
+            x(ind) = 1/sqrt(.5*max(diag(D)));
         end
     end
 end
