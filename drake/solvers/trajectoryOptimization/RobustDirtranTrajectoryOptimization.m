@@ -89,10 +89,10 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         [K,G,A,B] = lqrController(obj,h,x,u);
         
         m = zeros(N*nu,1);
-        P = zeros(nx,nw);
+        M = zeros(nx,nw);
         for k = 1:(obj.N-1)
-            m((k-1)*nu+(1:nu)) = max(K(:,:,k)*P,[],2);
-            P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P + G(:,:,k)*obj.L;
+            m((k-1)*nu+(1:nu)) = max(K(:,:,k)*M,[],2);
+            M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
         end
         
         c = [u+m; u-m];
