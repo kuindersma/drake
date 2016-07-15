@@ -156,38 +156,22 @@ classdef CartPolePlant < Manipulator
       end
     end
     
-    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,D,Q,R,Qf)
+    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,N,D,Q,R,Qf,xguess,uguess)
       x0 = zeros(4,1); tf0 = 4; xf = double(obj.xG);
-      N = 51; % This controls the number of time samples (knot points) used
-              % for trajectory optimization. The more time samples you have
-              % the more accurate the trajectory will be. But the
-              % computation time will increase as you increase this. I've
-              % increased the number of time samples to make it more
-              % accurate.
 
       options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,[2 8],options);
+      prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,[2 5],options);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
       prog = prog.addFinalCost(@finalCost);
-      prog = prog.addRobustCost(@robust_cost);
-      prog = prog.addRobustConstraints(@robust_cost);
+      
+      prog = prog.addRobustCost(eye(4), 1);
+      prog = prog.addRobustConstraint();
       
       prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-3);
-      prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-5);
-      prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-5);
-
-      function [g,dg,ddg] = robust_cost(h,dx,du)
-        nx = 4;
-        nu = 1;
-        Qw = 100*eye(nx);
-        Rw = 100;
-        g = h*dx'*Qw*dx + h*du'*Rw*du;
-        dg = [dx'*Qw*dx+du'*Rw*du, 2*h*dx'*Qw, 2*h*du'*Rw];
-        ddg = [0, 2*dx'*Qw, 2*du'*Rw;
-               2*Qw*dx, 2*h*Qw, zeros(nx,nu);
-               2*Rw*du, zeros(nu,nx), 2*h*Rw];
-      end
+      prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-4);
+      prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-4);
+      prog = prog.setSolverOptions('snopt','scaleoption', 2);
 
       function [h,dh] = finalCost(t,x)
         h = t;
@@ -204,7 +188,14 @@ classdef CartPolePlant < Manipulator
       end
       prog = prog.addTrajectoryDisplayFunction(@displayStateTrajectory);
       
-      traj_init.x = PPTrajectory(foh([0,tf0],[x0,xf]));
+      if nargin > 6
+          traj_init.x = xguess;
+          traj_init.u = uguess;
+          tf0 = uguess.tspan(2);
+      else
+          traj_init.x = PPTrajectory(foh([0,tf0],[x0,xf]));
+      end
+      
       for attempts=1:10
         tic
         [xtraj,utraj,z,F,info] = prog.solveTraj(tf0,traj_init);

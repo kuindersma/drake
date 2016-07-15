@@ -7,17 +7,18 @@ p = PendulumPlant();
 v = PendulumVisualizer();
 
 N = 41;
-Q = [10 0; 0 1];
-R = .1;
-Qf = 100*eye(2);
 
 options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
 [utraj1,xtraj1,z1,prog1] = p.swingUpTrajectory(N,options);
 
-D = (2/.2^2); %This corresponds to +/-.2 uncertainty in mass (20%)
-[utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D,Q,R,Qf);
+D = (1/.2^2); %This corresponds to +/-.2 uncertainty in mass (20%)
+[utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D);
 
 %closed-loop
+Q = [100 0; 0 10];
+R = 1;
+Qf = 500*eye(2);
+      
 p = p.setMass(1);
 c = tvlqr(p,xtraj1,utraj1,Q,R,Qf);
 p = p.setMass(1.2);
@@ -35,8 +36,8 @@ clsys = feedback(p,c);
 v.playback(xcl2);
 
 %Write movie files
-%v.playbackAVI(xcl1, 'swing1.avi');
-%v.playbackAVI(xcl2, 'swing2.avi');
+v.playbackAVI(xcl1, 'swing1.avi');
+v.playbackAVI(xcl2, 'swing2.avi');
 % setenv('PATH', [getenv('PATH') ':/usr/local/bin']);
 % setenv('PATH', [getenv('PATH') ':/Library/TeX/texbin']);
 % v.playbackSWF(xcl1, 'swing1.swf');
@@ -51,10 +52,7 @@ u1 = z1(prog1.u_inds);
 h2 = z2(prog2.h_inds);
 t2 = [0; cumsum(h2)];
 x2 = z2(prog2.x_inds);
-dx = z2(prog2.dx_inds);
 u2 = z2(prog2.u_inds);
-du = z2(prog2.du_inds);
-w = z2(prog2.w_inds);
 
 figure(2);
 subplot(2,1,1);
@@ -83,38 +81,3 @@ hold on
 plot(t2,x2(2,:));
 ylabel('x_{robust}');
 xlim([0 t2(end)]);
-
-figure(4);
-subplot(3,1,1);
-plot(t2,x2(1,:));
-hold on;
-plot(t2,x2(2,:));
-ylabel('x');
-subplot(3,1,2);
-plot(t2,dx(1,:));
-hold on;
-plot(t2,dx(2,:));
-ylabel('\delta x');
-subplot(3,1,3);
-plot(t2,x2(1,:)+dx(1,:));
-hold on;
-plot(t2,x2(2,:)+dx(2,:));
-ylabel('x + \delta x');
-
-figure(5);
-subplot(3,1,1);
-plot(t2,u2);
-ylabel('u');
-ylim([-3 3]);
-subplot(3,1,2);
-plot(t2,du);
-ylim([-3 3]);
-ylabel('\delta u');
-subplot(3,1,3);
-plot(t2,u2+du);
-ylim([-3 3]);
-ylabel('u + \delta u');
-
-figure(6);
-plot(t2,w);
-ylabel('w');

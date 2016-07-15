@@ -307,137 +307,28 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       options.degL1=4;
       c = LQRTree.buildLQRTree(obj,obj.xG,obj.uG,@()rand(2,1).*[2*pi;10]-[pi;5],Q,R,options);
     end
- 
     
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
-    
-    function [utraj,xtraj,z,prog]=robustSwingUpTrajectory(obj,N,D,Q,R,Qf,xguess,uguess)
+    function [utraj,xtraj,z,prog] = robustSwingUpTrajectory(obj,N,D)
       x0 = [0;0]; 
       xf = double(obj.xG);
       tf = 4;
       
-      options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
-      prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,[1 8],options);
+      Q = [100 0; 0 10];
+      R = 1;
+      Qf = 500*eye(2);
+      
+      prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,[1 4]);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
-      %prog = prog.addRunningCost(@cost);
       prog = prog.addFinalCost(@finalCost);
-      prog = prog.addRobustCost(@robust_cost);
-      prog = prog.addRobustConstraints(@robust_cost);
+      
+      prog = prog.addRobustCost(200*eye(2),200);
+      prog = prog.addRobustConstraint();
       
       prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-3);
-      prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-5);
-      prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-5);
+      prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-4);
+      prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-4);
       
-      if nargin == 7
-          traj_init.x = xguess;
-      elseif nargin == 8
-          traj_init.x = xguess;
-          traj_init.u = uguess;
-      else
-          traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
-      end
-      
-      disp('constructor done');
-
-%       nx=2; nu=1; nw=1;
-%       for j=1:20
-%         hr = rand();
-%         xr = 2*randn(nx,1);
-%         x1r = 2*randn(nx,1);
-%         dx1r = 0.1*randn(nx,1);
-%         dxr = 0.1*randn(nx,1);
-%         ur = randn(nu,1);
-%         dur = randn(nu,1);
-%         u1r = randn(nu,1);
-%         wr = randn(nw,1);
-%         gr = randn();
-%         
-%         [~,df1] = geval(@cost,hr,xr,ur,struct('grad_method','numerical'));
-%         [~,df2] = cost(hr,xr,ur);
-%       
-%         valuecheck(df1,df2,1e-3);
-% 
-%         [~,df1] = geval(@finalCost,hr,xr,struct('grad_method','numerical'));
-%         [~,df2] = finalCost(hr,xr);
-%       
-%         valuecheck(df1,df2,1e-3);
-% 
-%         
-%         [~,df1] = geval(@robust_cost,xr,ur,wr,struct('grad_method','numerical'));
-%         [~,df2] = robust_cost(xr,ur,wr);
-%       
-%         valuecheck(df1,df2,1e-3);        
-%         
-%         [~,df1] = geval(@prog.forward_robust_dynamics_fun,hr,xr,ur,dur,wr,struct('grad_method','numerical'));
-%         [~,df2] = prog.forward_robust_dynamics_fun(hr,xr,ur,dur,wr);
-%       
-%         valuecheck(df1,df2,1e-3);
-% 
-%         [~,df1] = geval(@prog.midpoint_robust_dynamics_fun,hr,xr,dxr,x1r,ur,dur,u1r,wr,struct('grad_method','numerical'));
-%         [~,df2] = prog.midpoint_robust_dynamics_fun(hr,xr,dxr,x1r,ur,dur,u1r,wr);
-%       
-%         valuecheck(df1,df2,1e-3);
-% 
-%         tmp1 = @(gamma,h,x0,dx0,x1,u,du) prog.forward_robust_bound_fun(@robust_cost,1,gamma,h,x0,dx0,x1,u,du);
-%         [~,df1] = geval(tmp1,gr,hr,xr,dxr,x1r,ur,dur,struct('grad_method','numerical'));
-%         [~,df2] = tmp1(gr,hr,xr,dxr,x1r,ur,dur);
-%       
-%         valuecheck(df1,df2,1e-3);
-% 
-%         tmp1 = @(gamma,h,x0,dx0,x1,u,du,u1) prog.midpoint_robust_bound_fun(@robust_cost,1,gamma,h,x0,dx0,x1,u,du,u1);
-%         [~,df1] = geval(tmp1,gr,hr,xr,dxr,x1r,ur,dur,u1r,struct('grad_method','numerical'));
-%         [~,df2] = tmp1(gr,hr,xr,dxr,x1r,ur,dur,u1r);
-%       
-%         valuecheck(df1,df2,1e-3);
-%         
-%         
-%         tmp1 = @(gamma,h,x0,dx0,x1,u,du,w0) prog.forward_w_bound_fun(@robust_cost,gamma,h,x0,dx0,x1,u,du,w0);
-%         [~,df1] = geval(tmp1,gr,hr,xr,dxr,x1r,ur,dur,wr,struct('grad_method','numerical'));
-%         [~,df2] = tmp1(gr,hr,xr,dxr,x1r,ur,dur,wr);
-%       
-%         valuecheck(df1,df2,1e-3);
-% 
-%         tmp1 = @(gamma,h,x0,dx0,x1,u0,du0,u1,w0) prog.midpoint_w_bound_fun(@robust_cost,gamma,h,x0,dx0,x1,u0,du0,u1,w0);
-%         [~,df1] = geval(tmp1,gr,hr,xr,dxr,x1r,ur,dur,u1r,wr,struct('grad_method','numerical'));
-%         [~,df2] = tmp1(gr,hr,xr,dxr,x1r,ur,dur,u1r,wr);
-%       
-%         valuecheck(df1,df2,1e-3);
-%         
-% 
-%         tmp1 = @(h,x0,dx0,x1,dx1,u,du,w) prog.forward_delta_x_constraint(h,x0,dx0,x1,dx1,u,du,w);
-%         [~,df1] = geval(tmp1,hr,xr,dxr,x1r,dx1r,ur,dur,wr,struct('grad_method','numerical'));
-%         [~,df2] = tmp1(hr,xr,dxr,x1r,dx1r,ur,dur,wr);
-%       
-%         valuecheck(df1,df2,1e-3);
-% 
-%         tmp1 = @(h,x0,dx0,x1,dx1j,u0,du0,u1,w) prog.midpoint_delta_x_constraint(h,x0,dx0,x1,dx1j,u0,du0,u1,w);
-%         [~,df1] = geval(tmp1,hr,xr,dxr,x1r,dx1r,ur,dur,u1r,wr,struct('grad_method','numerical'));
-%         [~,df2] = tmp1(hr,xr,dxr,x1r,dx1r,ur,dur,u1r,wr);
-%       
-%         valuecheck(df1,df2,1e-3);        
-%         
-%         [~,df1] = geval(@prog.linear_delta_u_constraint,xr,ur,struct('grad_method','numerical'));
-%         [~,df2] = prog.linear_delta_u_constraint(xr,ur);
-%       
-%         valuecheck(df1,df2,1e-3);
-%         
-%         
-%         
-%       end
-% 
-%       keyboard
-             
       % add a display function to draw the trajectory on every iteration
       function displayStateTrajectory(t,x,u)
         subplot(2,1,1);
@@ -448,35 +339,12 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       end
       prog = addTrajectoryDisplayFunction(prog,@displayStateTrajectory);
       
-      for attempts=1:1
-        disp('Running solve');
-        tic
-        [xtraj,utraj,z,F,info] = prog.solveTraj(tf,traj_init);
-        toc
-        if info==1, break; end
-      end
+      traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
       
-%       h = z(prog.h_inds);
-%       x = z(prog.x_inds);
-%       dx = z(prog.dx_inds);
-%       u = z(prog.u_inds);
-%       du = z(prog.du_inds);
-%       w = z(prog.w_inds);
-      
-      %keyboard
-      
-      function [g,dg] = cost(dt,x,u);
-        xg = double(obj.xG);
-        Rt = 0;
-        Qt = [0 0; 0 0];
-        pmpi = [pi; -pi];
-        [e1, i] = min(abs([x(1)+pi x(1)-pi]));
-        e = [e1; x(2)-xg(2)];
-        g = e'*Qt*e + u'*Rt*u;
-        if (nargout>1)
-          dg = [0, 2*[x(1)+pmpi(i), x(2)]*Qt, 2*u'*Rt];
-        end
-      end
+      disp('Running solve');
+      tic
+      [xtraj,utraj,z] = prog.solveTraj(tf,traj_init);
+      toc
       
       function [h,dh] = finalCost(tf,x)
         h = tf;
@@ -485,29 +353,7 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
         end
       end
       
-      function [g,dg,ddg] = robust_cost(h,dx,du)
-        nx = 2;
-        nu = 1;
-        Qw = [100 0; 0 100];
-        Rw = 100;
-        g = h*dx'*Qw*dx + h*du'*Rw*du;
-        dg = [dx'*Qw*dx+du'*Rw*du, 2*h*dx'*Qw, 2*h*du'*Rw];
-        ddg = [0, 2*dx'*Qw, 2*du'*Rw;
-               2*Qw*dx, 2*h*Qw, zeros(nx,nu);
-               2*Rw*du, zeros(nu,nx), 2*h*Rw];
-      end
-       
     end
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    
   end
 
