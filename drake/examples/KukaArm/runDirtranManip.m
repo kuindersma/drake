@@ -1,6 +1,7 @@
 function runDirtranManip(N)
 
 options.with_weight = true;
+options.with_box = true;
 r = KukaArm(options);
 
 nx = r.getNumStates;
@@ -23,7 +24,7 @@ options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
 traj_opt = DirtranTrajectoryOptimization(r,N,tf0*[(1-0.5) (1+0.5)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 % traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
-traj_opt = traj_opt.addRunningCost(@cost,2);
+% traj_opt = traj_opt.addRunningCost(@cost,2);
 traj_opt = traj_opt.addFinalCost(@finalCost,2);
 % traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
 
@@ -36,6 +37,13 @@ traj_opt = traj_opt.addConstraint(BoundingBoxConstraint(repmat(xmin,N,1),repmat(
 constraint = FunctionHandleConstraint(-1e-1*ones(3,1),1e-1*ones(3,1),nx,@l_hand_constraint);
 constraint = constraint.setName('left_hand_constraint');
 traj_opt = traj_opt.addConstraint(constraint, {traj_opt.x_inds(:,N)});
+
+for i=1:N
+  constraint = FunctionHandleConstraint(0,inf,nx,@l_hand_box_constraint);
+  constraint = constraint.setName(sprintf('l_hand_box_constraint_%d',i));
+  traj_opt = traj_opt.addConstraint(constraint, {traj_opt.x_inds(:,i)});
+end
+
 
 tic;
 [xtraj,utraj,z,F,info,infeasible] = traj_opt.solveTraj(tf0,traj_init);
@@ -103,6 +111,20 @@ keyboard
 
     f = pl-[0.0;0.0;1.36];
     df = [Jl,zeros(length(f),nq)];
+  end
+
+  function [f,df] = l_hand_box_constraint(x)
+    q = x(1:nq);
+    kinsol = doKinematics(r, q);
+    [pl,Jl] = forwardKin(r,kinsol,r.findLinkId('iiwa_link_ee'),[0;0;0.1]);
+
+    box_center = [0.6;0;1.4];
+    radius = 0.4 + 0.05;
+
+    % approx
+    err = pl - box_center;
+    f = err'*err - radius^2;
+    df = [2*err'*Jl,zeros(length(f),nq)];
   end
 
 end

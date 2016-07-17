@@ -20,6 +20,9 @@ classdef KukaArm < RigidBodyManipulator
       if ~isfield(options,'with_weight')
         options.with_weight = false;
       end
+      if ~isfield(options,'with_box')
+        options.with_box = false;
+      end
 
       if options.with_weight
         urdf = 'urdf/iiwa14_with_weight.urdf';
@@ -34,6 +37,9 @@ classdef KukaArm < RigidBodyManipulator
       if options.with_weight
         options_hand.weld_to_link = findLinkId(obj,obj.hand_name);
         obj = obj.addRobotFromURDF('urdf/robotiq_simple.urdf', [0;0;0.099], [pi/2;0;0], options_hand);
+      end
+      if options.with_box
+        obj = obj.addRobotFromURDF('urdf/box.urdf', [0.6;0;1.4], [0;0;0]);
       end
          
     end
