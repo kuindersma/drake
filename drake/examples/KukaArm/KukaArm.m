@@ -2,6 +2,7 @@ classdef KukaArm < RigidBodyManipulator
 
   properties
     hand_name = 'iiwa_link_ee';
+    disturbance_type = 1; % 1 ee-force, 2-state error, 3-torque
   end
   
   methods
@@ -41,11 +42,26 @@ classdef KukaArm < RigidBodyManipulator
       if options.with_box
         obj = obj.addRobotFromURDF('urdf/box.urdf', [0.6;0;1.4], [0;0;0]);
       end
-         
     end
 
-    
     function [f,df] = dynamics_w(obj,t,x,u,w)
+     switch obj.disturbance_type
+       case 1
+         % ee force
+         [f,df] = dynamics_w_ee(obj,t,x,u,w);       
+       case 2
+         % x error
+         [f,df] = dynamics_w_x(obj,t,x,u,w);       
+       case 3
+         % u error
+         [f,df] = dynamics_w_u(obj,t,x,u,w);       
+       otherwise 
+         error('Unknown disturbance type');
+     end
+
+    end
+    
+    function [f,df] = dynamics_w_ee(obj,t,x,u,w)
       % w should be a 3x1 force vector in world coordinates acting at the
       % robot's end effector
 
@@ -82,7 +98,19 @@ classdef KukaArm < RigidBodyManipulator
 
     end
     
+    function [f,df] = dynamics_w_x(obj,t,x,u,w)
+      % w is a state error vector
+      [f,df] = dynamics(obj,t,x+w,u);
+      df = [df,df(:,1+(1:obj.getNumStates))];
+    end
+    
+    function [f,df] = dynamics_w_u(obj,t,x,u,w)
+      % u is a state error vector
+      [f,df] = dynamics(obj,t,x,u+w);
+      df = [df,df(:,1+obj.getNumStates+(1:obj.getNumInputs))];
+    end 
   end
+    
   
 end
 
