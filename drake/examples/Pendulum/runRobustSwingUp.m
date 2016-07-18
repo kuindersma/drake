@@ -36,8 +36,8 @@ clsys = feedback(p,c);
 v.playback(xcl2);
 
 %Write movie files
-v.playbackAVI(xcl1, 'swing1.avi');
-v.playbackAVI(xcl2, 'swing2.avi');
+%v.playbackAVI(xcl1, 'swing1.avi');
+%v.playbackAVI(xcl2, 'swing2.avi');
 % setenv('PATH', [getenv('PATH') ':/usr/local/bin']);
 % setenv('PATH', [getenv('PATH') ':/Library/TeX/texbin']);
 % v.playbackSWF(xcl1, 'swing1.swf');
