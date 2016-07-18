@@ -48,8 +48,8 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         obj.Rr = Rr;
         
         dim = N-1+N*(nx+nu);
-        cost = FunctionHandleObjective(dim,@obj.robust_cost,0);
-        cost.grad_method = 'numerical';
+        cost = FunctionHandleObjective(dim,@obj.robust_cost_grad,1);
+        cost.grad_method = 'user';
         obj = obj.addCost(cost, {obj.h_inds(:); obj.x_inds(:); obj.u_inds(:)});
     end
     
@@ -60,24 +60,97 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         
         lb = repmat(obj.plant.umin,2*N,1);
         ub = repmat(obj.plant.umax,2*N,1);
-        constraint = FunctionHandleConstraint(lb,ub,N-1+N*(nx+nu),@obj.robust_constraint,0);
-        constraint.grad_method = 'numerical';
+        constraint = FunctionHandleConstraint(lb,ub,N-1+N*(nx+nu),@obj.robust_constraint_grad,1);
+        constraint.grad_method = 'user';
         obj = obj.addConstraint(constraint, {obj.h_inds(:); obj.x_inds(:); obj.u_inds(:)});
+    end
+    
+    function [c, dc] = robust_cost_grad(obj,h,x,u)
+        nx = obj.nX;
+        nu = obj.nU;
+        N = obj.N;
+        
+        [K,A,B,G] = lqrController(obj,h,x,u);
+        
+        c = 0;
+        P = zeros(nx,nx);
+        for k = 1:(N-1)
+            c = c + h(k)*trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
+            P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
+        end
+        
+        delta = 1e-6;
+        
+        dcdh = zeros(1,N-1);
+        hdif = h;
+        for k = 1:(N-1)
+            hdif(k) = h(k)+delta;
+            dcdh(k) = (robust_cost(obj,hdif,x,u) - c)/delta;
+            hdif(k) = h(k);
+        end
+        dcdx = zeros(1,N*nx);
+        xdif = x;
+        for k = 1:(N*nx)
+            xdif(k) = x(k)+delta;
+            dcdx(k) = (robust_cost(obj,h,xdif,u) - c)/delta;
+            xdif(k) = x(k);
+        end
+        dcdu = zeros(1,N*nu);
+        udif = u;
+        for k = 1:(N*nu)
+            udif(k) = u(k)+delta;
+            dcdu(k) = (robust_cost(obj,h,x,udif) - c)/delta;
+            udif(k) = u(k);
+        end
+        
+        dc = [dcdh, dcdx, dcdu];
     end
     
     function c = robust_cost(obj,h,x,u)
         nx = obj.nX;
         N = obj.N;
-        
-        [K,G,A,B] = lqrController(obj,h,x,u);
+
+        [K,A,B,G] = lqrController(obj,h,x,u);
         
         c = 0;
         P = zeros(nx,nx);
         for k = 1:(N-1)
-            U = chol(obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k));
-            c = c + h(k)*trace(U*P*U');
+            c = c + h(k)*trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
         end
+    end
+    
+    function [c, dc] = robust_constraint_grad(obj,h,x,u)
+        nx = obj.nX;
+        nu = obj.nU;
+        N = obj.N;
+        delta = 1e-6;
+        
+        c = robust_constraint(obj,h,x,u);
+        
+        dcdh = zeros(2*N*nu,N-1);
+        hdif = h;
+        for k = 1:(N-1)
+            hdif(k) = h(k)+delta;
+            dcdh(:,k) = (robust_constraint(obj,hdif,x,u) - c)./delta;
+            hdif(k) = h(k);
+        end
+        dcdx = zeros(2*N*nu,N*nx);
+        xdif = x;
+        for k = 1:(N*nx)
+            xdif(k) = x(k)+delta;
+            dcdx(:,k) = (robust_constraint(obj,h,xdif,u) - c)./delta;
+            xdif(k) = x(k);
+        end
+        dcdu = zeros(2*N*nu,N*nu);
+        udif = u;
+        for k = 1:(N*nu)
+            udif(k) = u(k)+delta;
+            dcdu(:,k) = (robust_constraint(obj,h,x,udif) - c)./delta;
+            udif(k) = u(k);
+        end
+        
+        dc = [dcdh, dcdx, dcdu];
     end
     
     function c = robust_constraint(obj,h,x,u)
@@ -86,19 +159,19 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         nw = obj.nW;
         N = obj.N;
         
-        [K,G,A,B] = lqrController(obj,h,x,u);
+        [K,A,B,G] = lqrController(obj,h,x,u);
         
-        m = zeros(N*nu,1);
+        v = zeros(N*nu,1);
         M = zeros(nx,nw);
         for k = 1:(obj.N-1)
-            m((k-1)*nu+(1:nu)) = max(K(:,:,k)*M,[],2);
+            v((k-1)*nu+(1:nu)) = max(abs(K(:,:,k)*M),[],2);
             M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
         end
         
-        c = [u+m; u-m];
+        c = [u+v; u-v];
     end
     
-    function [K,G,A,B] = lqrController(obj,h,x,u)
+    function [K,A,B,G] = lqrController(obj,h,x,u)
         nx = obj.nX;
         nu = obj.nU;
         nw = obj.nW;
@@ -108,6 +181,9 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         A = zeros(nx,nx,N-1);
         B = zeros(nx,nu,N-1);
         G = zeros(nx,nw,N-1);
+%         dA = zeros(nx,nx,1+nx+nu,N-1);
+%         dB = zeros(nx,nu,1+nx+nu,N-1);
+%         dG = zeros(nx,nw,1+nx+nu,N-1);
         switch obj.options.integration_method
             case DirtranTrajectoryOptimization.FORWARD_EULER
                 for k = 1:(N-1)
@@ -115,6 +191,10 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                     A(:,:,k) = dx1(:,1+(1:nx));
                     B(:,:,k) = dx1(:,1+nx+(1:nu));
                     G(:,:,k) = dx1(:,1+nx+nu+(1:nw));
+%                     T = reshape(d2x1,nx,1+nx+nu,1+nx+nu);
+%                     dA(:,:,:,k) = T(:,1+(1:nx),:);
+%                     dB(:,:,:,k) = T(:,1+nx+(1:nu),:);
+%                     dG(:,:,:,k) = T(:,1+nx+nu+(1:nw),:);
                 end
             case DirtranTrajectoryOptimization.MIDPOINT
                 for k = 1:(N-1)
@@ -122,6 +202,10 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                     A(:,:,k) = dx1(:,1+(1:nx));
                     B(:,:,k) = dx1(:,1+nx+(1:nu));
                     G(:,:,k) = dx1(:,1+nx+nu+(1:nw));
+%                     T = reshape(d2x1,nx,1+nx+nu,1+nx+nu);
+%                     dA(:,:,:,k) = T(:,1+(1:nx),:);
+%                     dB(:,:,:,k) = T(:,1+nx+(1:nu),:);
+%                     dG(:,:,:,k) = T(:,1+nx+nu+(1:nw),:);
                 end
         end
         
