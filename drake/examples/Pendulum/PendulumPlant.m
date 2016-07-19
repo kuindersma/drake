@@ -142,14 +142,20 @@ classdef PendulumPlant < SecondOrderSystem
       end
       
       if nargout > 2
-        %d2f = sparse(2,25);
-        d2f = zeros(2,25);
-        d2f(2,7) = (obj.g/l_)*sin(q);
-        d2f(2,15) = b_/(m_*m_*l_*l_);
-        d2f(2,20) = -1/(m_*m_*l_*l_);
-        d2f(2,23) = b_/(m_*m_*l_*l_);
-        d2f(2,24) = -1/(m_*m_*l_*l_);
-        d2f(2,25) = -2*(b_*qd-u)/(m_*m_*m_*l_*l_);
+        d2f = sparse(2*ones(6,1),[7;15;20;23;24;25],...
+         [(obj.g/l_)*sin(q);
+          b_/(m_*m_*l_*l_);
+          -1/(m_*m_*l_*l_);
+          b_/(m_*m_*l_*l_);
+          -1/(m_*m_*l_*l_);
+          -2*(b_*qd-u)/(m_*m_*m_*l_*l_)]);
+%         d2f = zeros(2,25);
+%         d2f(2,7) = (obj.g/l_)*sin(q);
+%         d2f(2,15) = b_/(m_*m_*l_*l_);
+%         d2f(2,20) = -1/(m_*m_*l_*l_);
+%         d2f(2,23) = b_/(m_*m_*l_*l_);
+%         d2f(2,24) = -1/(m_*m_*l_*l_);
+%         d2f(2,25) = -2*(b_*qd-u)/(m_*m_*m_*l_*l_);
       end
       
     end
