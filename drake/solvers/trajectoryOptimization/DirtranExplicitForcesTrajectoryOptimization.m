@@ -32,7 +32,7 @@ classdef DirtranExplicitForcesTrajectoryOptimization < DirtranTrajectoryOptimiza
       obj.right_foot_pos = rf;
       obj.left_foot_pos = lf;
       obj.left_hand_goal_pos = lh;
-      obj = obj.addStateConstraints;
+%       obj = obj.addStateConstraints;
     end
     
     function obj = setupVariables(obj, N)

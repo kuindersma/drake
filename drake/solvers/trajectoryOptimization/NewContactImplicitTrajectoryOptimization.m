@@ -30,9 +30,6 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
      
       obj = obj.addContactConstraints();
       obj = obj.addComplementarityConstraints();
-  
-      % Ensure that all lambda values and Lagrange multipliers are non-negative
-      obj = obj.addConstraint(BoundingBoxConstraint(zeros(N*obj.nL,1),inf(N*obj.nL,1)),obj.beta_inds);
     end
     
     function obj = setupVariables(obj, N)
@@ -46,15 +43,14 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
         num_d = 4;
       end
       nl = nc * num_d;
-      nb = nl;
       
-      num_vars = nh + N*(nx+nu+2*nl+nb);
+      num_vars = nh + N*(nx+nu+3*nl);
       obj.h_inds = (1:nh)';
       obj.x_inds = reshape(nh + (1:nx*N),nx,N);
       obj.u_inds = reshape(nh + nx*N + (1:nu*N),nu,N);
       obj.l_inds = reshape(nh + (nx+nu)*N +(1:nl*N),nl,N);
       obj.alpha_inds = reshape(nh + (nx+nu+nl)*N +(1:nl*N),nl,N); 
-      obj.beta_inds = reshape(nh + (nx+nu+2*nl)*N +(1:nb*N),nb,N); 
+      obj.beta_inds = reshape(nh + (nx+nu+2*nl)*N +(1:nl*N),nl,N); 
       
       x_names = cell(num_vars,1);
       for i = 1:N
@@ -71,8 +67,8 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
           x_names{nh+(nx+nu)*N+(i-1)*nl+j} = sprintf('l%d[%d]',j,i);
           x_names{nh+(nx+nu+nl)*N+(i-1)*nl+j} = sprintf('alpha%d[%d]',j,i);
         end
-        for j = 1:nb
-          x_names{nh+(nx+nu+2*nl)*N+(i-1)*nb+j} = sprintf('beta%d[%d]',j,i);
+        for j = 1:nl
+          x_names{nh+(nx+nu+2*nl)*N+(i-1)*nl+j} = sprintf('beta%d[%d]',j,i);
         end
       end
 
@@ -97,8 +93,8 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
         inds = {obj.h_inds(i); ...
                 obj.x_inds(:,i); ...
                 obj.x_inds(:,i+1); ...
-                obj.u_inds(:,i); ...
-                obj.l_inds(:,i)};
+                obj.u_inds(:,i+1); ...
+                obj.l_inds(:,i+1)};
         constraint = FunctionHandleConstraint(zeros(nx,1),zeros(nx,1),n_vars,@obj.forward_constraint_fun);
         constraint = constraint.setName(sprintf('dynamics_%d',i));
         obj = obj.addConstraint(constraint, inds);
@@ -110,7 +106,6 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
       nu = obj.nU;
       nl = obj.nL;
       N = obj.N;
-      nc = obj.nC;
      
       for i=1:N-1
         % contact force dynamics constraints
@@ -145,37 +140,41 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
         constraint = constraint.setName(sprintf('phi_bound_%d',i));
         obj = obj.addConstraint(constraint, inds);        
 
-        if i<N
-          % lagrange multiplier equality constraint on vmin
-          n_vars = nx + nl;
-          inds = {obj.x_inds(:,i); ...
-                  obj.l_inds(:,i)};     
-          constraint = FunctionHandleConstraint(0,obj.linc_slack,n_vars,@obj.phi_comp);
-          constraint = constraint.setName(sprintf('phi_comp_%d',i));
-          obj = obj.addConstraint(constraint, inds);
-        end
-      end    
+        % lagrange multiplier equality constraint on vmin
+        n_vars = nx + nl;
+        inds = {obj.x_inds(:,i); ...
+                obj.l_inds(:,i)};     
+        constraint = FunctionHandleConstraint(0,obj.linc_slack,n_vars,@obj.phi_comp);
+        constraint = constraint.setName(sprintf('phi_comp_%d',i));
+        obj = obj.addConstraint(constraint, inds);
+      end 
+      
+      % Ensure that all lambda values and Lagrange multipliers are non-negative
+      obj = obj.addConstraint(BoundingBoxConstraint(zeros(N*obj.nL,1),inf(N*obj.nL,1)),obj.beta_inds);
+
     end
         
     function [f,df] = forward_constraint_fun(obj,h,x0,x1,u,l)
-      [xn,dxn] = forward_dynamics_fun(obj,h,x0,u,l);
+      [xn,dxn] = forward_dynamics_fun(obj,h,x0,x1,u,l);
       
       f = xn-x1;
       dfdh = dxn(:,1);
       dfdx0 = dxn(:,1+(1:obj.nX));
-      dfdx1 = -eye(obj.nX);
-      dfdu = dxn(:,1+obj.nX+(1:obj.nU));
-      dfdl = dxn(:,1+obj.nX+obj.nU+(1:obj.nL));
+      dfdx1 = dxn(:,1+obj.nX+(1:obj.nX))-eye(obj.nX);
+      dfdu = dxn(:,1+obj.nX*2+(1:obj.nU));
+      dfdl = dxn(:,1+obj.nX*2+obj.nU+(1:obj.nL));
       df = [dfdh, dfdx0, dfdx1, dfdu, dfdl];
     end
     
-    function [f,df] = forward_dynamics_fun(obj,h,x,u,l)
+    function [f,df] = forward_dynamics_fun(obj,h,x0,x1,u,l)
       p = obj.plant;
       nq = obj.nQ;
-      q = x(1:nq);
-      qd = x(nq+(1:nq));
+      q0 = x0(1:nq);
+      qd0 = x0(nq+(1:nq));
+      q1 = x1(1:nq);
+      qd1 = x1(nq+(1:nq));
       
-      kinsol = doKinematics(p, q, [], struct('compute_gradients', true));
+      kinsol = doKinematics(p, q1, [], struct('compute_gradients', true));
 
       [~,normal,d,Apts,Bpts,Aidx,Bidx,mu] = contactConstraints(p,kinsol,p.multiple_contacts);
       V = computeV(obj,normal,mu,d);
@@ -186,32 +185,45 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
         dJtVl(:,i) = dJ(:,(i-1)*nq+(1:nq))'*V*l;
       end
       
-      [H,C,B,dH,dC] = manipulatorDynamics(p,q,qd);
+      [H,C,B,dH,dC] = manipulatorDynamics(p,q1,qd1);
       Hinv = inv(H);
-      dHdq = dH(:,1:nq);
+      dHdq1 = dH(:,1:nq);
        
       tau = B*u-C;
-      qdn = qd + Hinv*(tau + J'*V*l)*h;
-      qn = q + qdn*h;  
+      qdn = qd0 + Hinv*(tau + J'*V*l)*h;
+      qn = q0 + qdn*h;  
       
       f = [qn;qdn];
-      dtau_dq = -dC(:,1:nq);
-      dtau_dqd = -dC(:,nq+(1:nq));
+      
+      dtau_dq1 = -dC(:,1:nq);
+      dtau_dqd1 = -dC(:,nq+(1:nq));
       dtau_du = B;
       
+      dqdn_dq0 = zeros(nq);
+      dqn_dq0 = eye(nq);
+      df_dq0 = [dqn_dq0; dqdn_dq0];
+      
+      dqn_dqd0 = eye(nq)*h;
+      dqdn_dqd0 = eye(nq);
+      df_dqd0 = [dqn_dqd0; dqdn_dqd0];
+      
+      dqdn_dq1 = -Hinv*matGradMult(dHdq1,Hinv*(tau + J'*V*l)*h) + Hinv*(dtau_dq1 + dJtVl)*h;
+      dqn_dq1 = h*dqdn_dq1;      
+      df_dq1 = [dqn_dq1; dqdn_dq1];
+      
+      dqdn_dqd1 = Hinv*dtau_dqd1*h;
+      dqn_dqd1 = dqdn_dqd1*h;
+      df_dqd1 = [dqn_dqd1; dqdn_dqd1];
+
+      %----------
       dfdh = [qdn + Hinv*(tau + J'*V*l)*h; Hinv*(tau + J'*V*l)];
-      
-      dqdn_dq = -Hinv*matGradMult(dHdq,Hinv*(tau + J'*V*l)*h) + Hinv*(dtau_dq + dJtVl)*h;
-      dqndq = eye(nq) + h*dqdn_dq;
-      dfdq = [dqndq; dqdn_dq];
-      
-      dqdn_dqd = eye(nq) + Hinv*dtau_dqd*h;
-      dfdqd = [dqdn_dqd*h; dqdn_dqd];
-      
+      dfdx0 = [df_dq0,df_dqd0];
+      dfdx1 = [df_dq1,df_dqd1];
       dfdu = [Hinv*dtau_du*h^2; Hinv*dtau_du*h];
       dfdl = [Hinv*J'*V*h^2; Hinv*J'*V*h];
+      %----------      
       
-      df = [dfdh, dfdq, dfdqd, dfdu, dfdl];
+      df = [dfdh, dfdx0, dfdx1, dfdu, dfdl];
     end
             
     function [f,df] = lambda_constraint_fun(obj,h,x,u,l,alpha,beta)
