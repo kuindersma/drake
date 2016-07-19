@@ -2,7 +2,7 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
   properties
     l_inds  
     alpha_inds  
-    beta_inds  
+    beta_inds
     nX
     nU
     nC
@@ -32,7 +32,7 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
       obj = obj.addComplementarityConstraints();
   
       % Ensure that all lambda values and Lagrange multipliers are non-negative
-      obj = obj.addConstraint(BoundingBoxConstraint(zeros(N*obj.nC,1),inf(N*obj.nC,1)),obj.beta_inds);
+      obj = obj.addConstraint(BoundingBoxConstraint(zeros(N*obj.nL,1),inf(N*obj.nL,1)),obj.beta_inds);
     end
     
     function obj = setupVariables(obj, N)
@@ -40,14 +40,13 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
       nx = obj.plant.getNumStates();
       nu = obj.plant.getNumInputs();
       nc = obj.plant.getNumContactPairs();
-      dim = 3;
       if obj.plant.twoD
         num_d = 2;  
       else
         num_d = 4;
       end
       nl = nc * num_d;
-      nb = nc * dim;
+      nb = nl;
       
       num_vars = nh + N*(nx+nu+2*nl+nb);
       obj.h_inds = (1:nh)';
@@ -115,7 +114,7 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
      
       for i=1:N-1
         % contact force dynamics constraints
-        n_vars = 1 + nx + nu + 2*nl + nc;
+        n_vars = 1 + nx + nu + 3*nl;
         inds = {obj.h_inds(i); ...
                 obj.x_inds(:,i); ...
                 obj.u_inds(:,i); ...
@@ -146,13 +145,15 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
         constraint = constraint.setName(sprintf('phi_bound_%d',i));
         obj = obj.addConstraint(constraint, inds);        
 
-        % lagrange multiplier equality constraint on vmin
-        n_vars = nx + nl;
-        inds = {obj.x_inds(:,i); ...
-                obj.l_inds(:,i)};     
-        constraint = FunctionHandleConstraint(0,obj.linc_slack,n_vars,@obj.phi_comp);
-        constraint = constraint.setName(sprintf('phi_comp_%d',i));
-        obj = obj.addConstraint(constraint, inds);
+        if i<N
+          % lagrange multiplier equality constraint on vmin
+          n_vars = nx + nl;
+          inds = {obj.x_inds(:,i); ...
+                  obj.l_inds(:,i)};     
+          constraint = FunctionHandleConstraint(0,obj.linc_slack,n_vars,@obj.phi_comp);
+          constraint = constraint.setName(sprintf('phi_comp_%d',i));
+          obj = obj.addConstraint(constraint, inds);
+        end
       end    
     end
         
@@ -220,7 +221,12 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
       qd = x(nq+(1:nq));
       nl = obj.nL;
       nc = obj.nC;
-
+      if obj.plant.twoD
+        num_d = 2;  
+      else
+        num_d = 4;
+      end
+      
       kinsol = doKinematics(p, q, [], struct('compute_gradients', true));
 
       [phiC,normal,d,Apts,Bpts,Aidx,Bidx,mu,n] = contactConstraints(p,kinsol,p.multiple_contacts);
@@ -232,93 +238,72 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
       Hinv = inv(H);
       dHdq = dH(:,1:nq);
      
-      A = J*Hinv*J'*h;
+      phi_ = repmat(phiC',num_d,1);
+      phi_ = phi_(:);
+      
+      Abar = V'*J*Hinv*J'*V*h;
       tau = B*u-C;
-      c = J*qd + J*Hinv*tau*h;
+      cbar = V'*(J*qd + J*Hinv*tau*h);
       
-      ncell = cell(1,nc);
-      for i=1:nc
-        ncell{i} = normal(:,i)';
-      end
-      normal_mat = blkdiag(ncell{:});
-      
-      f = V'*A*V*l + V'*c - alpha - phiC.*beta*normal_mat*V'*c;
+      f = Abar*l + cbar - alpha - phi_.*beta.*cbar;
       
       dJtVl = zeros(nq,nq);
       for i=1:nq
         dJtVl(:,i) = dJ(:,(i-1)*nq+(1:nq))'*V*l;
       end
+
+      dphi_ = reshape(repmat(reshape(n,1,numel(n)),num_d,1),nc*num_d,numel(n)/nc);
       
       dtau_dq = -dC(:,1:nq);
       dtau_dqd = -dC(:,nq+(1:nq));
       dtau_du = B;
       
-      dfdh = V'*J*Hinv*(J'*V*l + tau) - V'*A*normal_mat'*beta -  h*V'*J*Hinv*J'*normal_mat'*beta;
-      dfdq = V'*(matGradMult(dR',V*l)' + (matGradMult(dJ',qd + Hinv*(tau + J'*V*l)*h)' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau + J'*V*l)*h) + Hinv*(dtau_dq + dJtVl)*h))) ...
-           - V'* (matGradMult(dJ',Hinv*J'*normal_mat'*beta)' + J*(-Hinv*matGradMult(dHdq,Hinv*J'*normal_mat'*beta) + Hinv*dJtnB))*h^2;
-      dfdqd = V'*(J + J*Hinv*(dtau_dqd*h));
-      dfdu = V'*J*Hinv*dtau_du*h;
-      dfdl = V'*(R + h*J*Hinv*J')*V;
+      dAbarl_dh = V'*J*Hinv*J'*V*l;
+      dcbar_dh = V'*J*Hinv*tau;
+      
+      dAbarl_dq = V'*(matGradMult(dJ',Hinv*J'*V*l*h)' + J*(-Hinv*matGradMult(dHdq,Hinv*J'*V*l*h) + Hinv*dJtVl*h));
+      dcbar_dq = V'*(matGradMult(dJ',qd + Hinv*tau*h)' + J*(-Hinv*matGradMult(dHdq,Hinv*tau*h) + Hinv*dtau_dq*h));
+
+      dcbar_dqd = V'*(J + J*Hinv*dtau_dqd*h);
+      dcbar_du = V'*J*Hinv*dtau_du*h;
+      
+      dfdh = dAbarl_dh + dcbar_dh - phi_.*beta.*dcbar_dh;
+      dfdq = dAbarl_dq + dcbar_dq - (dphi_'*diag(beta.*cbar))' - diag(phi_.*beta)*dcbar_dq;
+      dfdqd = dcbar_dqd - diag(phi_.*beta)*dcbar_dqd;
+      dfdu = dcbar_du - diag(phi_.*beta)*dcbar_du;
+      dfdl = Abar;
       dfdalpha = -eye(nl);
-      dfdbeta = -phiC.*normal_mat*V'*c;
+      dfdbeta = -diag(phi_.*cbar);
 
       df = [dfdh, dfdq, dfdqd, dfdu, dfdl, dfdalpha, dfdbeta];
     end
-        
-    function [f,df] = vmin_inequality(obj,h,x,u,l) 
-      p = obj.plant;
-      nq = obj.nQ;
+    
+    function [f,df] = phi_bound(obj,x)
+      nq = obj.plant.getNumPositions;
       q = x(1:nq);
-      qd = x(nq+(1:nq));
-      nc = obj.nC;
-      
-      kinsol = doKinematics(p, q, [], struct('compute_gradients', true));
+      kinsol = doKinematics(obj.plant, q);
+      [f,~,~,~,~,~,~,~,dfdq] = obj.plant.contactConstraints(kinsol,obj.plant.multiple_contacts);
+      df = [dfdq,0*dfdq];
+    end
 
-      [phiC,normal,d,Apts,Bpts,Aidx,Bidx,mu,n] = contactConstraints(p,kinsol,p.multiple_contacts);
+    function [f,df] = phi_comp(obj,x,l)
+      nq = obj.plant.getNumPositions;
+      nc = obj.nC;
+      q = x(1:nq);
+      kinsol = doKinematics(obj.plant, q);
+      [phi,normal,d,~,~,~,~,mu,dphi] = obj.plant.contactConstraints(kinsol,obj.plant.multiple_contacts);
 
       V = computeV(obj,normal,mu,d);
-      [J,dJ] = computeJ(obj,kinsol,Aidx,Apts,Bidx,Bpts);
-
-      dJtVl = zeros(nq,nq);
-      for i=1:nq
-        dJtVl(:,i) = dJ(:,(i-1)*nq+(1:nq))'*V*l;
-      end
-      
-      [H,C,B,dH,dC] = manipulatorDynamics(p,q,qd);
-      Hinv = inv(H);
-      dHdq = dH(:,1:nq);
-      tau = B*u-C;
-      
-      A = J*Hinv*J';
-      c = J*qd + J*Hinv*tau*h;
-      
-      dtau_dq = -dC(:,1:nq);
-      dtau_dqd = -dC(:,nq+(1:nq));
-      dtau_du = B;
-      
       ncell = cell(1,nc);
       for i=1:nc
         ncell{i} = normal(:,i)';
       end
       normal_mat = blkdiag(ncell{:});
       
-      % N*(A*z + c) - v_min \ge 0
-      Ain = h*normal_mat*A*V;
-      bin = -phiC - h*normal_mat*c;
-      
-      f = Ain*l - bin;
-      
-%     f = normal_mat*J*(Hinv*J'*V*l + qd + Hinv*tau*h) + phiC/h 
-
-      dfdh = normal_mat*(A*V*l + c + h*J*Hinv*tau);
-      dfdq = normal_mat*(matGradMult(dJ',qd + Hinv*(tau*h + J'*V*l))' + J*(-Hinv*matGradMult(dHdq,Hinv*(tau*h + J'*V*l)) + Hinv*(dtau_dq*h + dJtVl)))*h + n; 
-      dfdqd = normal_mat*h*(J + J*Hinv*(dtau_dqd*h));
-      dfdu = normal_mat*h^2*J*Hinv*dtau_du;
-      dfdl = normal_mat*h*J*Hinv*J'*V;
-
-      df = [dfdh, dfdq, dfdqd, dfdu, dfdl];
-    end    
-        
+      f = phi'*normal_mat*V*l;
+      df = [(dphi'*normal_mat*V*l)', zeros(1,nq), phi'*normal_mat*V];
+    end
+    
     function V = computeV(obj,normal,mu,d)
       nc = obj.nC;
       nl = obj.nL;
@@ -343,7 +328,7 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
       V = blkdiag(V_cell{:});
       
     end
- 
+    
     function [J,dJ] = computeJ(obj,kinsol,Aidx,Apts,Bidx,Bpts)
       JA = [];
       dJA = [];
@@ -422,31 +407,6 @@ classdef NewContactImplicitTrajectoryOptimization < DirtranTrajectoryOptimizatio
       end
     end
     
-    function [f,df] = phi_bound(obj,x)
-      nq = obj.plant.getNumPositions;
-      q = x(1:nq);
-      kinsol = doKinematics(obj.plant, q);
-      [f,~,~,~,~,~,~,~,dfdq] = obj.plant.contactConstraints(kinsol,obj.plant.multiple_contacts);
-      df = [dfdq,0*dfdq];
-    end
-
-    function [f,df] = phi_comp(obj,x,l)
-      nq = obj.plant.getNumPositions;
-      q = x(1:nq);
-      kinsol = doKinematics(obj.plant, q);
-      [phi,normal,d,~,~,~,~,mu,dphi] = obj.plant.contactConstraints(kinsol,obj.plant.multiple_contacts);
-
-      V = computeV(obj,normal,mu,d);
-      ncell = cell(1,nc);
-      for i=1:nc
-        ncell{i} = normal(:,i)';
-      end
-      normal_mat = blkdiag(ncell{:});
-      
-      f = phi'*normal_mat*V*l;
-      df = [dphi'*normal_mat*V*l, zeros(1,nq), phi'*normal_mat*V];
-    end
-
   end
 
 end

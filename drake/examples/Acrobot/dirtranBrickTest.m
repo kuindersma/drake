@@ -27,9 +27,8 @@ tf0 = 1.5;
 % v.playback(traj,struct('slider',true));
 % keyboard
 
-options.linc_slack = 0.0001;
-options.scale_factor = 10;
-traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.1) (1+0.1)],options);
+options.linc_slack = 1;
+traj_opt = NewContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.1) (1+0.1)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 % traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
 % traj_opt = traj_opt.addRunningCost(@cost);
@@ -44,16 +43,69 @@ function displayStateTrajectory(hs,x,u)
 end
   
 % traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
-      
-% for j=1:10
+     
+% 
+% for i=1:20
 %   h = rand;
-%   x = randn(nx,1);
-%   u = randn(nu,1);
+%   x=double(r.resolveConstraints(randn(nx,1)));
+%   x2=double(r.resolveConstraints(randn(nx,1)));
+%   u=randn(nu,1);
+%   nc = r.getNumContactPairs();
+%   nl = nc*2;
+%   l=rand(nl,1);
+%   a = rand(nl,1);
+%   b = rand(nl,1);
 % 
-%   [~,df1] = geval(@r.update,h,x,u,struct('grad_method','numerical'));
-%   [~,df2] = r.update(h,x,u);
+%   i
 % 
-%   valuecheck(df1,df2,1e-5);
+%   tmp1 = @(h,x,u,l) traj_opt.forward_dynamics_fun(h,x,u,l); 
+%   [f1,df1] = tmp1(h(1),x(:,1),u(:,1),l(:,1));
+%   [f2,df2] = geval(tmp1,h(1),x(:,1),u(:,1),l(:,1),struct('grad_method','numerical'));
+%   try
+%     valuecheck(df1,df2,1e-3);
+%   catch
+%     keyboard
+%   end
+% 
+%   tmp1 = @(h,x,x2,u,l) traj_opt.forward_constraint_fun(h,x,x2,u,l); 
+%   [f1,df1] = tmp1(h,x,x2,u,l);
+%   [f2,df2] = geval(tmp1,h,x,x2,u,l,struct('grad_method','numerical'));
+%   try
+%     valuecheck(df1,df2,1e-3);
+%   catch
+%     keyboard
+%   end
+%   
+%   
+%   tmp1 = @(x) traj_opt.phi_bound(x); 
+%   [f1,df1] = tmp1(x);
+%   [f2,df2] = geval(tmp1,x,struct('grad_method','numerical'));
+%   try
+%     valuecheck(df1,df2,1e-3);
+%   catch
+%     keyboard
+%   end
+%   
+%     
+%   tmp1 = @(x,l) traj_opt.phi_comp(x,l); 
+%   [f1,df1] = tmp1(x,l);
+%   [f2,df2] = geval(tmp1,x,l,struct('grad_method','numerical'));
+%   try
+%     valuecheck(df1,df2,1e-3);
+%   catch
+%     keyboard
+%   end
+%   
+% 
+%   tmp1 = @(h,x,u,l,a,b) traj_opt.lambda_constraint_fun(h,x,u,l,a,b); 
+%   [f1,df1] = tmp1(h,x,u,l,a,b);
+%   [f2,df2] = geval(tmp1,h,x,u,l,a,b,struct('grad_method','numerical'));
+%   try
+%     valuecheck(df1,df2,1e-3);
+%   catch
+%     keyboard
+%   end
+% 
 % end
 % 
 % keyboard
