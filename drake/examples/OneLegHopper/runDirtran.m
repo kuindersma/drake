@@ -47,57 +47,32 @@ t_init = linspace(0,tf0,N);
 xtraj = PPTrajectory(foh(t_init,[linspacevec(x0,x1,floor(N/2)),linspacevec(x1,xG,N-floor(N/2))]));
 utraj = PPTrajectory(foh(t_init,zeros(nu,N)));
 l = zeros(nl*N,1);
-alpha = zeros(nl*N,1);
-beta = zeros(nc*N,1);
 
-slack = 10.0;
-R_max = 5.0;
+w = 1.0;
 
-[xtraj,utraj,z,F,info,infeasible,traj_opt] = doTrajopt(tf0,xtraj,utraj,l,alpha,beta,slack,R_max);
+[xtraj,utraj,z,F,info,infeasible,traj_opt] = doTrajopt(tf0,xtraj,utraj,l,w);
 v.playback(xtraj,struct('slider',true));
 
 h = z(traj_opt.h_inds);
 x = z(traj_opt.x_inds);
 u = z(traj_opt.u_inds);
 l = z(traj_opt.l_inds);
-a = z(traj_opt.alpha_inds);
-b = z(traj_opt.beta_inds);
 keyboard
 
 for i=1:5
-  slack = 0.1*slack;
-  R_max = i*10;
-  [xtraj,utraj,z,F,info,infeasible,traj_opt] = doTrajopt(xtraj.tspan(2),xtraj,utraj,l,a,b,slack,R_max);
+  w = w*2;
+  [xtraj,utraj,z,F,info,infeasible,traj_opt] = doTrajopt(xtraj.tspan(2),xtraj,utraj,l,w);
   
   h = z(traj_opt.h_inds);
   x = z(traj_opt.x_inds);
   u = z(traj_opt.u_inds);
   l = z(traj_opt.l_inds);
-  a = z(traj_opt.alpha_inds);
-  b = z(traj_opt.beta_inds);
   keyboard
 
 end
 
 v.playback(xtraj,struct('slider',true));
 keyboard
-
-
-
-
-% tmp1 = @(h,x,u,l) traj_opt.forward_dynamics_fun(h,x,u,l); 
-% for i=1:N
-%   
-%   [f1,df1] = tmp1(h(1),x(:,i),u(:,i),l(:,i));
-%   [f2,df2] = geval(tmp1,h(1),x(:,i),u(:,i),l(:,i),struct('grad_method','numerical'));
-%   
-%   try
-%     valuecheck(df1,df2,1e-3);
-%   catch
-%     keyboard
-%   end
-% end
-
 
 
 
@@ -127,22 +102,19 @@ keyboard
     dg = [0,2*(x'*Q - xG'*Q)];
   end
 
-  function [xtraj,utraj,z,F,info,infeasible,traj_opt] = doTrajopt(tf0,xtraj,utraj,l,alpha,beta,slack,R_max)
+  function [xtraj,utraj,z,F,info,infeasible,traj_opt] = doTrajopt(tf0,xtraj,utraj,l,w)
 
     t_init = linspace(0,tf0,N);
     traj_init.x = xtraj;
     traj_init.u = utraj;
     traj_init.l = l;
-    traj_init.alpha = alpha;
-    traj_init.beta = beta;
   
-    options.linc_slack = slack;
-    options.R_max = R_max;
-    traj_opt = SmoothContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.2) (1+0.2)],options);
+    options.w = w;
+    traj_opt = NewContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.2) (1+0.2)],options);
     traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
-    traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
-%     traj_opt = traj_opt.addRunningCost(@cost);
-%     traj_opt = traj_opt.addFinalCost(@finalCost);
+%     traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
+    traj_opt = traj_opt.addRunningCost(@cost);
+    traj_opt = traj_opt.addFinalCost(@finalCost);
     traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
 
     tic;

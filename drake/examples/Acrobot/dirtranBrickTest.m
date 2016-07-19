@@ -27,8 +27,7 @@ tf0 = 1.5;
 % v.playback(traj,struct('slider',true));
 % keyboard
 
-options.linc_slack = 1e-4;
-options.time_option = 1;
+options.w = 100;
 traj_opt = NewContactImplicitTrajectoryOptimization(r,N,tf0*[(1-0.1) (1+0.1)],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
 % traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
@@ -45,71 +44,60 @@ end
   
 % traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
      
-
-for i=1:20
-  h = rand;
-  x=double(r.resolveConstraints(randn(nx,1)));
-  x2=double(r.resolveConstraints(randn(nx,1)));
-  u=randn(nu,1);
-  nc = r.getNumContactPairs();
-  nl = nc*2;
-  l=rand(nl,1);
-  a = rand(nl,1);
-  b = rand(nl,1);
-
-  i
-
-  tmp1 = @(h,x,x2,u,l) traj_opt.forward_dynamics_fun(h,x,x2,u,l); 
-  [f1,df1] = tmp1(h,x,x2,u,l);
-  [f2,df2] = geval(tmp1,h,x,x2,u,l,struct('grad_method','numerical'));
-  try
-    valuecheck(df1,df2,1e-3);
-  catch
-    keyboard
-  end
-
-  tmp1 = @(h,x,x2,u,l) traj_opt.forward_constraint_fun(h,x,x2,u,l); 
-  [f1,df1] = tmp1(h,x,x2,u,l);
-  [f2,df2] = geval(tmp1,h,x,x2,u,l,struct('grad_method','numerical'));
-  try
-    valuecheck(df1,df2,1e-3);
-  catch
-    keyboard
-  end
-  
-  
-  tmp1 = @(x) traj_opt.phi_bound(x); 
-  [f1,df1] = tmp1(x);
-  [f2,df2] = geval(tmp1,x,struct('grad_method','numerical'));
-  try
-    valuecheck(df1,df2,1e-3);
-  catch
-    keyboard
-  end
-  
-    
-  tmp1 = @(x,l) traj_opt.phi_comp(x,l); 
-  [f1,df1] = tmp1(x,l);
-  [f2,df2] = geval(tmp1,x,l,struct('grad_method','numerical'));
-  try
-    valuecheck(df1,df2,1e-3);
-  catch
-    keyboard
-  end
-  
-
-  tmp1 = @(h,x,u,l,a,b) traj_opt.lambda_constraint_fun(h,x,u,l,a,b); 
-  [f1,df1] = tmp1(h,x,u,l,a,b);
-  [f2,df2] = geval(tmp1,h,x,u,l,a,b,struct('grad_method','numerical'));
-  try
-    valuecheck(df1,df2,1e-3);
-  catch
-    keyboard
-  end
-
-end
-
-keyboard
+% 
+% for i=1:20
+%   h = rand;
+%   x=double(r.resolveConstraints(randn(nx,1)));
+%   x2=double(r.resolveConstraints(randn(nx,1)));
+%   u=randn(nu,1);
+%   nc = r.getNumContactPairs();
+%   nl = nc*2;
+%   l=rand(nl,1);
+%   a = rand(nl,1);
+%   b = rand(nl,1);
+% 
+%   i
+% 
+%   tmp1 = @(h,x,x2,u,l) traj_opt.forward_dynamics_fun(h,x,x2,u,l); 
+%   [f1,df1] = tmp1(h,x,x2,u,l);
+%   [f2,df2] = geval(tmp1,h,x,x2,u,l,struct('grad_method','numerical'));
+%   try
+%     valuecheck(df1,df2,1e-3);
+%   catch
+%     keyboard
+%   end
+% 
+%   tmp1 = @(h,x,x2,u,l) traj_opt.forward_constraint_fun(h,x,x2,u,l); 
+%   [f1,df1] = tmp1(h,x,x2,u,l);
+%   [f2,df2] = geval(tmp1,h,x,x2,u,l,struct('grad_method','numerical'));
+%   try
+%     valuecheck(df1,df2,1e-3);
+%   catch
+%     keyboard
+%   end
+%   
+%   
+%   tmp1 = @(x) traj_opt.phi_bound(x); 
+%   [f1,df1] = tmp1(x);
+%   [f2,df2] = geval(tmp1,x,struct('grad_method','numerical'));
+%   try
+%     valuecheck(df1,df2,1e-3);
+%   catch
+%     keyboard
+%   end
+% 
+%   tmp1 = @(h,x,u,l) traj_opt.contact_cost_fun(h,x,u,l); 
+%   [f1,df1] = tmp1(h,x,u,l);
+%   [f2,df2] = geval(tmp1,h,x,u,l,struct('grad_method','numerical'));
+%   try
+%     valuecheck(df1,df2,1e-3);
+%   catch
+%     keyboard
+%   end
+% 
+% end
+% 
+% keyboard
 
 
 tic
@@ -120,8 +108,6 @@ h = z(traj_opt.h_inds);
 x = z(traj_opt.x_inds);
 u = z(traj_opt.u_inds);
 l = z(traj_opt.l_inds);
-a = z(traj_opt.alpha_inds);
-b = z(traj_opt.beta_inds);
 
 v.playback(xtraj,struct('slider',true));
 keyboard

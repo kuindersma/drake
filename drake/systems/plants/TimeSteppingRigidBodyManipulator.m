@@ -24,7 +24,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     contact_smoothing_params = struct('phi_max',0.1, ... m, max contact force distance
                                'active_threshold',inf, ... height below which contact forces are calculated
                                'contact_threshold',1e-3, ... threshold where force penalties are eliminated (modulo regularization)
-                               'R_max',50, ... regularization parameter at phi_max
+                               'R_max',1, ... regularization parameter at phi_max
                                'R_min',0.01, ... regularization parameter at contact_threshold
                                'k',0.1); % exponential decay parameter
   end
