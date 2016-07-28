@@ -56,12 +56,12 @@ u2 = z2(prog2.u_inds);
 
 figure(2);
 subplot(2,1,1);
-plot(t1(1:end-1),u1(1:end-1));
+plot(t1(1:end-1),u1);
 ylabel('u_{dirtran}');
 xlim([0 t2(end)]);
 ylim([-3.5 3.5]);
 subplot(2,1,2);
-plot(t2(1:end-1),u2(1:end-1));
+plot(t2(1:end-1),u2);
 xlim([0 t2(end)]);
 ylim([-3.5 3.5]);
 ylabel('u_{robust}');

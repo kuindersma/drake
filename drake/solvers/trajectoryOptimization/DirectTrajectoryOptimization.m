@@ -302,7 +302,7 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
     function utraj = reconstructInputTrajectory(obj,z)
       % default behavior is to use first order holds, but this can be
       % re-implemented by a subclass.
-      t = [0; cumsum(z(obj.h_inds))];
+      t = [0; cumsum(z(obj.h_inds(1:end-1)))];
 
       if size(obj.u_inds,1)>0
         u = reshape(z(obj.u_inds),[],obj.N-1);
