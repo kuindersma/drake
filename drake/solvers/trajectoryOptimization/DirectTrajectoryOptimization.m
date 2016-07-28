@@ -14,7 +14,7 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
   %
   % This class assumes that there are a fixed number (N) time steps, and
   % that the trajectory is discreteized into timesteps h (N-1), state x
-  % (N), and control input u (N)
+  % (N), and control input u (N-1)
   %
   % To maintain nominal sparsity in the optimization programs, this
   % implementation assumes that all constraints and costs are
@@ -90,7 +90,7 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
 
       % add control inputs as bounding box constraints
       if any(~isinf(plant.umin)) || any(~isinf(plant.umax))
-        control_limit = BoundingBoxConstraint(repmat(plant.umin,N,1),repmat(plant.umax,N,1));
+        control_limit = BoundingBoxConstraint(repmat(plant.umin,N-1,1),repmat(plant.umax,N-1,1));
         obj = obj.addConstraint(control_limit,obj.u_inds(:));
       end
 
@@ -211,7 +211,7 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
       if isfield(traj_init,'u')
         z0(obj.u_inds) = traj_init.u.eval(t_init);
       else
-        z0(obj.u_inds) = 0.01*randn(nU,obj.N);
+        z0(obj.u_inds) = 0.01*randn(nU,obj.N-1);
       end
 
       if isfield(traj_init,'x')
@@ -251,30 +251,31 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
       % Generates num_vars total number of decision variables
       %   h_inds (N-1) x 1 indices for timesteps h so that z(h_inds(i)) = h(i)
       %   x_inds N x n indices for state
-      %   u_inds N x m indices for time
+      %   u_inds (N-1) x m indices for input
       %
       % @param N number of knot points
       nH = N-1;
       nX = obj.plant.getNumStates();
       nU = obj.plant.getNumInputs();
 
-      num_vars = nH + N*(nX+nU);
+      num_vars = nH + N*nX + (N-1)*nU;
       obj.h_inds = (1:nH)';
       obj.x_inds = reshape(nH + (1:nX*N),nX,N);
-      obj.u_inds = reshape(nH + nX*N + (1:nU*N),nU,N);
+      obj.u_inds = reshape(nH + nX*N + (1:nU*(N-1)),nU,N-1);
 
       obj.N = N;
       x_names = cell(num_vars,1);
-      for i = 1:N
-        if(i<N)
-          x_names{i} = sprintf('h[%d]',i);
-        end
+      for i = 1:(N-1)
+        x_names{i} = sprintf('h[%d]',i);
         for j = 1:nX
           x_names{nH+(i-1)*nX+j}=sprintf('x%d[%d]',j,i);
         end
         for j = 1:nU
           x_names{nH+nX*N+(i-1)*nU+j} = sprintf('u%d[%d]',j,i);
         end
+      end
+      for j = 1:nX
+          x_names{nH+(N-1)*nX+j}=sprintf('x%d[%d]',j,N);
       end
 
       obj = obj.addDecisionVariable(num_vars,x_names);
@@ -304,7 +305,7 @@ classdef DirectTrajectoryOptimization < NonlinearProgram
       t = [0; cumsum(z(obj.h_inds))];
 
       if size(obj.u_inds,1)>0
-        u = reshape(z(obj.u_inds),[],obj.N);
+        u = reshape(z(obj.u_inds),[],obj.N-1);
         utraj = PPTrajectory(foh(t,u));
         utraj = utraj.setOutputFrame(obj.plant.getInputFrame);
       else

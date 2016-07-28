@@ -336,14 +336,14 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-4);
       
       % add a display function to draw the trajectory on every iteration
-      function displayStateTrajectory(t,x,u)
+      function displayTrajectory(t,x,u)
         subplot(2,1,1);
         plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
         subplot(2,1,2);
-        plot([0; cumsum(t)],u,'r.-','MarkerSize',10);
+        plot([0; cumsum(t(1:end-1))],u,'r.-','MarkerSize',10);
         drawnow;
       end
-      prog = addTrajectoryDisplayFunction(prog,@displayStateTrajectory);
+      prog = addTrajectoryDisplayFunction(prog,@displayTrajectory);
       
       traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
       
