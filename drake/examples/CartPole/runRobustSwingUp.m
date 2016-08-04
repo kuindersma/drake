@@ -13,7 +13,7 @@ Qf = (1/.001^2)*eye(4);
 [utraj1,xtraj1]=swingUpTrajectory(p);
 
 %Robust DIRTRAN
-[utraj2,xtraj2,z,prog] = p.robustSwingUpTrajectory(N,D,Q,R,Qf,xtraj1,utraj1);
+[utraj2,xtraj2,z,prog] = p.robustSwingUpTrajectory(N,D,Q,R,Qf);
 
 %Closed-loop simulations
 p.friction_on = 0;

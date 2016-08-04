@@ -142,7 +142,7 @@ classdef CartPolePlant < Manipulator
         subplot(2,1,1);
         plot(x(2,:),x(4,:),'b.-','MarkerSize',10);
         subplot(2,1,2);
-        plot([0; cumsum(h(1:end))],u,'r.-','MarkerSize',10);
+        plot([0; cumsum(h(1:end-1))],u,'r.-','MarkerSize',10);
         drawnow;
       end
       prog = prog.addTrajectoryDisplayFunction(@displayStateTrajectory);
@@ -183,7 +183,7 @@ classdef CartPolePlant < Manipulator
         subplot(2,1,1);
         plot(x(2,:),x(4,:),'b.-','MarkerSize',10);
         subplot(2,1,2);
-        plot([0; cumsum(h(1:end))],u,'r.-','MarkerSize',10);
+        plot([0; cumsum(h(1:end-1))],u,'r.-','MarkerSize',10);
         drawnow;
       end
       prog = prog.addTrajectoryDisplayFunction(@displayStateTrajectory);
