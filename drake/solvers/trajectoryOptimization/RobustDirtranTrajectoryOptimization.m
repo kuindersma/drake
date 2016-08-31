@@ -67,36 +67,52 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         obj = obj.addConstraint(constraint, {reshape([obj.h_inds'; obj.x_inds(:,1:end-1); obj.u_inds],[],1); obj.x_inds(:,end)});
     end
     
-    function [c, dc] = robust_cost_fd(obj,y,xf)
-        nx = obj.nX;
-        nu = obj.nU;
-        N = obj.N;
-        
-        [K,A,B,G] = lqrController(obj,y,xf);
-        
-        c = 0;
-        P = zeros(nx,nx);
-        for k = 1:(N-1)
-            c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
-            P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
-        end
-        c = c + trace(obj.Qrf*P);
-        
-        delta = 5e-7;
-        dc = zeros(1,length(y)+length(xf));
-        dy = zeros(size(y));
-        for k = 1:length(y)
-            dy(k) = delta;
-            dc(k) = (robust_cost(obj,y+dy,xf) - robust_cost(obj,y-dy,xf))/(2*delta);
-            dy(k) = 0;
-        end
-        dxf = zeros(size(xf));
-        for k = 1:length(xf)
-            dxf(k) = delta;
-            dc(length(y)+k) = (robust_cost(obj,y,xf+dxf) - robust_cost(obj,y,xf-dxf))/(2*delta);
-            dxf(k) = 0;
-        end
-    end
+%     function c = robust_cost(obj,y,xf)
+%         nx = obj.nX;
+%         nu = obj.nU;
+%         N = obj.N;
+%         
+%         [K,A,B,G] = lqrController(obj,y,xf);
+%         
+%         c = 0;
+%         P = zeros(nx,nx);
+%         for k = 1:(N-1)
+%             c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
+%             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
+%         end
+%         c = c + trace(obj.Qrf*P);
+%     end
+    
+%     function [c, dc] = robust_cost_fd(obj,y,xf)
+%         nx = obj.nX;
+%         nu = obj.nU;
+%         N = obj.N;
+%         
+%         [K,A,B,G] = lqrController(obj,y,xf);
+%         
+%         c = 0;
+%         P = zeros(nx,nx);
+%         for k = 1:(N-1)
+%             c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
+%             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
+%         end
+%         c = c + trace(obj.Qrf*P);
+%         
+%         delta = 5e-7;
+%         dc = zeros(1,length(y)+length(xf));
+%         dy = zeros(size(y));
+%         for k = 1:length(y)
+%             dy(k) = delta;
+%             dc(k) = (robust_cost(obj,y+dy,xf) - robust_cost(obj,y-dy,xf))/(2*delta);
+%             dy(k) = 0;
+%         end
+%         dxf = zeros(size(xf));
+%         for k = 1:length(xf)
+%             dxf(k) = delta;
+%             dc(length(y)+k) = (robust_cost(obj,y,xf+dxf) - robust_cost(obj,y,xf-dxf))/(2*delta);
+%             dxf(k) = 0;
+%         end
+%     end
     
     function [c, dc] = robust_cost_grad(obj,y,xf)
         nx = obj.nX;
@@ -135,22 +151,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         dc = dc + dcdP*dP;
     end
     
-    function c = robust_cost(obj,y,xf)
-        nx = obj.nX;
-        nu = obj.nU;
-        N = obj.N;
-
-        [K,A,B,G] = lqrController(obj,y,xf);
-        
-        c = 0;
-        P = zeros(nx,nx);
-        for k = 1:(N-1)
-            c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
-            P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
-        end
-        c = c + trace(obj.Qrf*P);
-    end
-    
     function [c, dc] = robust_constraint_fd(obj,y,xf)
         %nx = obj.nX;
         nu = obj.nU;
@@ -172,6 +172,26 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
             dc(:,length(y)+k) = (robust_constraint(obj,y,xf+dxf) - robust_constraint(obj,y,xf-dxf))./(2*delta);
             dxf(k) = 0;
         end
+    end
+    
+    function [c, dc] = robust_constraint_grad(obj,y,xf)
+        nx = obj.nX;
+        nu = obj.nU;
+        nw = obj.nW;
+        N = obj.N;
+        
+        [K,A,B,G] = lqrController(obj,y,xf);
+        
+        v = zeros((N-1)*nu,1);
+        M = zeros(nx,nw);
+        for k = 1:(obj.N-1)
+            v((k-1)*nu+(1:nu)) = max(abs(K(:,:,k)*M),[],2);
+            M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
+        end
+        
+        u = y(1+nx+(0:N-2)'*(1+nx+nu)+kron(ones(N-1,1), (1:nu)'));
+        
+        c = [u+v; u-v];
     end
     
     function c = robust_constraint(obj,y,xf)
@@ -228,12 +248,11 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
             end
             
             %Solve Riccati Equation
-            S = zeros(nx,nx,N);
-            S(:,:,N) = obj.Qf;
+            S = obj.Qf;
             K = zeros(nu,nx,N-1);
             for k = (N-1):-1:1
-                K(:,:,k) = (B(:,:,k).'*S(:,:,k+1)*B(:,:,k)+obj.R)\(B(:,:,k).'*S(:,:,k+1)*A(:,:,k));
-                S(:,:,k) = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*S(:,:,k+1)*(A(:,:,k) - B(:,:,k)*K(:,:,k));
+                K(:,:,k) = (B(:,:,k).'*S*B(:,:,k)+obj.R)\(B(:,:,k).'*S*A(:,:,k));
+                S = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*S*(A(:,:,k) - B(:,:,k)*K(:,:,k));
             end
             
         else %need derivatives
@@ -279,25 +298,24 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
             end
             
             %Solve Riccati Equation
-            S = zeros(nx,nx,N);
-            S(:,:,N) = obj.Qf;
+            S = obj.Qf;
             dS = zeros(nx*nx,(N-1)*(1+nx+nu)+nx);
-            
             K = zeros(nu,nx,N-1);
             dK = zeros(nu*nx,(N-1)*(1+nx+nu)+nx,N-1);
             for k = (N-1):-1:1
-                K(:,:,k) = (B(:,:,k).'*S(:,:,k+1)*B(:,:,k)+obj.R)\(B(:,:,k).'*S(:,:,k+1)*A(:,:,k));
-                dKdA = kron(eye(nx),(B(:,:,k)'*S(:,:,k+1)*B(:,:,k)+obj.R)\B(:,:,k)'*S(:,:,k+1));
-                dKdB = kron(A(:,:,k)'*S(:,:,k+1), inv(B(:,:,k)'*S(:,:,k+1)*B(:,:,k)+obj.R))*comm(nx,nu) - kron(A(:,:,k)'*S(:,:,k+1)*B(:,:,k), eye(nu))*kron(inv(B(:,:,k)'*S(:,:,k+1)*B(:,:,k)+obj.R)', inv(B(:,:,k)'*S(:,:,k+1)*B(:,:,k)+obj.R))*(kron(eye(nu), B(:,:,k)'*S(:,:,k+1)) + kron(B(:,:,k)'*S(:,:,k+1), eye(nu))*comm(nx,nu));
-                dKdS = kron(A(:,:,k)', (B(:,:,k)'*S(:,:,k+1)*B(:,:,k)+obj.R)\B(:,:,k)') - kron(A(:,:,k)'*S(:,:,k+1)*B(:,:,k), eye(nu))*kron(inv(B(:,:,k)'*S(:,:,k+1)*B(:,:,k)+obj.R)', inv(B(:,:,k)'*S(:,:,k+1)*B(:,:,k)+obj.R))*kron(B(:,:,k)', B(:,:,k)');
+                K(:,:,k) = (B(:,:,k).'*S*B(:,:,k)+obj.R)\(B(:,:,k).'*S*A(:,:,k));
+                dKdA = kron(eye(nx),(B(:,:,k)'*S*B(:,:,k)+obj.R)\B(:,:,k)'*S);
+                dKdB = kron(A(:,:,k)'*S, inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*comm(nx,nu) - kron(A(:,:,k)'*S*B(:,:,k), eye(nu))*kron(inv(B(:,:,k)'*S*B(:,:,k)+obj.R)', inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*(kron(eye(nu), B(:,:,k)'*S) + kron(B(:,:,k)'*S, eye(nu))*comm(nx,nu));
+                dKdS = kron(A(:,:,k)', (B(:,:,k)'*S*B(:,:,k)+obj.R)\B(:,:,k)') - kron(A(:,:,k)'*S*B(:,:,k), eye(nu))*kron(inv(B(:,:,k)'*S*B(:,:,k)+obj.R)', inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*kron(B(:,:,k)', B(:,:,k)');
                 dK(:,:,k) = dKdS*dS;
                 dK(:,(k-1)*(1+nx+nu)+(1:(1+nx+nu)),k) = dKdA*dA(:,:,k) + dKdB*dB(:,:,k);
                  
-                S(:,:,k) = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*S(:,:,k+1)*(A(:,:,k) - B(:,:,k)*K(:,:,k));
-                dSdA = kron(eye(nx), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S(:,:,k+1)) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S(:,:,k+1), eye(nx))*comm(nx,nx);
-                dSdB = -kron(eye(nx), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S(:,:,k+1))*kron(K(:,:,k)', eye(nx)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S(:,:,k+1), eye(nx))*kron(eye(nx), K(:,:,k)')*comm(nx,nu);
-                dSdK = kron(eye(nx), K(:,:,k)'*obj.R) + kron(K(:,:,k)'*obj.R, eye(nx))*comm(nu,nx) - kron(eye(nx), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S(:,:,k+1))*kron(eye(nx), B(:,:,k)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S(:,:,k+1), eye(nx))*kron(B(:,:,k), eye(nx))*comm(nu,nx);
+                dSdA = kron(eye(nx), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nx))*comm(nx,nx);
+                dSdB = -kron(eye(nx), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S)*kron(K(:,:,k)', eye(nx)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nx))*kron(eye(nx), K(:,:,k)')*comm(nx,nu);
+                dSdK = kron(eye(nx), K(:,:,k)'*obj.R) + kron(K(:,:,k)'*obj.R, eye(nx))*comm(nu,nx) - kron(eye(nx), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S)*kron(eye(nx), B(:,:,k)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nx))*kron(B(:,:,k), eye(nx))*comm(nu,nx);
                 dSdS = kron((A(:,:,k)-B(:,:,k)*K(:,:,k))', (A(:,:,k)-B(:,:,k)*K(:,:,k))');
+                
+                S = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*S*(A(:,:,k) - B(:,:,k)*K(:,:,k));
                 dS = dSdS*dS + dSdK*dK(:,:,k);
                 dS(:,(k-1)*(1+nx+nu)+(1:(1+nx+nu))) = dSdA*dA(:,:,k) + dSdB*dB(:,:,k);
             end
