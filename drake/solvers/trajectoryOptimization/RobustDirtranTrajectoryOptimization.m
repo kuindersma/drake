@@ -58,11 +58,12 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
     function obj = addRobustConstraint(obj)
         nx = obj.nX;
         nu = obj.nU;
+        nw = obj.nW;
         N = obj.N;
         
-        lb = repmat(obj.plant.umin,2*(N-1),1);
-        ub = repmat(obj.plant.umax,2*(N-1),1);
-        constraint = FunctionHandleConstraint(lb,ub,N-1 + N*nx + (N-1)*nu,@obj.robust_constraint_fd,1);
+        lb = repmat(obj.plant.umin,2*nw*(N-1),1);
+        ub = repmat(obj.plant.umax,2*nw*(N-1),1);
+        constraint = FunctionHandleConstraint(lb,ub,N-1 + N*nx + (N-1)*nu,@obj.robust_constraint_grad,1);
         constraint.grad_method = 'user';
         obj = obj.addConstraint(constraint, {reshape([obj.h_inds'; obj.x_inds(:,1:end-1); obj.u_inds],[],1); obj.x_inds(:,end)});
     end
@@ -82,7 +83,7 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
 %         end
 %         c = c + trace(obj.Qrf*P);
 %     end
-    
+%     
 %     function [c, dc] = robust_cost_fd(obj,y,xf)
 %         nx = obj.nX;
 %         nu = obj.nU;
@@ -151,67 +152,89 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         dc = dc + dcdP*dP;
     end
     
-    function [c, dc] = robust_constraint_fd(obj,y,xf)
-        %nx = obj.nX;
-        nu = obj.nU;
-        N = obj.N;
-        delta = 5e-7;
-        
-        c = robust_constraint(obj,y,xf);
-        
-        dc = zeros(2*(N-1)*nu,length(y)+length(xf));
-        dy = zeros(size(y));
-        for k = 1:length(y)
-            dy(k) = delta;
-            dc(:,k) = (robust_constraint(obj,y+dy,xf) - robust_constraint(obj,y-dy,xf))./(2*delta);
-            dy(k) = 0;
-        end
-        dxf = zeros(size(xf));
-        for k = 1:length(xf)
-            dxf(k) = delta;
-            dc(:,length(y)+k) = (robust_constraint(obj,y,xf+dxf) - robust_constraint(obj,y,xf-dxf))./(2*delta);
-            dxf(k) = 0;
-        end
-    end
-    
+%     function [c, dc] = robust_constraint_fd(obj,y,xf)
+%         %nx = obj.nX;
+%         nu = obj.nU;
+%         N = obj.N;
+%         delta = 1e-5;
+%         
+%         c = robust_constraint(obj,y,xf);
+%         
+%         dc = zeros(2*(N-1)*nu,length(y)+length(xf));
+%         dy = zeros(size(y));
+%         for k = 1:length(y)
+%             dy(k) = delta;
+%             dc(:,k) = (robust_constraint(obj,y+dy,xf) - robust_constraint(obj,y-dy,xf))./(2*delta);
+%             dy(k) = 0;
+%         end
+%         dxf = zeros(size(xf));
+%         for k = 1:length(xf)
+%             dxf(k) = delta;
+%             dc(:,length(y)+k) = (robust_constraint(obj,y,xf+dxf) - robust_constraint(obj,y,xf-dxf))./(2*delta);
+%             dxf(k) = 0;
+%         end
+%     end
+%     
+%     function c = robust_constraint(obj,y,xf)
+%         nx = obj.nX;
+%         nu = obj.nU;
+%         nw = obj.nW;
+%         N = obj.N;
+%         
+%         [K,A,B,G] = lqrController(obj,y,xf);
+%         
+%         v = zeros((N-1)*nu,nw);
+%         M = zeros(nx,nw);
+%         for k = 1:(obj.N-1)
+%             v((k-1)*nu+(1:nu),nw) = K(:,:,k)*M;
+%             M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
+%         end
+%         
+%         u = y(1+nx+(0:N-2)'*(1+nx+nu)+kron(ones(N-1,1), (1:nu)'));
+%         uc = kron(ones(nw,1), u);
+%         c = [uc+v(:); uc-v(:)];
+%     end
+
     function [c, dc] = robust_constraint_grad(obj,y,xf)
         nx = obj.nX;
         nu = obj.nU;
         nw = obj.nW;
         N = obj.N;
         
-        [K,A,B,G] = lqrController(obj,y,xf);
+        [K,A,B,G,dK,dA,dB,dG] = lqrController(obj,y,xf);
         
-        v = zeros((N-1)*nu,1);
+        v = zeros((N-1)*nu*nw,1);
+        dv = zeros((N-1)*nu*nw,(N-1)*(1+nx+nu)+nx);
         M = zeros(nx,nw);
+        dM = zeros(nx*nw,(N-1)*(1+nx+nu)+nx);
         for k = 1:(obj.N-1)
-            v((k-1)*nu+(1:nu)) = max(abs(K(:,:,k)*M),[],2);
+            
+            v((k-1)*(nu*nw)+(1:nu*nw)) = vec(K(:,:,k)*M);
+            
+            dvdK = kron(M', eye(nu));
+            dvdM = kron(eye(nw), K(:,:,k));
+            
+            dv((k-1)*(nu*nw)+(1:nu*nw),:) = dvdK*dK(:,:,k) + dvdM*dM;
+            
+            dMdA = kron(M', eye(nx));
+            dMdB = -kron((K(:,:,k)*M)', eye(nx));
+            dMdG = kron(obj.L', eye(nx));
+            dMdK = -kron(M', B(:,:,k));
+            dMdM = kron(eye(nw), A(:,:,k)-B(:,:,k)*K(:,:,k));
+            
+            dM = dMdM*dM + dMdK*dK(:,:,k);
+            dM(:,(k-1)*(1+nx+nu)+(1:(1+nx+nu))) = dM(:,(k-1)*(1+nx+nu)+(1:(1+nx+nu))) + dMdA*dA(:,:,k) + dMdB*dB(:,:,k) + dMdG*dG(:,:,k);
+            
             M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
         end
         
-        u = y(1+nx+(0:N-2)'*(1+nx+nu)+kron(ones(N-1,1), (1:nu)'));
+        uinds = 1+nx+(0:N-2)'*(1+nx+nu)+kron(ones(N-1,1), (1:nu)');
+        u = y(uinds);
+        uc = kron(ones(nw,1), u);
+        c = [uc+v(:); uc-v(:)];
         
-        c = [u+v; u-v];
-    end
-    
-    function c = robust_constraint(obj,y,xf)
-        nx = obj.nX;
-        nu = obj.nU;
-        nw = obj.nW;
-        N = obj.N;
-        
-        [K,A,B,G] = lqrController(obj,y,xf);
-        
-        v = zeros((N-1)*nu,1);
-        M = zeros(nx,nw);
-        for k = 1:(obj.N-1)
-            v((k-1)*nu+(1:nu)) = max(abs(K(:,:,k)*M),[],2);
-            M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
-        end
-        
-        u = y(1+nx+(0:N-2)'*(1+nx+nu)+kron(ones(N-1,1), (1:nu)'));
-        
-        c = [u+v; u-v];
+        du = sparse(1:(N-1)*nu, uinds, ones((N-1)*nu,1),(N-1)*nu,(N-1)*(1+nx+nu)+nx);
+        dc = [du+dv; du-dv];
     end
     
     function [K,A,B,G,dK,dA,dB,dG] = lqrController(obj,y,xf)

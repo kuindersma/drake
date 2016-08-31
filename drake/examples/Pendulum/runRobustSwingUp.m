@@ -6,7 +6,7 @@ close all
 p = PendulumPlant();
 v = PendulumVisualizer();
 
-N = 5;
+N = 41;
 
 options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
 [utraj1,xtraj1,z1,prog1] = p.swingUpTrajectory(N,options);
