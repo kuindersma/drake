@@ -6,30 +6,30 @@ close all
 p = PendulumPlant();
 v = PendulumVisualizer();
 
-N = 41;
+N = 51;
 
-options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
+options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
 [utraj1,xtraj1,z1,prog1] = p.swingUpTrajectory(N,options);
 
-D = (1/.2^2); %This corresponds to +/-.2 uncertainty in mass (20%)
-[utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D);
+D = (1/.1^2); %This corresponds to +/-.1 uncertainty in mass (10%)
+[utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D,options);
 
 %closed-loop
 Q = [100 0; 0 10];
 R = 1;
-Qf = 500*eye(2);
+Qf = 1000*eye(2);
       
-p = p.setMass(1);
+%p = p.setMass(1);
 c = tvlqr(p,xtraj1,utraj1,Q,R,Qf);
-p = p.setMass(1.2);
+%p = p.setMass(1.2);
 p.limit_torque = 1;
 clsys = feedback(p,c);
 [~,xcl1] = clsys.simulate([0 3], [0 0]');
 v.playback(xcl1);
 
-p = p.setMass(1);
+%p = p.setMass(1);
 c = tvlqr(p,xtraj2,utraj2,Q,R,Qf);
-p = p.setMass(1.2);
+%p = p.setMass(1.2);
 p.limit_torque = 1;
 clsys = feedback(p,c);
 [~,xcl2] = clsys.simulate([0 4], [0 0]');

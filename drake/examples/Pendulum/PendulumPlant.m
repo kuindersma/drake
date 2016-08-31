@@ -122,7 +122,7 @@ classdef PendulumPlant < SecondOrderSystem
     
     function [f,df,d2f] = dynamics_w(obj,t,x,u,w)
 
-      % w is mass
+      % w is added mass
       q=x(1:obj.num_q); 
       qd=x((obj.num_q+1):end);
       
@@ -313,21 +313,27 @@ function [utraj,xtraj,z,traj_opt]=swingUpTrajectory(obj,N,options)
       c = LQRTree.buildLQRTree(obj,obj.xG,obj.uG,@()rand(2,1).*[2*pi;10]-[pi;5],Q,R,options);
     end
     
-    function [utraj,xtraj,z,prog] = robustSwingUpTrajectory(obj,N,D)
+    function [utraj,xtraj,z,prog] = robustSwingUpTrajectory(obj,N,D,options)
+      
+      if nargin == 2
+          options = struct();
+      end  
+        
       x0 = [0;0]; 
       xf = double(obj.xG);
-      tf = 4;
+      tf = 3;
       
       Q = [100 0; 0 10];
       R = 1;
-      Qf = 500*eye(2);
+      Qf = 1000*eye(2);
       
-      prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,[1 4]);
+      prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,[1 4],options);
       prog = prog.addStateConstraint(ConstantConstraint(x0),1);
       prog = prog.addStateConstraint(ConstantConstraint(xf),N);
+      %prog = prog.addInputConstraint(ConstantConstraint(0),N-1);
       prog = prog.addFinalCost(@finalCost);
       
-      prog = prog.addRobustCost(200*eye(2),200);
+      prog = prog.addRobustCost(Q,R,Qf);
       prog = prog.addRobustConstraint();
       
       prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-3);
