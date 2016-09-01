@@ -1,5 +1,16 @@
-classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
+classdef RobustDirtranTrajectoryOptimization < DirectTrajectoryOptimization
+    %  For forward euler integratino:
+    %    dynamics constraints are: x(k+1) = x(k) + h(k)*f(x(k),u(k))
+    %    integrated cost is sum of g(h(k),x(k),u(k))
+    %  For midpoint integration:
+    %    dynamics constraints are: x(k+1) = x(k) + h(k)*f(.5*x(k)+.5*x(k+1),u(k))
+    %    integrated cost is sum of g(h(k),.5*x(k)+.5*x(k+1),u(k))
     
+  properties (Constant)
+    FORWARD_EULER = 1;
+    MIDPOINT = 3;  % DEFAULT
+  end
+  
   properties
     nX
     nU
@@ -20,15 +31,18 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
   
   methods
     function obj = RobustDirtranTrajectoryOptimization(plant,N,D,Q,R,Qf,duration,options)
+      
       if nargin < 8
         options = struct();
       end
-      if isscalar(duration), duration=[duration,duration]; end
-
       if ~isfield(options,'integration_method')
-        options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
+        options.integration_method = RobustDirtranTrajectoryOptimization.MIDPOINT;
       end
-      obj = obj@DirtranTrajectoryOptimization(plant,N,duration,options);
+      if isscalar(duration)
+          duration=[duration,duration];
+      end
+
+      obj = obj@DirectTrajectoryOptimization(plant,N,duration,options);
       obj.nX = plant.getNumStates;
       obj.nU = plant.getNumInputs;
       obj.nW = plant.getNumDisturbances;
@@ -38,6 +52,79 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       obj.Q = Q;
       obj.R = R;
       obj.Qf = Qf;
+      
+    end
+    
+    function obj = addDynamicConstraints(obj)
+      nX = obj.plant.getNumStates();
+      nU = obj.plant.getNumInputs();
+      N = obj.N;
+      
+      constraints = cell(N-1,1);
+      dyn_inds = cell(N-1,1);
+      
+      switch obj.options.integration_method
+        case RobustDirtranTrajectoryOptimization.FORWARD_EULER
+          n_vars = 2*nX + nU + 1;
+          cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.forward_constraint_fun);
+        case RobustDirtranTrajectoryOptimization.MIDPOINT
+          n_vars = 2*nX + nU + 1;
+          cnstr = FunctionHandleConstraint(zeros(nX,1),zeros(nX,1),n_vars,@obj.midpoint_constraint_fun);
+        otherwise
+          error('Drake:RobustDirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
+      end
+      
+      for i=1:obj.N-1,
+        switch obj.options.integration_method
+          case RobustDirtranTrajectoryOptimization.FORWARD_EULER
+            dyn_inds{i} = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
+          case RobustDirtranTrajectoryOptimization.MIDPOINT
+            dyn_inds{i} = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
+          otherwise
+            error('Drake:RobustDirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
+        end
+        cnstr = cnstr.setName(sprintf('dynamics_constr_%d_',i));
+        constraints{i} = cnstr;
+        
+        obj = obj.addConstraint(constraints{i}, dyn_inds{i});
+      end
+    end
+    
+    function obj = addRunningCost(obj,running_cost_function,grad_level)
+      % Adds an integrated cost to all time steps, which is
+      % numerical implementation specific (thus abstract)
+      % this cost is assumed to be time-invariant
+      % @param running_cost_function a function handle
+      %  of the form running_cost_function(dt,x,u)
+      
+      if nargin < 3
+        grad_level = -1;
+      end
+      
+      nX = obj.plant.getNumStates();
+      nU = obj.plant.getNumInputs();
+      
+      for i=1:obj.N-1,
+        switch obj.options.integration_method
+          case DirtranTrajectoryOptimization.FORWARD_EULER
+            running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function,grad_level);
+            inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.u_inds(:,i)};
+          case DirtranTrajectoryOptimization.BACKWARD_EULER
+            running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function,grad_level);
+            inds_i = {obj.h_inds(i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
+          case DirtranTrajectoryOptimization.MIDPOINT
+            running_cost = FunctionHandleObjective(1+2*nX+nU,...
+              @(h,x0,x1,u0) obj.midpoint_running_fun(running_cost_function,h,x0,x1,u0),grad_level);
+            inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.x_inds(:,i+1);obj.u_inds(:,i)};
+          case DirtranTrajectoryOptimization.DT_SYSTEM
+            running_cost = FunctionHandleObjective(1+nX+nU, running_cost_function,grad_level);
+            inds_i = {obj.h_inds(i);obj.x_inds(:,i);obj.u_inds(:,i)};
+          otherwise
+            error('Drake:DirtranTrajectoryOptimization:InvalidArgument','Unknown integration method');
+        end
+        
+        obj = obj.addCost(running_cost,inds_i);
+      end
     end
     
     function obj = addRobustCost(obj,Qr,Rr,Qrf)
@@ -68,52 +155,27 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
         obj = obj.addConstraint(constraint, {reshape([obj.h_inds'; obj.x_inds(:,1:end-1); obj.u_inds],[],1); obj.x_inds(:,end)});
     end
     
-%     function c = robust_cost(obj,y,xf)
-%         nx = obj.nX;
-%         nu = obj.nU;
-%         N = obj.N;
-%         
-%         [K,A,B,G] = lqrController(obj,y,xf);
-%         
-%         c = 0;
-%         P = zeros(nx,nx);
-%         for k = 1:(N-1)
-%             c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
-%             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
-%         end
-%         c = c + trace(obj.Qrf*P);
-%     end
-%     
-%     function [c, dc] = robust_cost_fd(obj,y,xf)
-%         nx = obj.nX;
-%         nu = obj.nU;
-%         N = obj.N;
-%         
-%         [K,A,B,G] = lqrController(obj,y,xf);
-%         
-%         c = 0;
-%         P = zeros(nx,nx);
-%         for k = 1:(N-1)
-%             c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
-%             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
-%         end
-%         c = c + trace(obj.Qrf*P);
-%         
-%         delta = 5e-7;
-%         dc = zeros(1,length(y)+length(xf));
-%         dy = zeros(size(y));
-%         for k = 1:length(y)
-%             dy(k) = delta;
-%             dc(k) = (robust_cost(obj,y+dy,xf) - robust_cost(obj,y-dy,xf))/(2*delta);
-%             dy(k) = 0;
-%         end
-%         dxf = zeros(size(xf));
-%         for k = 1:length(xf)
-%             dxf(k) = delta;
-%             dc(length(y)+k) = (robust_cost(obj,y,xf+dxf) - robust_cost(obj,y,xf-dxf))/(2*delta);
-%             dxf(k) = 0;
-%         end
-%     end
+    function [f,df] = forward_constraint_fun(obj,h,x0,x1,u)
+      nX = obj.plant.getNumStates();
+      [xdot,dxdot] = obj.plant.dynamics(0,x0,u);
+      f = x1 - x0 - h*xdot;
+      df = [-xdot (-eye(nX) - h*dxdot(:,2:1+nX)) eye(nX) -h*dxdot(:,nX+2:end)];
+    end
+    
+    function [f,df] = midpoint_running_fun(obj,running_handle,h,x0,x1,u0)
+      nX = obj.plant.getNumStates();
+      nU = obj.plant.getNumInputs();
+      [f,dg] = running_handle(h,.5*(x0+x1),u0);
+      
+      df = [dg(:,1) .5*dg(:,2:1+nX) .5*dg(:,2:1+nX) dg(:,2+nX:1+nX+nU)];
+    end
+    
+    function [f,df] = midpoint_constraint_fun(obj,h,x0,x1,u0)
+      nX = obj.plant.getNumStates();
+      [xdot,dxdot] = obj.plant.dynamics(0,.5*(x0+x1),u0);
+      f = x1 - x0 - h*xdot;
+      df = [-xdot (-eye(nX) - .5*h*dxdot(:,2:1+nX)) (eye(nX)- .5*h*dxdot(:,2:1+nX)) -h*dxdot(:,nX+2:end)];
+    end
     
     function [c, dc] = robust_cost_grad(obj,y,xf)
         nx = obj.nX;
@@ -197,49 +259,6 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
                 dc = dc + dcdP*dP;
         end
     end
-    
-%     function [c, dc] = robust_constraint_fd(obj,y,xf)
-%         %nx = obj.nX;
-%         nu = obj.nU;
-%         N = obj.N;
-%         delta = 1e-5;
-%         
-%         c = robust_constraint(obj,y,xf);
-%         
-%         dc = zeros(2*(N-1)*nu,length(y)+length(xf));
-%         dy = zeros(size(y));
-%         for k = 1:length(y)
-%             dy(k) = delta;
-%             dc(:,k) = (robust_constraint(obj,y+dy,xf) - robust_constraint(obj,y-dy,xf))./(2*delta);
-%             dy(k) = 0;
-%         end
-%         dxf = zeros(size(xf));
-%         for k = 1:length(xf)
-%             dxf(k) = delta;
-%             dc(:,length(y)+k) = (robust_constraint(obj,y,xf+dxf) - robust_constraint(obj,y,xf-dxf))./(2*delta);
-%             dxf(k) = 0;
-%         end
-%     end
-%     
-%     function c = robust_constraint(obj,y,xf)
-%         nx = obj.nX;
-%         nu = obj.nU;
-%         nw = obj.nW;
-%         N = obj.N;
-%         
-%         [K,A,B,G] = lqrController(obj,y,xf);
-%         
-%         v = zeros((N-1)*nu,nw);
-%         M = zeros(nx,nw);
-%         for k = 1:(obj.N-1)
-%             v((k-1)*nu+(1:nu),nw) = K(:,:,k)*M;
-%             M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
-%         end
-%         
-%         u = y(1+nx+(0:N-2)'*(1+nx+nu)+kron(ones(N-1,1), (1:nu)'));
-%         uc = kron(ones(nw,1), u);
-%         c = [uc+v(:); uc-v(:)];
-%     end
 
     function [c, dc] = robust_constraint_grad(obj,y,xf)
         nx = obj.nX;
@@ -516,5 +535,95 @@ classdef RobustDirtranTrajectoryOptimization < DirtranTrajectoryOptimization
       xtraj = xtraj.setOutputFrame(obj.plant.getStateFrame);
     end
 
+%     function c = robust_cost(obj,y,xf)
+%         nx = obj.nX;
+%         nu = obj.nU;
+%         N = obj.N;
+%         
+%         [K,A,B,G] = lqrController(obj,y,xf);
+%         
+%         c = 0;
+%         P = zeros(nx,nx);
+%         for k = 1:(N-1)
+%             c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
+%             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
+%         end
+%         c = c + trace(obj.Qrf*P);
+%     end
+%     
+%     function [c, dc] = robust_cost_fd(obj,y,xf)
+%         nx = obj.nX;
+%         nu = obj.nU;
+%         N = obj.N;
+%         
+%         [K,A,B,G] = lqrController(obj,y,xf);
+%         
+%         c = 0;
+%         P = zeros(nx,nx);
+%         for k = 1:(N-1)
+%             c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
+%             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
+%         end
+%         c = c + trace(obj.Qrf*P);
+%         
+%         delta = 5e-7;
+%         dc = zeros(1,length(y)+length(xf));
+%         dy = zeros(size(y));
+%         for k = 1:length(y)
+%             dy(k) = delta;
+%             dc(k) = (robust_cost(obj,y+dy,xf) - robust_cost(obj,y-dy,xf))/(2*delta);
+%             dy(k) = 0;
+%         end
+%         dxf = zeros(size(xf));
+%         for k = 1:length(xf)
+%             dxf(k) = delta;
+%             dc(length(y)+k) = (robust_cost(obj,y,xf+dxf) - robust_cost(obj,y,xf-dxf))/(2*delta);
+%             dxf(k) = 0;
+%         end
+%     end
+
+%     function [c, dc] = robust_constraint_fd(obj,y,xf)
+%         %nx = obj.nX;
+%         nu = obj.nU;
+%         N = obj.N;
+%         delta = 1e-5;
+%         
+%         c = robust_constraint(obj,y,xf);
+%         
+%         dc = zeros(2*(N-1)*nu,length(y)+length(xf));
+%         dy = zeros(size(y));
+%         for k = 1:length(y)
+%             dy(k) = delta;
+%             dc(:,k) = (robust_constraint(obj,y+dy,xf) - robust_constraint(obj,y-dy,xf))./(2*delta);
+%             dy(k) = 0;
+%         end
+%         dxf = zeros(size(xf));
+%         for k = 1:length(xf)
+%             dxf(k) = delta;
+%             dc(:,length(y)+k) = (robust_constraint(obj,y,xf+dxf) - robust_constraint(obj,y,xf-dxf))./(2*delta);
+%             dxf(k) = 0;
+%         end
+%     end
+%     
+%     function c = robust_constraint(obj,y,xf)
+%         nx = obj.nX;
+%         nu = obj.nU;
+%         nw = obj.nW;
+%         N = obj.N;
+%         
+%         [K,A,B,G] = lqrController(obj,y,xf);
+%         
+%         v = zeros((N-1)*nu,nw);
+%         M = zeros(nx,nw);
+%         for k = 1:(obj.N-1)
+%             v((k-1)*nu+(1:nu),nw) = K(:,:,k)*M;
+%             M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
+%         end
+%         
+%         u = y(1+nx+(0:N-2)'*(1+nx+nu)+kron(ones(N-1,1), (1:nu)'));
+%         uc = kron(ones(nw,1), u);
+%         c = [uc+v(:); uc-v(:)];
+%     end
+    
   end
 end
