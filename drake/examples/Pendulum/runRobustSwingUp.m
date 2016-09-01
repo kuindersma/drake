@@ -6,10 +6,10 @@ close all
 p = PendulumPlant();
 v = PendulumVisualizer();
 
-N = 41;
+N = 3;
 
-options.integration_method = DirtranTrajectoryOptimization.FORWARD_EULER;
-[utraj1,xtraj1,z1,prog1] = p.swingUpTrajectory(N,options);
+options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
+%[utraj1,xtraj1,z1,prog1] = p.swingUpTrajectory(N,options);
 
 D = (1/.1^2); %This corresponds to +/-.1 uncertainty in mass (10%)
 [utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D,options);
