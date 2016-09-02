@@ -1,4 +1,5 @@
-#include "mex.h"
+#include <mex.h>
+
 #include <iostream>
 #include "drake/util/drakeMexUtil.h"
 #include <Eigen/Dense>
@@ -26,7 +27,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
     case RigidBodyConstraint::QuasiStaticConstraintType: {
       QuasiStaticConstraint* cnst = (QuasiStaticConstraint*)constraint;
       if (field_str == "active") {
-        // setActive(qsc_ptr,flag)
+        // setActive(qsc_ptr, flag)
         if (mxGetNumberOfElements(prhs[2]) != 1) {
           mexErrMsgIdAndTxt(
               "Drake:updatePtrRigidBodyConstraintmex:BadInputs",
@@ -37,7 +38,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
         cnst_new->setActive(*flag);
         plhs[0] = createDrakeConstraintMexPointer((void*)cnst_new,
                                                   "QuasiStaticConstraint");
-      } else if (field_str == "factor") {  // setShrinkFactor(qsc_ptr,factor)
+      } else if (field_str == "factor") {  // setShrinkFactor(qsc_ptr, factor)
         if (mxGetNumberOfElements(prhs[2]) != 1) {
           mexErrMsgIdAndTxt(
               "Drake:updatePtrRigidBodyConstraintmex:BadInputs",
@@ -54,7 +55,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
         plhs[0] = createDrakeConstraintMexPointer((void*)cnst_new,
                                                   "QuasiStaticConstraint");
       } else if (field_str == "contact") {
-        // addContact(qsc_ptr,body1, body1_pts, body2, body2_pts,...)
+        // addContact(qsc_ptr, body1, body1_pts, body2, body2_pts,...)
         int num_new_bodies = (nrhs - 2) / 2;
         int* new_bodies = new int[num_new_bodies];
         Matrix3Xd* new_body_pts = new Matrix3Xd[num_new_bodies];
@@ -79,21 +80,23 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
         cnst_new->updateRobot(robot);
         plhs[0] = createDrakeConstraintMexPointer((void*)cnst_new,
                                                   "QuasiStaticConstraint");
-      } else if (field_str == "robotnum") {
+      } else if (field_str == "model_instance_id") {
         size_t num_robot = mxGetNumberOfElements(prhs[2]);
-        double* robotnum_tmp = new double[num_robot];
-        int* robotnum = new int[num_robot];
-        memcpy(robotnum_tmp, mxGetPrSafe(prhs[2]), sizeof(double) * num_robot);
+        double* model_instance_id_tmp = new double[num_robot];
+        int* model_instance_id = new int[num_robot];
+        memcpy(model_instance_id_tmp, mxGetPrSafe(prhs[2]), sizeof(double) *
+            num_robot);
         for (int i = 0; i < num_robot; i++) {
-          robotnum[i] = (int)robotnum_tmp[i] - 1;
+          model_instance_id[i] = (int)model_instance_id_tmp[i] - 1;
         }
-        set<int> robotnumset(robotnum, robotnum + num_robot);
+        set<int> model_instance_id_set(model_instance_id, model_instance_id +
+            num_robot);
         QuasiStaticConstraint* cnst_new = new QuasiStaticConstraint(*cnst);
-        cnst_new->updateRobotnum(robotnumset);
+        cnst_new->updateRobotnum(model_instance_id_set);
         plhs[0] = createDrakeConstraintMexPointer((void*)cnst_new,
                                                   "QuasiStaticConstraint");
-        delete[] robotnum_tmp;
-        delete[] robotnum;
+        delete[] model_instance_id_tmp;
+        delete[] model_instance_id;
       } else {
         mexErrMsgIdAndTxt("Drake:updatePtrRigidBodyConstraintmex:BadInputs",
                           "QuasiStaticConstraint:argument 2 is not accepted");
@@ -101,7 +104,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
     } break;
     case RigidBodyConstraint::PostureConstraintType: {
       PostureConstraint* pc = (PostureConstraint*)constraint;
-      if (field_str == "bounds") {  // setJointLimits(pc,joint_idx,lb,ub)
+      if (field_str == "bounds") {  // setJointLimits(pc, joint_idx, lb, ub)
         size_t num_idx = mxGetM(prhs[2]);
         if (!mxIsNumeric(prhs[2]) || mxGetN(prhs[2]) != 1 ||
             !mxIsNumeric(prhs[3]) || mxGetM(prhs[3]) != num_idx ||
@@ -239,21 +242,23 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
         cnst_new->updateRobot(robot);
         plhs[0] = createDrakeConstraintMexPointer((void*)cnst_new,
                                                   "WorldCoMConstraint");
-      } else if (field_str == "robotnum") {
+      } else if (field_str == "model_instance_id") {
         size_t num_robot = mxGetNumberOfElements(prhs[2]);
-        double* robotnum_tmp = new double[num_robot];
-        int* robotnum = new int[num_robot];
-        memcpy(robotnum_tmp, mxGetPrSafe(prhs[2]), sizeof(double) * num_robot);
+        double* model_instance_id_tmp = new double[num_robot];
+        int* model_instance_id = new int[num_robot];
+        memcpy(model_instance_id_tmp, mxGetPrSafe(prhs[2]), sizeof(double) *
+            num_robot);
         for (int i = 0; i < num_robot; i++) {
-          robotnum[i] = (int)robotnum_tmp[i] - 1;
+          model_instance_id[i] = (int)model_instance_id_tmp[i] - 1;
         }
-        set<int> robotnumset(robotnum, robotnum + num_robot);
+        set<int> model_instance_id_set(model_instance_id, model_instance_id +
+            num_robot);
         WorldCoMConstraint* cnst_new = new WorldCoMConstraint(*cnst);
-        cnst_new->updateRobotnum(robotnumset);
+        cnst_new->updateRobotnum(model_instance_id_set);
         plhs[0] = createDrakeConstraintMexPointer((void*)cnst_new,
                                                   "WorldCoMConstraint");
-        delete[] robotnum_tmp;
-        delete[] robotnum;
+        delete[] model_instance_id_tmp;
+        delete[] model_instance_id;
       } else {
         mexErrMsgIdAndTxt("Drake:updatePtrRigidBodyConstraintmex:BadInputs",
                           "WorldCoMConstraint:argument 2 is not accepted");

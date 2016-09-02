@@ -1,6 +1,7 @@
-#ifndef __CONSTRUCTPTRRIGIDBODYCONSTRAINT_H__
-#define __CONSTRUCTPTRRIGIDBODYCONSTRAINT_H__
-#include "mex.h"
+#pragma once
+
+#include <mex.h>
+
 #include <Eigen/Dense>
 
 #if defined(WIN32) || defined(WIN64)
@@ -10,7 +11,7 @@
 #define CONSTRUCT_CONSTRAINT_DLLEXPORT __declspec(dllimport)
 #endif
 #else
-#define CONSTRUCT_CONSTRAINT_DLLEXPORT
+#define CONSTRUCT_CONSTRAINT_DLLEXPORT [[gnu::visibility("default")]]
 #endif
 
 CONSTRUCT_CONSTRAINT_DLLEXPORT mxArray* createDrakeConstraintMexPointer(
@@ -25,4 +26,3 @@ CONSTRUCT_CONSTRAINT_DLLEXPORT double rigidBodyConstraintParseGazeConethreshold(
     const mxArray* pm);
 CONSTRUCT_CONSTRAINT_DLLEXPORT double rigidBodyConstraintParseGazeThreshold(
     const mxArray* pm);
-#endif

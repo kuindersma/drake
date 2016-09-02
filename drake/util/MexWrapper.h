@@ -1,7 +1,7 @@
-#ifndef MEX_WRAPPER_H
-#define MEX_WRAPPER_H
+#pragma once
 
-#include "mex.h"
+#include <mex.h>
+
 #include <string>
 
 #undef DLLEXPORT
@@ -12,12 +12,12 @@
 #define DLLEXPORT __declspec(dllimport)
 #endif
 #else
-#define DLLEXPORT
+#define DLLEXPORT [[gnu::visibility("default")]]
 #endif
 
 class DLLEXPORT MexWrapper {
  public:
-  MexWrapper(std::string const& filename);
+  explicit MexWrapper(std::string const& filename);
   ~MexWrapper();
   void mexFunction(int nlhs, mxArray* plhs[], int nrhs,
                    const mxArray* prhs[]) const;
@@ -29,5 +29,3 @@ class DLLEXPORT MexWrapper {
   void* m_handle;
   void (*m_mexFunc)(int, mxArray* [], int, const mxArray* []);
 };
-
-#endif

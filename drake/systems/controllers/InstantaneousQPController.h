@@ -1,10 +1,10 @@
-#ifndef INSTANTANEOUSQPCONTROLLER_H
-#define INSTANTANEOUSQPCONTROLLER_H
+#pragma once
 
 #include <memory>
 #include "QPCommon.h"
-#include "drake/solvers/gurobiQP.h"
+#include "drake/solvers/gurobi_qp.h"
 #include "lcmtypes/drake/lcmt_qp_controller_input.hpp"
+#include "drake/drakeQPCommon_export.h"
 
 #define INSTQP_USE_FASTQP 1
 #define INSTQP_GUROBI_OUTPUTFLAG 0
@@ -14,25 +14,25 @@
 #define INSTQP_GUROBI_BARHOMOGENEOUS 0
 #define INSTQP_GUROBI_BARCONVTOL (5e-4)
 
-class InstantaneousQPController {
+class DRAKEQPCOMMON_EXPORT InstantaneousQPController {
  public:
   InstantaneousQPController(
       std::unique_ptr<RigidBodyTree> robot_in,
       const std::map<std::string, QPControllerParams>& param_sets_in,
       const RobotPropertyCache& rpc_in)
       : robot(std::move(robot_in)),
-        cache(this->robot->bodies),
         param_sets(param_sets_in),
         rpc(rpc_in),
-        use_fast_qp(INSTQP_USE_FASTQP) {
+        use_fast_qp(INSTQP_USE_FASTQP),
+        cache(this->robot->bodies) {
     initialize();
   }
 
   InstantaneousQPController(std::unique_ptr<RigidBodyTree> robot_in,
                             const std::string& control_config_filename)
       : robot(std::move(robot_in)),
-        cache(this->robot->bodies),
-        use_fast_qp(INSTQP_USE_FASTQP) {
+        use_fast_qp(INSTQP_USE_FASTQP),
+        cache(this->robot->bodies) {
     loadConfigurationFromYAML(control_config_filename);
     initialize();
   }
@@ -40,8 +40,8 @@ class InstantaneousQPController {
   InstantaneousQPController(const std::string& urdf_filename,
                             const std::string& control_config_filename)
       : robot(std::unique_ptr<RigidBodyTree>(new RigidBodyTree(urdf_filename))),
-        cache(this->robot->bodies),
-        use_fast_qp(INSTQP_USE_FASTQP) {
+        use_fast_qp(INSTQP_USE_FASTQP),
+        cache(this->robot->bodies) {
     loadConfigurationFromYAML(control_config_filename);
     initialize();
   }
@@ -118,11 +118,15 @@ class InstantaneousQPController {
 
   void initialize();
   void loadConfigurationFromYAML(const std::string& control_config_filename);
+
+  // Select a parameter set by name from the collection of parameter sets.
+  // If not found, fall back to "standing". If that fails, throw an exception.
+  const QPControllerParams& FindParams(const std::string& param_set_name);
 };
 
-void applyURDFModifications(std::unique_ptr<RigidBodyTree>& robot,
-                            const KinematicModifications& modifications);
-void applyURDFModifications(std::unique_ptr<RigidBodyTree>& robot,
-                            const std::string& urdf_modifications_filename);
-
-#endif
+DRAKEQPCOMMON_EXPORT void applyURDFModifications(
+  std::unique_ptr<RigidBodyTree>& robot,
+  const KinematicModifications& modifications);
+DRAKEQPCOMMON_EXPORT void applyURDFModifications(
+  std::unique_ptr<RigidBodyTree>& robot,
+  const std::string& urdf_modifications_filename);

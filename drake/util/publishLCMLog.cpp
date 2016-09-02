@@ -1,4 +1,5 @@
 #include <mex.h>
+
 #include <lcm/lcm.h>
 
 static lcm_t* lcm = NULL;
@@ -25,7 +26,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
         "publishLCMLog failed: input must be a structure with fields 'channel' "
         "and 'data'");
 
-  for (int i = 0; i < mxGetNumberOfElements(prhs[0]); i++) {
+  for (size_t i = 0; i < mxGetNumberOfElements(prhs[0]); i++) {
     channel =
         mxArrayToString(mxGetFieldByNumber(prhs[0], i, channel_field_number));
     data = mxGetFieldByNumber(prhs[0], i, data_field_number);

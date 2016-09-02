@@ -3,8 +3,9 @@
 
 using namespace std;
 
-PiecewiseFunction::PiecewiseFunction(std::vector<double> const& segment_times)
-    : segment_times(segment_times) {
+PiecewiseFunction::PiecewiseFunction(
+    std::vector<double> const& segment_times_in)
+    : segment_times(segment_times_in) {
   for (int i = 1; i < getNumberOfSegments() + 1; i++) {
     if (segment_times[i] < segment_times[i - 1])
       throw std::runtime_error("times must be increasing");
@@ -48,7 +49,7 @@ int PiecewiseFunction::getSegmentIndex(double t) const {
   t = std::min(std::max(t, getStartTime()), getEndTime());
 
   int segment_index = 0;
-  // TODO: something smarter than this linear search
+  // TODO(tkoolen): something smarter than this linear search
   while (t >= getEndTime(segment_index) &&
          segment_index < getNumberOfSegments() - 1)
     segment_index++;
@@ -85,7 +86,7 @@ std::vector<double> PiecewiseFunction::randomSegmentTimes(
 bool PiecewiseFunction::segmentTimesEqual(const PiecewiseFunction& other,
                                           double tol) const {
   if (segment_times.size() != other.segment_times.size()) return false;
-  for (int i = 0; i < segment_times.size(); i++) {
+  for (size_t i = 0; i < segment_times.size(); i++) {
     if (std::abs(segment_times[i] - other.segment_times[i]) > tol) return false;
   }
   return true;

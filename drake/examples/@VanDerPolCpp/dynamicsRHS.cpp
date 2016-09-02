@@ -1,9 +1,11 @@
-#include "mex.h"
+#include <mex.h>
+
 #include <Eigen/Dense>
 #include <cmath>
 #include <iostream>
+
+#include "drake/common/polynomial.h"
 #include "drake/util/drakeMexUtil.h"
-#include "drake/util/Polynomial.h"
 
 using namespace Eigen;
 using namespace std;
@@ -29,7 +31,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     dynamicsRHS(x, xdot);
     //    cout << xdot << endl;
     plhs[0] = eigenToMSSPoly<2, 1>(xdot);
-    //    plhs[0] = mxCreateDoubleMatrix(2,1,mxREAL);
+    //    plhs[0] = mxCreateDoubleMatrix(2, 1, mxREAL);
   } else {
     mexErrMsgIdAndTxt(
         "Drake:VanDerPolCpp:UnknownType",

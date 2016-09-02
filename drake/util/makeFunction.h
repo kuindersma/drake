@@ -1,9 +1,8 @@
-#ifndef DRAKE_MAKEFUNCTION_H
-#define DRAKE_MAKEFUNCTION_H
+#pragma once
 
 #include <functional>
 
-namespace Drake {
+namespace drake {
 /**
 * make_function
 * Note that a completely general make_function implementation is not possible
@@ -40,5 +39,3 @@ auto make_function(ReturnType (ClassType::*p)(Args...) const)
   return {std::mem_fn(p)};
 }
 }
-
-#endif  // DRAKE_MAKEFUNCTION_H

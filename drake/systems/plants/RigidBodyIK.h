@@ -1,5 +1,5 @@
-#ifndef __RIGIDBODYIK_H__
-#define __RIGIDBODYIK_H__
+#pragma once
+
 #include <string>
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
@@ -12,24 +12,15 @@ class RigidBodyTree;
 class IKResults {
  public:
   Eigen::VectorXd q_sol;
-  int INFO;
+  int info;
   std::vector<std::string> infeasible_constraints;
 
   const Eigen::VectorXd &getQSol() const { return q_sol; }
 
-  IKResults(){};
+  IKResults(){}
 };
 
-template <typename DerivedA, typename DerivedB, typename DerivedC>
-DRAKEIK_EXPORT void inverseKin(RigidBodyTree *model,
-                               const Eigen::MatrixBase<DerivedA> &q_seed,
-                               const Eigen::MatrixBase<DerivedB> &q_nom,
-                               const int num_constraints,
-                               RigidBodyConstraint **const constraint_array,
-                               Eigen::MatrixBase<DerivedC> &q_sol, int &INFO,
-                               std::vector<std::string> &infeasible_constraint,
-                               const IKoptions &ikoptions);
-/*
+/**
  * inverseKin solves the inverse kinematics problem
  * min_q (q-q_nom)'*Q*(q-q_nom)
  * s.t    lb<=constraint(q)<=ub
@@ -43,7 +34,7 @@ DRAKEIK_EXPORT void inverseKin(RigidBodyTree *model,
  * PostureConstraintType, SingleTimeKinematicConstraintType and
  * SingleTimeLinearPostureConstraintType.
  * @return q_sol    an nq x 1 double vector. The optimized posture
- * @return INFO     = 1   The optimization is successful
+ * @return info     = 1   The optimization is successful
  *                  = 3   The optimization is successful. But optimality is not
  * strictly satisfied
  *                  = 4   The optimization is successful. But feasibility is not
@@ -62,28 +53,30 @@ DRAKEIK_EXPORT void inverseKin(RigidBodyTree *model,
  * is reached. Set major iterations limit in ikoptions
  *                  = 41  Fails to find a solution because the numerics of the
  * problem is bad.
- *                  for more information of these INFO, check SNOPT manual for
+ *                  for more information of these info, check SNOPT manual for
  * reference www.stanford.edu/group/SOL/guides/sndoc7.pdf
  * @return infeasible_constraint. When the problem is infeasible,
  * infeasible_constraint contains the name of the infeasible constraints
  * @param ikoptions    The options to set parameters of IK problem.
  */
-
-IKResults inverseKinSimple(
-    RigidBodyTree *model, const Eigen::VectorXd &q_seed,
-    const Eigen::VectorXd &q_nom,
-    const std::vector<RigidBodyConstraint *> &constraint_array,
-    const IKoptions &ikoptions);
-
 template <typename DerivedA, typename DerivedB, typename DerivedC>
-DRAKEIK_EXPORT void approximateIK(RigidBodyTree *model,
-                                  const Eigen::MatrixBase<DerivedA> &q_seed,
-                                  const Eigen::MatrixBase<DerivedB> &q_nom,
-                                  const int num_constraints,
-                                  RigidBodyConstraint **const constraint_array,
-                                  Eigen::MatrixBase<DerivedC> &q_sol, int &INFO,
-                                  const IKoptions &ikoptions);
-/*
+DRAKEIK_EXPORT void inverseKin(RigidBodyTree* model,
+                               const Eigen::MatrixBase<DerivedA>& q_seed,
+                               const Eigen::MatrixBase<DerivedB>& q_nom,
+                               const int num_constraints,
+                               RigidBodyConstraint** const constraint_array,
+                               const IKoptions& ikoptions,
+                               Eigen::MatrixBase<DerivedC>* q_sol, int* info,
+                               std::vector<std::string>* infeasible_constraint);
+
+DRAKEIK_EXPORT IKResults inverseKinSimple(
+    RigidBodyTree* model, const Eigen::VectorXd& q_seed,
+    const Eigen::VectorXd& q_nom,
+    const std::vector<RigidBodyConstraint*>& constraint_array,
+    const IKoptions& ikoptions);
+
+
+/**
  * approximateIK solves the same problem as inverseKin. But for speed reason, it
  * linearizes all constraints around q_seed, and solve a quadratic problem
  * instead of a nonlinear problem.
@@ -94,21 +87,21 @@ DRAKEIK_EXPORT void approximateIK(RigidBodyTree *model,
  * @param constraint_array  Same as in inverseKin, but do not accept
  * SingleTimeLinearPostureConstraint for the moment
  * @return q_sol    Same as in inverseKin
- * @return INFO     = 0 Success
+ * @return info     = 0 Success
  *                  = 1 Fail
  * @param ikoptions  Same as in inverseKin
  */
-
 template <typename DerivedA, typename DerivedB, typename DerivedC>
-DRAKEIK_EXPORT void inverseKinPointwise(
-    RigidBodyTree *model, const int nT, const double *t,
-    const Eigen::MatrixBase<DerivedA> &q_seed,
-    const Eigen::MatrixBase<DerivedB> &q_nom, const int num_constraints,
-    RigidBodyConstraint **const constraint_array,
-    Eigen::MatrixBase<DerivedC> &q_sol, int *INFO,
-    std::vector<std::string> &infeasible_constraint,
-    const IKoptions &ikoptions);
-/*
+DRAKEIK_EXPORT void approximateIK(RigidBodyTree* model,
+                                  const Eigen::MatrixBase<DerivedA>& q_seed,
+                                  const Eigen::MatrixBase<DerivedB>& q_nom,
+                                  const int num_constraints,
+                                  RigidBodyConstraint** const constraint_array,
+                                  const IKoptions& ikoptions,
+                                  Eigen::MatrixBase<DerivedC>* q_sol,
+                                  int* info);
+
+/**
  * inverseKinPointwise   solves inverse kinematics problem at each t[i]
  * individually
  * @param nT        The length of time samples
@@ -122,8 +115,8 @@ DRAKEIK_EXPORT void inverseKinPointwise(
  * @param constraint_array  Same as in inverseKin
  * @return q_sol    An nq x nT double matrix. q_sol.col(i) is the solution to
  * inverse kinematics problem at t[i]
- * @return INFO     INFO[i] is the info for the inverse kinematics problem at
- * t[i]. The meaning of INFO[i] is explained in inverseKin
+ * @return info     info[i] is the info for the inverse kinematics problem at
+ * t[i]. The meaning of info[i] is explained in inverseKin
  * @return infeasible_constraint     infeasible_constraint[i] are the names of
  * infeasible constraints at t[i]
  * @param ikoptions   The options to set parameters of IK problem.
@@ -132,24 +125,23 @@ DRAKEIK_EXPORT void inverseKinPointwise(
  * the seed for t[i]. If the solver fails to find a posture at t[i-1], then
  * q_seed.col(i) would be used as the seed for t[i]
  *                    if ikoptions.sequentialSeedFlag = false, then
- * q_seed.col(i) would always be used as the seed at t[i]
+  * q_seed.col(i) would always be used as the seed at t[i]
  */
-template <typename DerivedA, typename DerivedB, typename DerivedC,
-          typename DerivedD, typename DerivedE, typename DerivedF>
-DRAKEIK_EXPORT void inverseKinTraj(
-    RigidBodyTree *model, const int nT, const double *t,
-    const Eigen::MatrixBase<DerivedA> &qdot0_seed,
-    const Eigen::MatrixBase<DerivedB> &q_seed,
-    const Eigen::MatrixBase<DerivedC> &q_nom, const int num_constraints,
-    RigidBodyConstraint **const constraint_array,
-    Eigen::MatrixBase<DerivedD> &q_sol, Eigen::MatrixBase<DerivedE> &qdot_sol,
-    Eigen::MatrixBase<DerivedF> &qddot_sol, int &INFO,
-    std::vector<std::string> &infeasible_constraint, IKoptions ikoptions);
-/*
+template <typename DerivedA, typename DerivedB, typename DerivedC>
+DRAKEIK_EXPORT void inverseKinPointwise(
+    RigidBodyTree* model, const int nT, const double* t,
+    const Eigen::MatrixBase<DerivedA>& q_seed,
+    const Eigen::MatrixBase<DerivedB>& q_nom, const int num_constraints,
+    RigidBodyConstraint** const constraint_array,
+    const IKoptions& ikoptions,
+    Eigen::MatrixBase<DerivedC>* q_sol, int* info,
+    std::vector<std::string>* infeasible_constraint);
+
+/**
  * inverseKinTraj  solves the inverse kinematics problem at all time together.
  * Try to generate a smooth trajectory by assuming cubic spline for the posture,
  * and minimize the acceleration of the interpolated trajectory
- * min_(q,qdot,qddot)
+ * min_(q, qdot, qddot)
  * sum(q(t(i))-q_nom(t(i)))'*Q*(q(t(i))-q_nom(t(i)))+qdot(t(i))'*Qv*qdot(t(i))+qddot(t(i))'*Qa*qddot(t(i))
  * @param nT    The length of time samples
  * @param t     t[i] is the i'th time
@@ -165,7 +157,7 @@ DRAKEIK_EXPORT void inverseKinTraj(
  * posture velocity at time t[i]
  * @return qddot_sol  An nq x nT double matrix. qddot_sol.col(i) is the solution
  * posture acceleration at time t[i]
- * @return INFO       Same as in inverseKin
+ * @return info       Same as in inverseKin
  * @return infeasible_constraint    Same as in inverseKin
  * @return ikoptions   Set parameters for inverse kinematics problem
  *         ikoptions.fixInitialState = True   The initial posture and velocity
@@ -174,4 +166,15 @@ DRAKEIK_EXPORT void inverseKinTraj(
  *         ikoptions.fixInitialState = False   The solver will search for the
  * initial posture and velocity
  */
-#endif
+template <typename DerivedA, typename DerivedB, typename DerivedC,
+          typename DerivedD, typename DerivedE, typename DerivedF>
+DRAKEIK_EXPORT void inverseKinTraj(
+    RigidBodyTree* model, const int nT, const double* t,
+    const Eigen::MatrixBase<DerivedA>& qdot0_seed,
+    const Eigen::MatrixBase<DerivedB>& q_seed,
+    const Eigen::MatrixBase<DerivedC>& q_nom, const int num_constraints,
+    RigidBodyConstraint** const constraint_array,
+    const IKoptions& ikoptions,
+    Eigen::MatrixBase<DerivedD>* q_sol, Eigen::MatrixBase<DerivedE>* qdot_sol,
+    Eigen::MatrixBase<DerivedF>* qddot_sol, int* info,
+    std::vector<std::string>* infeasible_constraint);

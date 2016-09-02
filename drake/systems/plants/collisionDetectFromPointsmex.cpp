@@ -1,13 +1,18 @@
 #include <mex.h>
+
+#include <cmath>
 #include <iostream>
 #include <memory>
+
+#include "drake/common/constants.h"
 #include "drake/util/drakeMexUtil.h"
 #include "RigidBodyTree.h"
 #include "drake/util/drakeGeometryUtil.h"
-#include "math.h"
 
 using namespace Eigen;
 using namespace std;
+
+using drake::kSpaceDimension;
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
   std::string usage =
@@ -31,7 +36,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
   KinematicsCache<double> *cache = static_cast<KinematicsCache<double> *>(
       getDrakeMexPointer(prhs[arg_num++]));
 
-  auto points = matlabToEigen<SPACE_DIMENSION, Eigen::Dynamic>(prhs[arg_num++]);
+  auto points = matlabToEigen<kSpaceDimension, Eigen::Dynamic>(prhs[arg_num++]);
   bool use_margins = (bool)(mxGetLogicals(prhs[arg_num++]))[0];
 
   VectorXd phi;

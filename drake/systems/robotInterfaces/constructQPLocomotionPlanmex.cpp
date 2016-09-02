@@ -1,3 +1,5 @@
+#include "drake/common/drake_assert.h"
+#include "drake/math/quaternion.h"
 #include "drake/util/drakeUtil.h"
 #include "drake/util/drakeMexUtil.h"
 #include "drake/systems/robotInterfaces/QPLocomotionPlan.h"
@@ -25,21 +27,22 @@ PiecewisePolynomial<double> matlabPPFormToPiecewisePolynomial(
 
   const mxArray* dim_mex = mxGetFieldSafe(pp, "dim");
   int num_dims_mex = mxGetNumberOfElements(dim_mex);
-  if (num_dims_mex == 0 | num_dims_mex > 2)
-    throw runtime_error("case not handled");  // because PiecewisePolynomial
-                                              // can't currently handle it
-  const int num_dims = 2;
-  mwSize dims[num_dims];
+  if ((num_dims_mex == 0) || (num_dims_mex > 2)) {
+    // PiecewisePolynomial can't currently handle it.
+    throw runtime_error("case not handled");
+  }
+  const int kNumDims = 2;
+  mwSize dims[kNumDims];
   if (!mxIsDouble(dim_mex))
     mexErrMsgIdAndTxt("Drake:matlabPPFormToPiecewisePolynomial:BadInputs",
                       "dim should have type double");
   for (int i = 0; i < num_dims_mex; i++) {
     dims[i] = static_cast<mwSize>(mxGetPr(dim_mex)[i]);
   }
-  for (int i = num_dims_mex; i < num_dims; i++) dims[i] = 1;
+  for (int i = num_dims_mex; i < kNumDims; i++) dims[i] = 1;
 
   size_t product_of_dimensions = dims[0];  // d
-  for (int i = 1; i < num_dims; ++i) {
+  for (int i = 1; i < kNumDims; ++i) {
     product_of_dimensions *= dims[i];
   }
 
@@ -89,13 +92,13 @@ PiecewisePolynomial<double> matlabCoefsAndBreaksToPiecewisePolynomial(
     mexErrMsgIdAndTxt("Drake:matlabPPFormToPiecewisePolynomial:BadInputs",
                       "coefs should have type double");
 
-  int num_dims = 3;
-  mwSize dims[num_dims];
+  const int kNumDims = 3;
+  mwSize dims[kNumDims];
   size_t num_dims_mex = mxGetNumberOfDimensions(mex_coefs);
-  for (int i = 0; i < num_dims_mex; i++) {
+  for (size_t i = 0; i < num_dims_mex; i++) {
     dims[i] = mxGetDimensions(mex_coefs)[i];
   }
-  for (int i = num_dims_mex; i < num_dims; i++) {
+  for (int i = num_dims_mex; i < kNumDims; i++) {
     dims[i] = 1;
   }
   vector<double> breaks = matlabToStdVector<double>(mex_breaks);
@@ -113,7 +116,7 @@ PiecewisePolynomial<double> matlabCoefsAndBreaksToPiecewisePolynomial(
                                            : coefficient_index;
         mwSize sub[] = {row, segment_index, third_dimension_index};
         coefficients[coefficient_index] =
-            *(mxGetPr(mex_coefs) + sub2ind(num_dims, dims, sub));
+            *(mxGetPr(mex_coefs) + sub2ind(kNumDims, dims, sub));
       }
       polynomial_matrix(row) = Polynomial<double>(coefficients);
     }
@@ -161,7 +164,7 @@ std::vector<RigidBodySupportState> setUpSupports(const mxArray* mex_supports) {
     auto body_ids = matlabToStdVector<int>(
         mxGetFieldOrPropertySafe(mex_supports, support_num, "bodies"));
     support_state.reserve(body_ids.size());
-    for (int i = 0; i < body_ids.size(); ++i) {
+    for (size_t i = 0; i < body_ids.size(); ++i) {
       RigidBodySupportStateElement support_state_element;
       support_state_element.body = body_ids[i] - 1;  // base 1 to base zero
       support_state_element.contact_points = matlabToEigenMap<3, Dynamic>(
@@ -181,11 +184,12 @@ std::vector<RigidBodySupportState> setUpSupports(const mxArray* mex_supports) {
 
 std::vector<QPLocomotionPlanSettings::ContactNameToContactPointsMap>
 setUpContactGroups(RigidBodyTree* robot, const mxArray* mex_contact_groups) {
-  assert(mxGetNumberOfElements(mex_contact_groups) == robot->bodies.size());
+  DRAKE_ASSERT(mxGetNumberOfElements(mex_contact_groups) ==
+               robot->bodies.size());
   std::vector<QPLocomotionPlanSettings::ContactNameToContactPointsMap>
       contact_groups;
   contact_groups.reserve(robot->bodies.size());
-  for (int body_id = 0; body_id < robot->bodies.size(); body_id++) {
+  for (size_t body_id = 0; body_id < robot->bodies.size(); body_id++) {
     const mxArray* mex_contact_group = mxGetCell(mex_contact_groups, body_id);
     QPLocomotionPlanSettings::ContactNameToContactPointsMap contact_group;
     for (int field_number = 0;
@@ -222,7 +226,7 @@ std::vector<BodyMotionData> setUpBodyMotions(const mxArray* mex_body_motions) {
     auto quat_task_to_world = matlabToEigenMap<4, 1>(
         mxGetPropertySafe(mex_body_motions, i, "quat_task_to_world"));
     body_motion_data.transform_task_to_world.linear() =
-        quat2rotmat(quat_task_to_world);
+        drake::math::quat2rotmat(quat_task_to_world);
     body_motion_data.transform_task_to_world.translation() =
         matlabToEigenMap<3, 1>(mxGetPropertySafe(mex_body_motions, i,
                                                  "translation_task_to_world"));
@@ -284,7 +288,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
   if (nrhs == 1) {
     // By convention, calling the constructor with just one argument (the
     // pointer) should delete the pointer
-    // TODO: make this not depend on number of arguments
+    // TODO(tkoolen): make this not depend on number of arguments
     if (isa(prhs[0], "DrakeMexPointer")) {
       destroyDrakeMexPointer<QPLocomotionPlan*>(prhs[0]);
       return;
@@ -337,7 +341,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
   settings.plan_shift_body_motion_indices = matlabToStdVector<Eigen::Index>(
       mxGetPropertySafe(mex_settings, "plan_shift_body_motion_inds"));
   addOffset(settings.plan_shift_body_motion_indices,
-            (Eigen::Index) - 1);  // base 1 to base 0
+            (Eigen::Index)-1);  // base 1 to base 0
   settings.g = mxGetScalar(mxGetPropertySafe(mex_settings, "g"));
   settings.is_quasistatic =
       mxGetLogicals(mxGetPropertySafe(mex_settings, "is_quasistatic"))[0];

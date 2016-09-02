@@ -1,6 +1,7 @@
-#ifndef PRISMATICJOINT_H_
-#define PRISMATICJOINT_H_
+#pragma once
 
+#include "drake/common/drake_assert.h"
+#include "drake/common/eigen_types.h"
 #include "FixedAxisOneDoFJoint.h"
 
 class DRAKEJOINTS_EXPORT PrismaticJoint
@@ -15,13 +16,13 @@ class DRAKEJOINTS_EXPORT PrismaticJoint
  public:
   PrismaticJoint(const std::string& name,
                  const Eigen::Isometry3d& transform_to_parent_body,
-                 const Eigen::Vector3d& translation_axis)
+                 const Eigen::Vector3d& translation_axis_in)
       : FixedAxisOneDoFJoint<PrismaticJoint>(
             *this, name, transform_to_parent_body,
-            spatialJointAxis(translation_axis)),
-        translation_axis(translation_axis) {
-    assert(std::abs(translation_axis.norm() - 1.0) < 1e-10);
-  };
+            spatialJointAxis(translation_axis_in)),
+        translation_axis(translation_axis_in) {
+    DRAKE_ASSERT(std::abs(translation_axis.norm() - 1.0) < 1e-10);
+  }
 
   template <typename DerivedQ>
   Eigen::Transform<typename DerivedQ::Scalar, 3, Eigen::Isometry>
@@ -34,14 +35,12 @@ class DRAKEJOINTS_EXPORT PrismaticJoint
     return ret;
   }
 
-  virtual ~PrismaticJoint(){};
+  virtual ~PrismaticJoint() {}
 
  private:
-  static Eigen::Matrix<double, TWIST_SIZE, 1> spatialJointAxis(
+  static drake::TwistVector<double> spatialJointAxis(
       const Eigen::Vector3d& translation_axis);
 
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
-
-#endif /* PRISMATICJOINT_H_ */

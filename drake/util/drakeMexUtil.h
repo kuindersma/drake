@@ -1,26 +1,31 @@
-#ifndef DRAKE_MEX_UTIL_H_
-#define DRAKE_MEX_UTIL_H_
+#pragma once
 
-#include "mex.h"
+#include <mex.h>
+
 #include <vector>
 #include <Eigen/Core>
 #include <Eigen/Sparse>
-#include "drake/util/TrigPoly.h"
-#include "unsupported/Eigen/AutoDiff"
-
+#include "drake/common/trig_poly.h"
 /*
- * NOTE: include AutoDiff AFTER TrigPoly.h.
- * TrigPoly.h includes LLDT.h via Eigenvalues, PolynomialSolver, and our
- * Polynomial.h
+ * NOTE: include AutoDiff AFTER trig_poly.h.
+ * trig_poly.h includes LLDT.h via Eigenvalues, PolynomialSolver, and our
+ * polynomial.h
  * MSVC versions up to and including 2013 have trouble with the rankUpdate
  * method in LLDT.h
  * For some reason there is a bad interaction with AutoDiff, even though LLDT.h
- * still gets included if TrigPoly.h is included before AutoDiff.
+ * still gets included if trig_poly.h is included before AutoDiff.
  * See http://eigen.tuxfamily.org/bz/show_bug.cgi?id=1057
  */
 #include <unsupported/Eigen/AutoDiff>
 #include <Eigen/src/SparseCore/SparseMatrix.h>
+
+#include "drake/math/autodiff.h"
+#include "drake/math/autodiff_gradient.h"
 #include "drake/util/drakeGradientUtil.h"
+
+using drake::math::autoDiffToValueMatrix;
+using drake::math::autoDiffToGradientMatrix;
+using drake::math::Gradient;
 
 #undef DLLEXPORT
 #if defined(WIN32) || defined(WIN64)
@@ -29,6 +34,8 @@
 #else
 #define DLLEXPORT __declspec(dllimport)
 #endif
+#elif __GNUC__ >= 4
+#define DLLEXPORT __attribute__((visibility("default")))
 #else
 #define DLLEXPORT
 #endif
@@ -118,21 +125,21 @@ Eigen::Map<const Eigen::Matrix<double, Rows, Cols>> matlabToEigenMap(
   using namespace Eigen;
   using namespace std;
 
-  Index rows, cols; // at runtime
+  Index rows, cols;  // at runtime
   if (mxIsEmpty(mex)) {
     // be lenient when it comes to dimensions in the empty input case
     if (Rows == Dynamic && Cols == Dynamic) {
-      // if both dimensions are dynamic, then follow the dimensions of the Matlab matrix
+      // if both dimensions are dynamic, then follow the dimensions of
+      // the Matlab matrix
       rows = mxGetM(mex);
       cols = mxGetN(mex);
-    }
-    else {
-      // if only one dimension is dynamic, use the known dimension at compile time and set the other dimension to zero
+    } else {
+      // if only one dimension is dynamic, use the known dimension at
+      // compile time and set the other dimension to zero
       rows = Rows == Dynamic ? 0 : Rows;
       cols = Cols == Dynamic ? 0 : Cols;
     }
-  }
-  else {
+  } else {
     // the non-empty case
     rows = Rows == Dynamic ? mxGetM(mex) : Rows;
     cols = Cols == Dynamic ? mxGetN(mex) : Cols;
@@ -203,7 +210,7 @@ template <int _Rows, int _Cols>
 mxArray* eigenToMSSPoly(const Eigen::Matrix<Polynomiald, _Rows, _Cols>& poly) {
   size_t num_monomials = 0, max_terms = 0;
   for (int i = 0; i < poly.size(); i++) {
-    auto monomials = poly(i).getMonomials();
+    auto monomials = poly(i).GetMonomials();
     num_monomials += monomials.size();
     for (std::vector<Polynomiald::Monomial>::const_iterator iter =
              monomials.begin();
@@ -222,13 +229,13 @@ mxArray* eigenToMSSPoly(const Eigen::Matrix<Polynomiald, _Rows, _Cols>& poly) {
   int index = 0;
   for (int i = 0; i < poly.rows(); i++) {
     for (int j = 0; j < poly.cols(); j++) {
-      auto monomials = poly(i, j).getMonomials();
+      auto monomials = poly(i, j).GetMonomials();
       for (std::vector<Polynomiald::Monomial>::const_iterator iter =
                monomials.begin();
            iter != monomials.end(); iter++) {
         sub(index, 0) = i + 1;
         sub(index, 1) = j + 1;
-        for (int k = 0; k < iter->terms.size(); k++) {
+        for (int k = 0; k < static_cast<int>(iter->terms.size()); k++) {
           var(index, k) = (double)iter->terms[k].var;
           pow(index, k) = (double)iter->terms[k].power;
         }
@@ -259,9 +266,9 @@ mxArray* eigenToTrigPoly(
       trigpoly_mat.rows(), trigpoly_mat.cols());
   TrigPolyd::SinCosMap sin_cos_map;
   for (int i = 0; i < trigpoly_mat.size(); i++) {
-    const TrigPolyd::SinCosMap& sc = trigpoly_mat(i).getSinCosMap();
+    const TrigPolyd::SinCosMap& sc = trigpoly_mat(i).sin_cos_map();
     sin_cos_map.insert(sc.begin(), sc.end());
-    poly_mat(i) = trigpoly_mat(i).getPolynomial();
+    poly_mat(i) = trigpoly_mat(i).poly();
   }
 
   if (sin_cos_map
@@ -337,18 +344,16 @@ mxArray* eigenToMatlabGeneral(const Eigen::MatrixBase<Eigen::Matrix<
     Eigen::AutoDiffScalar<DerType>, RowsAtCompileTime, ColsAtCompileTime>>&
                                   mat) {
   return eigenToTaylorVar(mat);
-};
+}
 
 template <int RowsAtCompileTime, int ColsAtCompileTime>
 mxArray* eigenToMatlabGeneral(const Eigen::MatrixBase<
     Eigen::Matrix<TrigPolyd, RowsAtCompileTime, ColsAtCompileTime>>& mat) {
   return eigenToTrigPoly<RowsAtCompileTime, ColsAtCompileTime>(mat);
-};
+}
 
 template <int RowsAtCompileTime, int ColsAtCompileTime>
 mxArray* eigenToMatlabGeneral(const Eigen::MatrixBase<
     Eigen::Matrix<double, RowsAtCompileTime, ColsAtCompileTime>>& mat) {
   return eigenToMatlab(mat.const_cast_derived());
-};
-
-#endif
+}

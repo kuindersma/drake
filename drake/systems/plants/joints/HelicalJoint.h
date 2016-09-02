@@ -1,7 +1,8 @@
-#ifndef HELICALJOINT_H_
-#define HELICALJOINT_H_
+#pragma once
 
 #include "FixedAxisOneDoFJoint.h"
+
+#include "drake/common/eigen_types.h"
 
 class DRAKEJOINTS_EXPORT HelicalJoint
     : public FixedAxisOneDoFJoint<HelicalJoint> {
@@ -10,8 +11,8 @@ class DRAKEJOINTS_EXPORT HelicalJoint
   // HelicalJoint& operator=(const HelicalJoint&) = delete;
 
  private:
-  const Eigen::Vector3d axis;
-  const double pitch;
+  const Eigen::Vector3d axis_;
+  const double pitch_;
 
  public:
   HelicalJoint(const std::string& name,
@@ -20,28 +21,26 @@ class DRAKEJOINTS_EXPORT HelicalJoint
       : FixedAxisOneDoFJoint<HelicalJoint>(*this, name,
                                            transform_to_parent_body,
                                            spatialJointAxis(axis, pitch)),
-        axis(axis),
-        pitch(pitch){};
+        axis_(axis),
+        pitch_(pitch) {}
 
-  virtual ~HelicalJoint(){};
+  virtual ~HelicalJoint() {}
 
   template <typename DerivedQ>
   Eigen::Transform<typename DerivedQ::Scalar, 3, Eigen::Isometry>
   jointTransform(const Eigen::MatrixBase<DerivedQ>& q) const {
     typedef typename DerivedQ::Scalar Scalar;
     Eigen::Transform<Scalar, 3, Eigen::Isometry> ret;
-    ret = Eigen::AngleAxis<Scalar>(q[0], axis.cast<Scalar>()) *
-          Eigen::Translation<Scalar, 3>(q[0] * (pitch * axis).cast<Scalar>());
+    ret = Eigen::AngleAxis<Scalar>(q[0], axis_.cast<Scalar>()) *
+          Eigen::Translation<Scalar, 3>(q[0] * (pitch_ * axis_).cast<Scalar>());
     ret.makeAffine();
     return ret;
   }
 
  private:
-  static Eigen::Matrix<double, TWIST_SIZE, 1> spatialJointAxis(
+  static drake::TwistVector<double> spatialJointAxis(
       const Eigen::Vector3d& axis, double pitch);
 
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
-
-#endif /* HELICALJOINT_H_ */

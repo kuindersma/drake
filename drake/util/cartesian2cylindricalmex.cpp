@@ -1,15 +1,16 @@
-#include "mex.h"
-#include "drake/util/drakeGeometryUtil.h"
+#include <mex.h>
+
+#include "drake/math/cylindrical.h"
 
 using namespace Eigen;
 using namespace std;
 
-void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
+void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
   if (nrhs != 5) {
     mexErrMsgIdAndTxt("Drake:cartesian2cylindricalmex:IncorrectInputs",
-                      "Usage [x_cartesian,v_cartesian,J,Jdotv] = "
-                      "cartesian2cylindrical(cylinder_axis,cylinder_x_dir,"
-                      "cylinder_origin,x_cylinder,v_cylinder)");
+                      "Usage [x_cartesian, v_cartesian, J, Jdotv] = "
+                      "cartesian2cylindrical(cylinder_axis, cylinder_x_dir,"
+                      "cylinder_origin, x_cylinder, v_cylinder)");
   }
   if (!mxIsNumeric(prhs[0]) || mxGetNumberOfElements(prhs[0]) != 3) {
     mexErrMsgIdAndTxt("Drake:cartesian2cylindricalmex:InvalidInput",
@@ -52,9 +53,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
   Matrix<double, 6, 1> v_cylinder;
   Matrix<double, 6, 6> J;
   Matrix<double, 6, 1> Jdotv;
-  cartesian2cylindrical(cylinder_axis, cylinder_x_dir, cylinder_origin,
-                        x_cartesian, v_cartesian, x_cylinder, v_cylinder, J,
-                        Jdotv);
+  drake::math::cartesian2cylindrical(cylinder_axis, cylinder_x_dir,
+                                     cylinder_origin, x_cartesian, v_cartesian,
+                                     x_cylinder, v_cylinder, J, Jdotv);
   plhs[0] = mxCreateDoubleMatrix(6, 1, mxREAL);
   memcpy(mxGetPr(plhs[0]), x_cylinder.data(), sizeof(double) * 6);
   plhs[1] = mxCreateDoubleMatrix(6, 1, mxREAL);

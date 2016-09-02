@@ -1,5 +1,4 @@
-#ifndef __DrakeCollisionModel_H__
-#define __DrakeCollisionModel_H__
+#pragma once
 
 #include <memory>
 #include <unordered_map>
@@ -7,9 +6,9 @@
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
 
-#include "Element.h"
-#include "PointPair.h"
+#include "drake/systems/plants/collision/Element.h"
 #include "drake/drakeCollision_export.h"
+#include "drake/systems/plants/collision/point_pair.h"
 
 namespace DrakeCollision {
 typedef std::pair<ElementId, ElementId> ElementIdPair;
@@ -18,7 +17,7 @@ class DRAKECOLLISION_EXPORT Model {
  public:
   Model() {}
 
-  virtual ~Model(){};
+  virtual ~Model() {}
 
   /** \brief Add a collision element to this model.
   * \param element the collision element to be added to this model
@@ -35,7 +34,7 @@ class DRAKECOLLISION_EXPORT Model {
    * the given id or nullptr if no such collision element is present in the
    * model.
    */
-  virtual const Element* readElement(ElementId id);
+  virtual const Element* readElement(ElementId id) const;
 
   virtual void getTerrainContactPoints(ElementId id0,
                                        Eigen::Matrix3Xd& terrain_points);
@@ -43,7 +42,7 @@ class DRAKECOLLISION_EXPORT Model {
   /** \brief Perform any operations needed to bring the model up-to-date
    * after making changes to its collision elements
    */
-  virtual void updateModel(){};
+  virtual void updateModel() = 0;
 
   /** \brief Change the element-to-world transform of a specified collision
    * element.
@@ -67,23 +66,22 @@ class DRAKECOLLISION_EXPORT Model {
    */
   virtual bool closestPointsAllToAll(const std::vector<ElementId>& ids_to_check,
                                      const bool use_margins,
-                                     std::vector<PointPair>& closest_points) {
-    return false;
-  };
+                                     std::vector<PointPair>&
+                                     closest_points) = 0;
 
-  /** \brief Compute the points of closest approach between all eligible
-   * pairs of collision elements in this model
-   * \param use_margins flag indicating whether or not to use the version
-   * of this model with collision margins
-   * \param[out] closest_points reference to a vector of PointPair objects
-   * that contains the closest point information after this method is
-   * called
-   * \return true if this method ran successfully
-   */
-  virtual bool collisionPointsAllToAll(const bool use_margins,
-                                       std::vector<PointPair>& points) {
-    return false;
-  };
+  /** Computes the point of closest approach between collision elements that
+   are in contact.
+
+   @param[in] use_margins If `true` the model uses the representation with
+   margins. If `false`, the representation without margins is used instead.
+
+   @param[out] closest_points reference to a vector of PointPair objects
+   that contains the closest point information after this method is called.
+
+   @returns `true` if this method ran successfully and `false` otherwise.
+   **/
+  virtual bool ComputeMaximumDepthCollisionPoints(
+      const bool use_margins, std::vector<PointPair>& closest_points) = 0;
 
   /** \brief Compute the points of closest approach between specified pairs
    * of collision elements
@@ -98,9 +96,24 @@ class DRAKECOLLISION_EXPORT Model {
    */
   virtual bool closestPointsPairwise(const std::vector<ElementIdPair>& id_pairs,
                                      const bool use_margins,
-                                     std::vector<PointPair>& closest_points) {
-    return false;
-  };
+                                     std::vector<PointPair>&
+                                     closest_points) = 0;
+
+  /** Clears possibly cached results so that a fresh computation can be
+  performed.
+
+  @param use_margins[in] If `true`, the cache of the model with margins is
+  cleared. If `false`, the cache of the model without margins is cleared.
+
+  Depending on the implementation, the collision model may cache results on each
+  dispatch. For instance, Bullet uses cached results to warm-start its LCP
+  solvers.
+
+  Clearing cached results allows the collision model to perform a fresh
+  computation without any coupling with previous history.
+
+  @see drake/systems/plants/collision/test/model_test.cc. **/
+  virtual void ClearCachedResults(bool use_margins) = 0;
 
   /** \brief Compute closest distance from each point to any surface in the
    * collision model utilizing Bullet's collision detection code.
@@ -112,7 +125,7 @@ class DRAKECOLLISION_EXPORT Model {
    */
   virtual void collisionDetectFromPoints(
       const Eigen::Matrix3Xd& points, bool use_margins,
-      std::vector<PointPair>& closest_points){};
+      std::vector<PointPair>& closest_points) = 0;
 
   /** \brief Compute the set of potential collision points for all
    * eligible pairs of collision geometries in this model. This includes
@@ -125,36 +138,52 @@ class DRAKECOLLISION_EXPORT Model {
    * \return a vector of PointPair objects containing the potential
    * collision points
    */
-  virtual std::vector<PointPair> potentialCollisionPoints(
-      const bool use_margins) {
-    return std::vector<PointPair>();
-  };
+  virtual std::vector<PointPair> potentialCollisionPoints(bool use_margins) = 0;
 
-  /** \brief Given a vector of points in world coordinates, returns the
-   * indices of those points within a specified distance of any collision
-   * geometry in the model.
-   * \param points a vector of points in world coordinates
-   * \param collision_threshold points are considered "in collision" if
-   * they lie within this distance of any collision geometry
-   * \return a vector containing the indices of those points that are "in
-   * collision" with the model.
-   */
+  /** Given a vector of points in world coordinates, returns the indices
+  of those points within a specified distance of any collision geometry in
+  the model.
+
+  In other words, this method tests if a sphere of radius
+  collision_threshold located at input_points[i] collides with any part of
+  the model. The result is returned as a vector of indexes in input_points
+  that do collide with the model.
+  Points are not checked against one another but only against the existing
+  model.
+
+  @param input_points The list of points to check for collisions against the
+  model.
+  @param collision_threshold The radius of a control sphere around each point
+  used to check for collisions with the model.
+
+  @return A vector with indexes in input_points of all those points that do
+  collide with the model within the specified threshold.
+
+  @see systems/plants/test/collidingPointsTest.m for a Matlab test. **/
   virtual std::vector<size_t> collidingPoints(
-      const std::vector<Eigen::Vector3d>& points, double collision_threshold) {
-    return std::vector<size_t>();
-  };
+      const std::vector<Eigen::Vector3d>& input_points,
+      double collision_threshold) = 0;
 
-  /** \brief Returns true if any of the given points are within a specified
-   * distance of the collision geometries in this model.
-   * \param points a vector of points in world coordinates
-   * \param collision_threshold points are considered "in collision" if
-   * they lie within this distance of any collision geometry
-   * \return a boolean value indicating if any points are "in collision"
-   */
+  /** Tests if any of the points supplied in input_points collides with
+  any part of the model within a given threshold.
+
+  In other words, this method tests if any of the spheres of radius
+  collision_threshold located at input_points[i] collides with any part of
+  the model. This method returns as soon as any of these spheres collides
+  with the model.
+  Points are not checked against one another but only against the existing
+  model.
+
+  @param input_points The list of points to check for collisions against the
+  model.
+  @param collision_threshold The radius of a control sphere around each point
+  used to check for collisions with the model.
+
+  @return `true` if any of the points positively checks for collision.
+  `false` otherwise. **/
   virtual bool collidingPointsCheckOnly(
-      const std::vector<Eigen::Vector3d>& points, double collision_threshold) {
-    return false;
-  };
+      const std::vector<Eigen::Vector3d>& input_points,
+      double collision_threshold) = 0;
 
   /** Performs raycasting collision detecting (like a LIDAR / laser rangefinder)
    *
@@ -171,17 +200,37 @@ class DRAKECOLLISION_EXPORT Model {
   virtual bool collisionRaycast(const Eigen::Matrix3Xd& origin,
                                 const Eigen::Matrix3Xd& ray_endpoint,
                                 bool use_margins, Eigen::VectorXd& distances,
-                                Eigen::Matrix3Xd& normals) {
-    return false;
-  };
+                                Eigen::Matrix3Xd& normals) = 0;
+
+  /**
+   * Modifies a collision element's local transform to be relative to a joint's
+   * frame rather than a link's frame. This is necessary because Drake requires
+   * that link frames by defined by their parent joint frames.
+   *
+   * @param eid The ID of the collision element to update.
+   * @param transform_body_to_joint The transform from the collision element's
+   * link's frame to the joint's coordinate frame.
+   * @param true if the collision element was successfully updated.
+   */
+  virtual bool transformCollisionFrame(
+      const DrakeCollision::ElementId& eid,
+      const Eigen::Isometry3d& transform_body_to_joint);
+
+  /**
+   * A toString method for this class.
+   */
+  friend DRAKECOLLISION_EXPORT std::ostream& operator<<(std::ostream&,
+                                                        const Model&);
 
  protected:
-  std::unordered_map<ElementId, std::unique_ptr<Element> > elements;
+  // Protected member variables are forbidden by the style guide.
+  // Please do not add new references to this member.  Instead, use
+  // the accessors.
+  std::unordered_map<ElementId, std::unique_ptr<Element>> elements;
 
  private:
   Model(const Model&) {}
   Model& operator=(const Model&) { return *this; }
 };
-}
 
-#endif
+}  // namespace DrakeCollision

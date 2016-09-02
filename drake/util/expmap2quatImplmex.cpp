@@ -1,13 +1,21 @@
 #include <Eigen/Core>
+
+#include "drake/math/autodiff.h"
+#include "drake/math/autodiff_gradient.h"
+#include "drake/math/expmap.h"
+#include "drake/math/gradient.h"
 #include "drake/util/mexify.h"
 #include "drake/util/standardMexConversions.h"
-#include "drake/util/drakeGeometryUtil.h"
 #include "drake/util/makeFunction.h"
-#include "drake/core/Gradient.h"
 
 using namespace std;
 using namespace Eigen;
-using namespace Drake;
+using namespace drake;
+
+using drake::math::autoDiffToGradientMatrix;
+using drake::math::autoDiffToValueMatrix;
+using drake::math::expmap2quat;
+using drake::math::initializeAutoDiff;
 
 pair<Vector4d, typename Gradient<Vector4d, 3>::type> expmap2quatWithGradient(
     const MatrixBase<Map<const Vector3d>>& expmap) {
@@ -41,7 +49,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
   } else if (nlhs == 3) {
     auto func_second_deriv = make_function(&expmap2quatWithSecondDeriv);
     mexCallFunction(nlhs, plhs, nrhs, prhs, true, func_second_deriv);
-  } else
+  } else {
     throw std::runtime_error(
         "can't handle requested number of output arguments");
+  }
 }

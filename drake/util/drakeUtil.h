@@ -1,3 +1,5 @@
+#pragma once
+
 /*
  * drakeUtil.h
  *
@@ -5,15 +7,14 @@
  *      Author: russt
  */
 
-#ifndef DRAKE_UTIL_H_
-#define DRAKE_UTIL_H_
-
 #include <stdexcept>
 #include <vector>
 #include <utility>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <unordered_map>
+
+#include "drake/common/drake_assert.h"
 #include "drake/drakeUtil_export.h"
 
 template <typename Key, typename T>
@@ -71,7 +72,7 @@ template <typename Derived>
 void eigenVectorToStdVector(
     const Eigen::MatrixBase<Derived>& source,
     std::vector<typename Derived::Scalar>& destination) {
-  assert(source.rows() == 1 || source.cols() == 1);
+  DRAKE_ASSERT(source.rows() == 1 || source.cols() == 1);
   destination.resize(static_cast<size_t>(source.size()));
   for (Eigen::Index i = 0; i < source.size(); i++) {
     destination[static_cast<size_t>(i)] = source(i);
@@ -182,5 +183,3 @@ void lqr(Eigen::MatrixBase<DerivedA> const& A,
   care(A, B, Q, R, S);
   K = R_cholesky.solve(B.transpose() * S);
 }
-
-#endif /* DRAKE_UTIL_H_ */

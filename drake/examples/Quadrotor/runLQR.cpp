@@ -1,12 +1,17 @@
 #include <iostream>
-#include "Quadrotor.h"
+
+#include "drake/common/drake_path.h"
+#include "drake/examples/Quadrotor/Quadrotor.h"
 #include "drake/systems/Simulation.h"
 #include "drake/systems/controllers/LQR.h"
 #include "drake/systems/plants/BotVisualizer.h"
+#include "drake/systems/cascade_system.h"
+#include "drake/systems/feedback_system.h"
+#include "drake/util/drakeAppUtil.h"
 
 using namespace std;
 using namespace Eigen;
-using namespace Drake;
+using namespace drake;
 
 int main(int argc, char* argv[]) {
   shared_ptr<lcm::LCM> lcm(new lcm::LCM);
@@ -29,9 +34,9 @@ int main(int argc, char* argv[]) {
   uG.w2 = uG.w1;
   uG.w3 = uG.w1;
   uG.w4 = uG.w1;
-  auto c = timeInvariantLQR(*quad, xG, uG, Q, R);
+  auto c = MakeTimeInvariantLqrSystem(*quad, xG, uG, Q, R);
   auto v = std::make_shared<BotVisualizer<QuadrotorState> >(
-      lcm, getDrakePath() + "/examples/Quadrotor/quadrotor.urdf",
+      lcm, GetDrakePath() + "/examples/Quadrotor/quadrotor.urdf",
       DrakeJoint::ROLLPITCHYAW);
 
   auto sys = cascade(feedback(quad, c), v);
@@ -39,6 +44,9 @@ int main(int argc, char* argv[]) {
   SimulationOptions options;
   options.realtime_factor = 1.0;
   options.initial_step_size = 0.005;
+  if (commandLineOptionExists(argv, argv + argc, "--non-realtime")) {
+    options.warn_real_time_violation = true;
+  }
 
   for (int i = 0; i < 5; i++) {
     Eigen::Matrix<double, 12, 1> x0 = toEigen(xG);

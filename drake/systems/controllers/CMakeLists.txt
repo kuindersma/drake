@@ -1,4 +1,7 @@
-drake_install_headers(LQR.h)
+drake_install_headers(
+  LQR.h
+  open_loop_trajectory_controller.h
+  simple_feedback_trajectory_controller.h)
 
 add_library_with_exports(LIB_NAME drakeControlUtil SOURCE_FILES controlUtil.cpp)
 target_link_libraries(drakeControlUtil drakeRBM drakeUtil drakeTrajectories)
@@ -10,10 +13,10 @@ pods_install_pkg_config_file(drake-control-util
   VERSION 0.0.1)
 
 pods_find_pkg_config(gurobi)
-if (gurobi_FOUND AND LCM_FOUND AND yaml-cpp_FOUND)
+if(gurobi_FOUND AND lcm_FOUND AND yaml-cpp_FOUND)
   add_library_with_exports(LIB_NAME drakeQPCommon SOURCE_FILES InstantaneousQPController.cpp)
-  target_link_libraries(drakeQPCommon drakeControlUtil drakeQP drakeTrajectories drakeLCMUtil drakeSide drakeYAMLUtil)
-  pods_use_pkg_config_packages(drakeQPCommon lcm)
+  target_link_libraries(drakeQPCommon drakeControlUtil drakeQP drakeTrajectories drakeLCMUtil drakeSide drakeYAMLUtil lcm)
+  pods_use_pkg_config_packages(drakeQPCommon gurobi)
   pods_install_libraries(drakeQPCommon)
   drake_install_headers(QPCommon.h InstantaneousQPController.h)
   pods_install_pkg_config_file(drake-qp-common
@@ -21,19 +24,19 @@ if (gurobi_FOUND AND LCM_FOUND AND yaml-cpp_FOUND)
     CFLAGS -I\${prefix}/include/lcmtypes
     REQUIRES drake-control-util
     VERSION 0.0.1)
-    
+
   pods_find_pkg_config(bot2-lcmgl-client)
-  if (bot2-lcmgl-client_FOUND)
+  if(bot2-lcmgl-client_FOUND)
     add_executable(zmpCoMObserverStateVisualizer zmpCoMObserverStateVisualizer.cpp)
-    pods_use_pkg_config_packages(zmpCoMObserverStateVisualizer lcm bot2-lcmgl-client)
-    target_link_libraries(zmpCoMObserverStateVisualizer drake_lcmtypes)
+    pods_use_pkg_config_packages(zmpCoMObserverStateVisualizer bot2-lcmgl-client)
+    target_link_libraries(zmpCoMObserverStateVisualizer drake_lcmtypes lcm)
   endif()
 endif()
 
-if (MATLAB_FOUND)
+if(MATLAB_FOUND)
   pods_find_pkg_config(gurobi)
 
-  if (gurobi_FOUND AND LCM_FOUND AND yaml-cpp_FOUND)
+  if(gurobi_FOUND AND lcm_FOUND AND yaml-cpp_FOUND)
 
     add_mex(instantaneousQPControllermex instantaneousQPControllermex.cpp)
     target_link_libraries(instantaneousQPControllermex drakeQP drakeControlUtil drakeQPCommon drakeMexUtil drakeSide)
@@ -45,14 +48,17 @@ if (MATLAB_FOUND)
   endif()
 
   add_mex(supportDetectmex supportDetectmex.cpp)
-  target_link_libraries(supportDetectmex drakeRBM drakeControlUtil) 
+  target_link_libraries(supportDetectmex drakeRBM drakeControlUtil)
 
-endif(MATLAB_FOUND)
+endif()
 
 add_library_with_exports(LIB_NAME drakeZMPUtil SOURCE_FILES zmpUtil.cpp)
 target_link_libraries(drakeZMPUtil drakeTrajectories)
 pods_install_libraries(drakeZMPUtil)
 drake_install_headers(zmpUtil.h)
-
+pods_install_pkg_config_file(drake-zmp-util
+  LIBS -ldrakeZMPUtil
+  REQUIRES
+  VERSION 0.0.1)
 
 add_subdirectory(test)

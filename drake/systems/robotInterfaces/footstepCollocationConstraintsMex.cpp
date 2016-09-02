@@ -1,4 +1,5 @@
-#include "mex.h"
+#include <mex.h>
+
 #include <math.h>
 #include <Eigen/Dense>
 
@@ -24,9 +25,9 @@ void constraints(mxArray* c_out, mxArray* ceq_out, mxArray* dc_out,
   Eigen::Vector2d u;
   Eigen::Vector2d al;
 
-  // ceq.segment(0,2) = steps.block(0,0,2,1) - rel_steps.block(0,0,2,1);
-  // dceq.block(0,0,2,2) << 1, 0, 0, 1;
-  // dceq.block(6,0,2,2) << -1, 0, 0, -1;
+  // ceq.segment(0, 2) = steps.block(0, 0, 2, 1) - rel_steps.block(0, 0, 2, 1);
+  // dceq.block(0, 0, 2, 2) << 1, 0, 0, 1;
+  // dceq.block(6, 0, 2, 2) << -1, 0, 0, -1;
 
   int j;
   int x1_ndx;
@@ -36,7 +37,7 @@ void constraints(mxArray* c_out, mxArray* ceq_out, mxArray* dc_out,
   int con_dndx;
   double dx, dy, si, co;
 
-  for (j = 2; j <= nsteps; j++) {
+  for (j = 2; j <= static_cast<int>(nsteps); j++) {
     con_ndx = (j - 1) * 2;
     con_dndx = 2;
     si = sin(steps(5, j - 2));

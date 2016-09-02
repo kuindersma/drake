@@ -1,18 +1,23 @@
-#ifndef DRAKE_LINEARSYSTEM_H
-#define DRAKE_LINEARSYSTEM_H
+#pragma once
 
+#include "drake/common/drake_assert.h"
 #include "drake/systems/System.h"
 
-namespace Drake {
+namespace drake {
 
-/** AffineSystem<StateVector,InputVector,OutputVector>
- * @brief Builds an affine system from it's state-space matrix coefficients
- * @concept{system_concept}
+/**
+ * Builds an affine system from its state-space matrix coefficients *A*, *B*,
+ * *C*, and *D*. This is done by implementing the following equations:
  *
- * Implements @f[
- *   \dot{x} = Ax + B*u + \dot{x}_0 \\
+ * @f[
+ *   \dot{x} = Ax + Bu + \dot{x}_0 \\
  *   y = Cx + Du + y_0
- *  @f]
+ * @f]
+ *
+ * Where *x* is the system state, *u* is the system inputs, and *y* is the
+ * system output.
+ *
+ * @concept{system_concept}
  */
 
 template <template <typename> class StateVec,
@@ -27,6 +32,26 @@ class AffineSystem {
   template <typename ScalarType>
   using InputVector = InputVec<ScalarType>;
 
+  /**
+   * A constructor that creates an Affine System based on its state-space matrix
+   * coefficients.
+   *
+   * @param[in] A The matrix coefficients of the system state *x* in the
+   * equation for the time derivative of the system's state *xdot*.
+   *
+   * @param[in] B The matrix coefficients of the system input *u* in the
+   * equation for the time derivative of the system's state *xdot*.
+   *
+   * @param[in] xdot0 The initial value of the system state's time derivative.
+   *
+   * @param[in] C The matrix coefficients of the system state *x* in the
+   * equation for the system's output *y*.
+   *
+   * @param[in] D The matrix coefficients of the system input *u* in the
+   * equation for the system's output *y*.
+   *
+   * @param[in] y0 The initial value of the system's output.
+   */
   template <typename DerivedA, typename DerivedB, typename Derivedxdot0,
             typename DerivedC, typename DerivedD, typename Derivedy0>
   AffineSystem(const Eigen::MatrixBase<DerivedA>& A,
@@ -35,20 +60,20 @@ class AffineSystem {
                const Eigen::MatrixBase<DerivedC>& C,
                const Eigen::MatrixBase<DerivedD>& D,
                const Eigen::MatrixBase<Derivedy0>& y0)
-      : A(A), B(B), C(C), D(D), xdot0(xdot0), y0(y0) {
-    assert(A.rows() == A.cols());
-    assert(B.rows() == A.cols());
-    assert(xdot0.rows() == A.cols());
-    assert(C.cols() == A.cols());
-    assert(y0.rows() == C.rows());
+      : A_(A), B_(B), C_(C), D_(D), xdot0_(xdot0), y0_(y0) {
+    DRAKE_ASSERT(A.rows() == A.cols());
+    DRAKE_ASSERT(B.rows() == A.cols());
+    DRAKE_ASSERT(xdot0.rows() == A.cols());
+    DRAKE_ASSERT(C.cols() == A.cols());
+    DRAKE_ASSERT(y0.rows() == C.rows());
   }
 
   template <typename ScalarType>
   StateVector<ScalarType> dynamics(const ScalarType& t,
                                    const StateVector<ScalarType>& x,
                                    const InputVector<ScalarType>& u) const {
-    if (A.rows() == 0) return StateVector<ScalarType>();
-    StateVector<ScalarType> xdot = A * toEigen(x) + B * toEigen(u) + xdot0;
+    if (A_.rows() == 0) return StateVector<ScalarType>();
+    StateVector<ScalarType> xdot = A_ * toEigen(x) + B_ * toEigen(u) + xdot0_;
     return xdot;
   }
 
@@ -56,23 +81,29 @@ class AffineSystem {
   OutputVector<ScalarType> output(const ScalarType& t,
                                   const StateVector<ScalarType>& x,
                                   const InputVector<ScalarType>& u) const {
-    OutputVector<ScalarType> y = C * toEigen(x) + D * toEigen(u) + y0;
+    OutputVector<ScalarType> y = C_ * toEigen(x) + D_ * toEigen(u) + y0_;
     return y;
   }
 
   bool isTimeVarying() const { return false; }
-  bool isDirectFeedthrough() const { return !D.isZero(); }
-  size_t getNumStates() const { return static_cast<size_t>(A.cols()); };
-  size_t getNumInputs() const { return static_cast<size_t>(B.cols()); };
-  size_t getNumOutputs() const { return static_cast<size_t>(C.rows()); };
+
+  /**
+   * A system is direct feedthrough if the outputs of the system (*y*) directly
+   * depend on the inputs of the system (*u*). In this case, *y* will directly
+   * depend on *u* only if *D* is non-zero.
+   */
+  bool isDirectFeedthrough() const { return !D_.isZero(); }
+  size_t getNumStates() const { return static_cast<size_t>(A_.cols()); }
+  size_t getNumInputs() const { return static_cast<size_t>(B_.cols()); }
+  size_t getNumOutputs() const { return static_cast<size_t>(C_.rows()); }
 
  private:
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> A;
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> B;
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> C;
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> D;
-  Eigen::Matrix<double, Eigen::Dynamic, 1> xdot0;
-  Eigen::Matrix<double, Eigen::Dynamic, 1> y0;
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> A_;
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> B_;
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> C_;
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> D_;
+  Eigen::Matrix<double, Eigen::Dynamic, 1> xdot0_;
+  Eigen::Matrix<double, Eigen::Dynamic, 1> y0_;
 
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW  // the num_states, etc can cause alignment
@@ -80,6 +111,20 @@ class AffineSystem {
                                    // sizes.
 };
 
+/**
+ * This is a specialization of AffineSystem where the initial time derivative
+ * of the system inputs (*xdot0*) and the system outputs (*y0*) are both zero.
+ * In other words, this system implements:
+ *
+ *
+ * @f[
+ *   \dot{x} = Ax + Bu\\
+ *   y = Cx + Du
+ * @f]
+ *
+ * Where *x* is the system state, *u* is the system inputs, and *y* is the
+ * system output.
+ */
 template <template <typename> class StateVec,
           template <typename> class InputVec,
           template <typename> class OutputVec>
@@ -92,6 +137,22 @@ class LinearSystem : public AffineSystem<StateVec, InputVec, OutputVec> {
   template <typename ScalarType>
   using InputVector = InputVec<ScalarType>;
 
+  /**
+   * A constructor that simply instantiates an AffineSystem where *xdot0* and
+   * *y0* are zero.
+   *
+   * @param[in] A The matrix coefficients of the system state *x* in the
+   * equation for the time derivative of the system's state *xdot*.
+   *
+   * @param[in] B The matrix coefficients of the system input *u* in the
+   * equation for the time derivative of the system's state *xdot*.
+   *
+   * @param[in] C The matrix coefficients of the system state *x* in the
+   * equation for the system's output *y*.
+   *
+   * @param[in] D The matrix coefficients of the system input *u* in the
+   * equation for the system's output *y*.
+   */
   template <typename DerivedA, typename DerivedB, typename DerivedC,
             typename DerivedD>
   LinearSystem(const Eigen::MatrixBase<DerivedA>& A,
@@ -103,6 +164,16 @@ class LinearSystem : public AffineSystem<StateVec, InputVec, OutputVec> {
             Eigen::VectorXd::Zero(C.rows())) {}
 };
 
+/**
+ * A specialization of LinearSystem in which *A*, *B*, and *C* are all zero.
+ * In other words, this system implements:
+ *
+ *
+ * @f[ y = Du @f]
+ *
+ * Where *y* is the system's output, *u* is the system's input, and *D* is the
+ * matrix coefficient for *u*.
+ */
 template <template <typename> class InputVec,
           template <typename> class OutputVec>
 class Gain : public LinearSystem<NullVector, InputVec, OutputVec> {
@@ -114,13 +185,18 @@ class Gain : public LinearSystem<NullVector, InputVec, OutputVec> {
   template <typename ScalarType>
   using InputVector = InputVec<ScalarType>;
 
+  /**
+   * The constructor that simply instantiates a LinearSystem where the
+   * coefficient matrices *A*, *B*, and *C* are all zero.
+   *
+   * @param[in] D The matrix coefficients of the system input *u* in the
+   * equation for the system's output *y*.
+   */
   template <typename Derived>
-  Gain(const Eigen::MatrixBase<Derived>& D)
+  explicit Gain(const Eigen::MatrixBase<Derived>& D)
       : LinearSystem<NullVector, InputVec, OutputVec>(
             Eigen::Matrix<double, 0, 0>(), Eigen::Matrix<double, 0, 0>(),
             Eigen::Matrix<double, Eigen::Dynamic, 0>(D.rows(), 0), D) {}
 };
 
-}  // end namespace Drake
-
-#endif  // DRAKE_LINEARSYSTEM_H
+}  // end namespace drake
