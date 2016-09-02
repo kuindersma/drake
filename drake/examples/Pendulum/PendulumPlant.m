@@ -33,6 +33,25 @@ classdef PendulumPlant < SecondOrderSystem
       obj.uG = Point(getInputFrame(obj),0);
     end
     
+    function obj = setMass(obj,mass)
+      obj.m = mass;
+      obj.I = mass*obj.l*obj.l;
+    end
+    
+    function obj = setDamping(obj,b)
+      obj.b = b;
+    end
+    
+    function obj = setLength(obj,length)
+      obj.l = length;
+      obj.lc = length;
+      obj.I = obj.m*length*length;
+    end
+    
+    function n = getNumDisturbances(~)
+      n = 1;
+    end
+    
     function qdd = sodynamics(obj,t,q,qd,u)
       % Implement the second-order dynamics
       qdd = (u - obj.m*obj.g*obj.lc*sin(q) - obj.b*qd)/obj.I;
@@ -145,7 +164,7 @@ classdef PendulumPlant < SecondOrderSystem
       end
     end
     
-    function [utraj,xtraj]=swingUpDirtran(obj,options)
+    function [utraj,xtraj,z,traj_opt]=swingUpDirtran(obj,options)
       x0 = [0;0]; 
       xf = double(obj.xG);
       tf0 = 4;
@@ -212,6 +231,58 @@ classdef PendulumPlant < SecondOrderSystem
       options.Tsub = 6;
       options.degL1=4;
       c = LQRTree.buildLQRTree(obj,obj.xG,obj.uG,@()rand(2,1).*[2*pi;10]-[pi;5],Q,R,options);
+    end
+    
+    function [utraj,xtraj,z,prog] = robustSwingUpTrajectory(obj,N,D,options)
+        
+        if nargin == 3
+            options = struct();
+        end
+        
+        x0 = [0;0];
+        xf = double(obj.xG);
+        tf = 3;
+        
+        Q = [100 0; 0 10];
+        R = 1;
+        Qf = 1000*eye(2);
+        
+        prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,[1 4],options);
+        prog = prog.addStateConstraint(ConstantConstraint(x0),1);
+        prog = prog.addStateConstraint(ConstantConstraint(xf),N);
+        prog = prog.addFinalCost(@finalCost);
+        
+        prog = prog.addRobustCost(Q,R,Qf);
+        prog = prog.addRobustConstraint();
+        
+        prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-3);
+        prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-4);
+        prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-4);
+        
+        % add a display function to draw the trajectory on every iteration
+        function displayTrajectory(t,x,u)
+            subplot(2,1,1);
+            plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
+            subplot(2,1,2);
+            plot([0; cumsum(t(1:end-1))],u,'r.-','MarkerSize',10);
+            drawnow;
+        end
+        prog = addTrajectoryDisplayFunction(prog,@displayTrajectory);
+        
+        traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
+        
+        disp('Running solve');
+        tic
+        [xtraj,utraj,z] = prog.solveTraj(tf,traj_init);
+        toc
+        
+        function [h,dh] = finalCost(tf,x)
+            h = tf;
+            if (nargout>1)
+                dh = [1, 0, 0];
+            end
+        end
+        
     end
 
   end
