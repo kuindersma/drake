@@ -45,6 +45,39 @@ classdef PendulumPlant < SecondOrderSystem
       end
     end
     
+    function [f,df,d2f] = dynamics_w(obj,t,x,u,w)
+
+      % w is added mass
+      q=x(1:obj.num_q); 
+      qd=x((obj.num_q+1):end);
+      
+      m_ = obj.m + w;
+      l_ = obj.lc;
+      b_ = obj.b;
+      
+      qdd = u/(m_*l_*l_) - obj.g*sin(q)/l_ - b_*qd/(m_*l_*l_);
+      f = [qd;qdd];
+      
+      if nargout > 1
+        dfdt = zeros(2,1);
+        dfdx = [0, 1; -(obj.g/l_)*cos(q),-b_/(m_*l_*l_)];
+        dfdu = [0;1/(m_*l_*l_)];
+        dfdw = [0;(b_*qd-u)/(m_*m_*l_*l_)];
+        df = [dfdt, dfdx, dfdu, dfdw];
+      end
+      
+      if nargout > 2
+        d2f = sparse(2*ones(6,1),[7;15;20;23;24;25],...
+         [(obj.g/l_)*sin(q);
+          b_/(m_*m_*l_*l_);
+          -1/(m_*m_*l_*l_);
+          b_/(m_*m_*l_*l_);
+          -1/(m_*m_*l_*l_);
+          -2*(b_*qd-u)/(m_*m_*m_*l_*l_)]);
+      end
+      
+    end
+    
     function [T,U] = energy(obj,x)
       theta = x(1);
       thetadot = x(2);
@@ -84,6 +117,44 @@ classdef PendulumPlant < SecondOrderSystem
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
       traj_opt = traj_opt.addRunningCost(@cost);
+      traj_opt = traj_opt.addFinalCost(@finalCost);
+      traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
+      
+      
+      function [g,dg] = cost(dt,x,u);
+        R = 10;
+        g = (R*u).*u;
+        
+        if (nargout>1)
+          dg = [zeros(1,3),2*u'*R];
+        end
+      end
+      
+      function [h,dh] = finalCost(tf,x)
+        h = tf;
+        if (nargout>1)
+          dh = [1, zeros(1,2)];
+        end
+      end
+      
+      info=0;
+      while (info~=1)
+        tic
+        [xtraj,utraj,z,F,info] = traj_opt.solveTraj(tf0,traj_init);
+        toc
+      end
+    end
+    
+    function [utraj,xtraj]=swingUpDirtran(obj,options)
+      x0 = [0;0]; 
+      xf = double(obj.xG);
+      tf0 = 4;
+
+      N = 31;
+      traj_opt = DirtranTrajectoryOptimization(obj,N,[2 6]);
+      traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
+      traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
+      %traj_opt = traj_opt.addRunningCost(@cost);
       traj_opt = traj_opt.addFinalCost(@finalCost);
       traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
       
