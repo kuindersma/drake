@@ -1,5 +1,9 @@
 function runDirtranManip(N)
 
+if nargin == 0
+    N = 51;
+end
+
 options.with_weight = true;
 options.with_box = true;
 r = KukaArm(options);
@@ -14,19 +18,22 @@ q0 = [0;1.57;0;0;0;0;1.57];
 x0 = [q0;zeros(nq,1)];
 xG = double(r.resolveConstraints(zeros(nx,1)));
 
-
-tf0 = 2.0;
+tf0 = 1.5;
 
 traj_init.x = PPTrajectory(foh([0,tf0],[x0,xG]));
-%traj_init.u = ConstantTrajectory(zeros(nu,1));
+traj_init.u = ConstantTrajectory(zeros(nu,1));
   
 options.integration_method = DirtranTrajectoryOptimization.MIDPOINT;
-traj_opt = DirtranTrajectoryOptimization(r,N,tf0*[(1-0.5) (1+0.5)],options);
+traj_opt = DirtranTrajectoryOptimization(r,N,[tf0 tf0],options);
 traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
-% traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
-% traj_opt = traj_opt.addRunningCost(@cost,2);
-traj_opt = traj_opt.addFinalCost(@finalCost,2);
+traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xG),N);
+% traj_opt = traj_opt.addRunningCost(@cost);
+% traj_opt = traj_opt.addFinalCost(@finalCost);
 % traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayStateTrajectory);
+
+%traj_opt = traj_opt.setSolverOptions('snopt','MajorIterationsLimit', 5000);
+%traj_opt = traj_opt.setSolverOptions('snopt','MinorIterationsLimit', 5000);
+traj_opt = traj_opt.setSolverOptions('snopt','IterationsLimit', 100000);
 
 [jlmin,jlmax] = r.getJointLimits;
 xmin = [jlmin;-inf(nq,1)];
@@ -87,16 +94,16 @@ keyboard
   end
 
   function [g,dg,ddg] = cost(h,x,u)
-    Q = diag([zeros(nq,1);1e-6*ones(nq,1)]);
-    R = 0.0*eye(nu);
+    Q = 0*diag([zeros(nq,1); 1*ones(nq,1)]);
+    R = .1*eye(nu);
 
     g = (x-xG)'*Q*(x-xG) + u'*R*u;
     dg = [0, 2*(x'*Q -xG'*Q), 2*u'*R];
     ddg = blkdiag(0, 2*Q, 2*R);
   end
 
-  function [g,dg,ddg] = finalCost(T,x)
-    Q = diag([zeros(nq,1);ones(nq,1)]);
+  function [g,dg,ddg] = finalCost(tf,x)
+    Q = eye(2*nq);
     
     g = (x-xG)'*Q*(x-xG);
     dg = [0, 2*(x'*Q -xG'*Q)];

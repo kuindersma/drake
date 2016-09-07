@@ -105,7 +105,7 @@ classdef KukaArm < RigidBodyManipulator
     end
     
     function [f,df] = dynamics_w_u(obj,t,x,u,w)
-      % u is a state error vector
+      % u is an input error vector
       [f,df] = dynamics(obj,t,x,u+w);
       df = [df,df(:,1+obj.getNumStates+(1:obj.getNumInputs))];
     end 
