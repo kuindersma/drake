@@ -3,21 +3,22 @@ close all
 p = PendulumPlant();
 v = PendulumVisualizer();
 
-N = 41;
+N = 51;
 
 [utraj1,xtraj1,z1,prog1] = p.swingUpDirtran(N);
+
+%Playback
+olsys1 = cascade(utraj1,p);
+xol1 = olsys1.simulateODE(utraj1.tspan,[0 0]');
+v.playback(xol1);
 
 D = (1/.2^2); %This corresponds to +/-.1 uncertainty in mass (10%)
 [utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D);
 
-% %Open-loop simulation
-% olsys1 = cascade(utraj1,p);
-% xol1 = olsys1.simulateODE(utraj1.tspan,[0 0]');
-% v.playback(xol1);
-% 
-% olsys2 = cascade(utraj2,p);
-% xol2 = olsys2.simulateODE(utraj2.tspan,[0 0]');
-% v.playback(xol2);
+%Playback
+olsys2 = cascade(utraj2,p);
+xol2 = olsys2.simulateODE(utraj2.tspan,[0 0]');
+v.playback(xol2);
 
 
 %Closed-loop simulation
@@ -29,14 +30,14 @@ Qf = 1000*eye(2);
 c1 = tvlqr(p,xtraj1,utraj1,Q,R,Qf);
 p = p.setMass(1.2);
 clsys1 = feedback(p,c1);
-xcl1 = clsys1.simulate(utraj1.tspan, [0 0]');
+xcl1 = clsys1.simulate([utraj1.tspan(1) utraj1.tspan(2)+.5], [0 0]');
 v.playback(xcl1);
 
 p = p.setMass(1);
 c2 = tvlqr(p,xtraj2,utraj2,Q,R,Qf);
 p = p.setMass(1.2);
 clsys2 = feedback(p,c2);
-xcl2 = clsys2.simulate(utraj2.tspan, [0 0]');
+xcl2 = clsys2.simulate([utraj2.tspan(1) utraj2.tspan(2)+.5], [0 0]');
 v.playback(xcl2);
 
 

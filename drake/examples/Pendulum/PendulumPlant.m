@@ -167,18 +167,27 @@ classdef PendulumPlant < SecondOrderSystem
     function [utraj,xtraj,z,traj_opt]=swingUpDirtran(obj,N)
       x0 = [0;0]; 
       xf = double(obj.xG);
-      tf0 = 4;
+      tf0 = 2;
 
-      traj_opt = DirtranTrajectoryOptimization(obj,N,[2 6]);
+      traj_opt = DirtranTrajectoryOptimization(obj,N,[1 4]);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
       %traj_opt = traj_opt.addRunningCost(@cost);
       traj_opt = traj_opt.addFinalCost(@finalCost);
       traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
       
-      
+      % add a display function to draw the trajectory on every iteration
+      function displayTrajectory(t,x,u)
+          subplot(2,1,1);
+          plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
+          subplot(2,1,2);
+          plot([0; cumsum(t(1:end))],u,'r.-','MarkerSize',10);
+          drawnow;
+      end
+      traj_opt = addTrajectoryDisplayFunction(traj_opt,@displayTrajectory);
+        
       function [g,dg] = cost(dt,x,u);
-        R = 10;
+        R = 1;
         g = (R*u).*u;
         
         if (nargout>1)
@@ -240,7 +249,7 @@ classdef PendulumPlant < SecondOrderSystem
         
         x0 = [0;0];
         xf = double(obj.xG);
-        tf = 3;
+        tf = 2;
         
         Q = [100 0; 0 10];
         R = 1;
@@ -258,15 +267,15 @@ classdef PendulumPlant < SecondOrderSystem
         prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-4);
         prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-4);
         
-%         % add a display function to draw the trajectory on every iteration
-%         function displayTrajectory(t,x,u)
-%             subplot(2,1,1);
-%             plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
-%             subplot(2,1,2);
-%             plot([0; cumsum(t(1:end-1))],u,'r.-','MarkerSize',10);
-%             drawnow;
-%         end
-%         prog = addTrajectoryDisplayFunction(prog,@displayTrajectory);
+        % add a display function to draw the trajectory on every iteration
+        function displayTrajectory(t,x,u)
+            subplot(2,1,1);
+            plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
+            subplot(2,1,2);
+            plot([0; cumsum(t(1:end-1))],u,'r.-','MarkerSize',10);
+            drawnow;
+        end
+        prog = addTrajectoryDisplayFunction(prog,@displayTrajectory);
         
         traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
         
