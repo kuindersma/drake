@@ -23,6 +23,18 @@ classdef QuadPlantPenn < SecondOrderSystem
           u0 = Point(getInputFrame(obj),obj.m*9.81*ones(4,1)/4);
         end
         
+        function [f,df,d2f] = dynamics(obj,t,x,u)
+            q = x(1:6);
+            qd = x(7:12);
+            qdd = obj.sodynamics(t,q,qd,u);
+            
+            f = [qd; qdd];
+            
+            if (nargout>1)
+                [df,d2f] = dynamicsGradients(obj,t,x,u,nargout-1);
+            end
+        end
+        
         function qdd = sodynamics(obj,t,q,qd,u)
             % States
             % x
