@@ -164,12 +164,11 @@ classdef PendulumPlant < SecondOrderSystem
       end
     end
     
-    function [utraj,xtraj,z,traj_opt]=swingUpDirtran(obj,options)
+    function [utraj,xtraj,z,traj_opt]=swingUpDirtran(obj,N)
       x0 = [0;0]; 
       xf = double(obj.xG);
       tf0 = 4;
 
-      N = 31;
       traj_opt = DirtranTrajectoryOptimization(obj,N,[2 6]);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(x0),1);
       traj_opt = traj_opt.addStateConstraint(ConstantConstraint(xf),N);
@@ -259,15 +258,15 @@ classdef PendulumPlant < SecondOrderSystem
         prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-4);
         prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-4);
         
-        % add a display function to draw the trajectory on every iteration
-        function displayTrajectory(t,x,u)
-            subplot(2,1,1);
-            plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
-            subplot(2,1,2);
-            plot([0; cumsum(t(1:end-1))],u,'r.-','MarkerSize',10);
-            drawnow;
-        end
-        prog = addTrajectoryDisplayFunction(prog,@displayTrajectory);
+%         % add a display function to draw the trajectory on every iteration
+%         function displayTrajectory(t,x,u)
+%             subplot(2,1,1);
+%             plot(x(1,:),x(2,:),'b.-','MarkerSize',10);
+%             subplot(2,1,2);
+%             plot([0; cumsum(t(1:end-1))],u,'r.-','MarkerSize',10);
+%             drawnow;
+%         end
+%         prog = addTrajectoryDisplayFunction(prog,@displayTrajectory);
         
         traj_init.x = PPTrajectory(foh([0,tf],[double(x0),double(xf)]));
         
