@@ -35,12 +35,12 @@ tf0 = 4; % initial guess at duration
 traj_init.x = PPTrajectory(foh([0,tf0],[double(x0),double(xf)]));
 traj_init.u = ConstantTrajectory(u0);
 
-N = 41;
+N = 35;
 duration = [0 4];
 
 %prog = DirtranTrajectoryOptimization(p, N, duration);
 
-D = 1/(.25^2)*eye(3);
+D = 1/(.5^2)*eye(3);
 Q = blkdiag(10*eye(6), 1*eye(6));
 R = .1*eye(4);
 Qf = Q;
