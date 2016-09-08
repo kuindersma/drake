@@ -1,4 +1,4 @@
-function [p, xtraj, utraj, prog1] = runRobustWObs
+function [p, xtraj, utraj, prog] = runRobustWObs
 
 % simple planning demo which takes the quadrotor from hover at y=0m to a new hover at
 % y=10m with minimal thrust. Creates a forest set up to have the Quadrotor
@@ -38,37 +38,38 @@ traj_init.u = ConstantTrajectory(u0);
 N = 41;
 duration = [0 4];
 
-%prog1 = DirtranTrajectoryOptimization(p, N, duration);
+%prog = DirtranTrajectoryOptimization(p, N, duration);
 
-D = 1/(.1^2)*eye(3);
-Q = 1*eye(12);
+D = 1/(.25^2)*eye(3);
+Q = blkdiag(10*eye(6), 1*eye(6));
 R = .1*eye(4);
-Qf = 1*eye(12);
+Qf = Q;
+prog = RobustDirtranTrajectoryOptimization(p,N,D,Q,R,Qf,duration);
+prog = prog.addRobustCost(Q,R,Qf);
+prog = prog.addRobustInputConstraint();
 
-prog1 = RobustDirtranTrajectoryOptimization(p,N,D,Q,R,Qf,duration);
+prog = addPlanVisualizer(p,prog);
 
-prog1 = addPlanVisualizer(p,prog1);
+prog = prog.addStateConstraint(ConstantConstraint(double(x0)),1);
+prog = prog.addInputConstraint(ConstantConstraint(u0),1);
 
-prog1 = prog1.addStateConstraint(ConstantConstraint(double(x0)),1);
-prog1 = prog1.addInputConstraint(ConstantConstraint(u0),1);
+prog = prog.addStateConstraint(ConstantConstraint(double(xf)),N);
+prog = prog.addInputConstraint(ConstantConstraint(u0),N-1);
 
-prog1 = prog1.addStateConstraint(ConstantConstraint(double(xf)),N);
-prog1 = prog1.addInputConstraint(ConstantConstraint(u0),N-1);
-
-prog1 = prog1.addRunningCost(@cost);
-prog1 = prog1.addFinalCost(@final_cost);
+prog = prog.addRunningCost(@cost);
+prog = prog.addFinalCost(@final_cost);
 
 collision_constraint = generateConstraint(MinDistanceConstraint(p,0.1),0);
-prog1 = prog1.addStateConstraint(collision_constraint{1},1:N,1:getNumPositions(p));
+prog = prog.addStateConstraint(collision_constraint{1},1:N,1:getNumPositions(p));
 
-prog1 = prog1.setSolverOptions('snopt','majoroptimalitytolerance',1e-2);
-prog1 = prog1.setSolverOptions('snopt','majorfeasibilitytolerance',1e-3);
+prog = prog.setSolverOptions('snopt','majoroptimalitytolerance',1e-3);
+prog = prog.setSolverOptions('snopt','majorfeasibilitytolerance',1e-3);
 
 tic
-[xtraj,utraj,z,F,info] = prog1.solveTraj(tf0,traj_init);
+[xtraj,utraj,z,F,info] = prog.solveTraj(tf0,traj_init);
 toc
 
-v.playback(xtraj); %, struct('slider',true));
+v.playback(xtraj, struct('slider',true));
 
 end
 

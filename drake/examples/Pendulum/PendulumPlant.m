@@ -261,7 +261,7 @@ classdef PendulumPlant < SecondOrderSystem
         prog = prog.addFinalCost(@finalCost);
         
         prog = prog.addRobustCost(Q,R,Qf);
-        prog = prog.addRobustConstraint();
+        prog = prog.addRobustInputConstraint();
         
         prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-3);
         prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-4);

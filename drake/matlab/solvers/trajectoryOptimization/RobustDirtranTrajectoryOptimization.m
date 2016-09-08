@@ -241,7 +241,7 @@
         obj = obj.addCost(cost, {reshape([obj.h_inds'; obj.x_inds(:,1:end-1); obj.u_inds],[],1); obj.x_inds(:,end)});
     end
     
-    function obj = addRobustConstraint(obj)
+    function obj = addRobustInputConstraint(obj)
         nX = obj.nX;
         nU = obj.nU;
         nw = obj.nW;
@@ -362,30 +362,30 @@
     function [c, dc] = robust_constraint_grad(obj,y,xf)
         nX = obj.nX;
         nU = obj.nU;
-        nw = obj.nW;
+        nW = obj.nW;
         N = obj.N;
         
         [K,A,B,G,dK,dA,dB,dG] = lqrController(obj,y,xf);
         
-        v = zeros((N-1)*nU*nw,1);
-        dv = zeros((N-1)*nU*nw,(N-1)*(1+nX+nU)+nX);
-        M = zeros(nX,nw);
-        dM = zeros(nX*nw,(N-1)*(1+nX+nU)+nX);
+        v = zeros((N-1)*nU*nW,1);
+        dv = zeros((N-1)*nU*nW,(N-1)*(1+nX+nU)+nX);
+        M = zeros(nX,nW);
+        dM = zeros(nX*nW,(N-1)*(1+nX+nU)+nX);
         switch obj.options.integration_method
             case DirtranTrajectoryOptimization.FORWARD_EULER
                 for k = 1:(N-2)
-                    v((k-1)*(nU*nw)+(1:nU*nw)) = vec(K(:,:,k)*M);
+                    v((k-1)*(nU*nW)+(1:nU*nW)) = vec(K(:,:,k)*M);
                     
                     dvdK = kron(M', eye(nU));
-                    dvdM = kron(eye(nw), K(:,:,k));
+                    dvdM = kron(eye(nW), K(:,:,k));
                     
-                    dv((k-1)*(nU*nw)+(1:nU*nw),:) = dvdK*dK(:,:,k) + dvdM*dM;
+                    dv((k-1)*(nU*nW)+(1:nU*nW),:) = dvdK*dK(:,:,k) + dvdM*dM;
                     
                     dMdA = kron(M', eye(nX));
                     dMdB = -kron((K(:,:,k)*M)', eye(nX));
                     dMdG = kron(obj.L', eye(nX));
                     dMdK = -kron(M', B(:,:,k));
-                    dMdM = kron(eye(nw), A(:,:,k)-B(:,:,k)*K(:,:,k));
+                    dMdM = kron(eye(nW), A(:,:,k)-B(:,:,k)*K(:,:,k));
                     
                     dM = dMdM*dM + dMdK*dK(:,:,k);
                     dM(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) = dM(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) + dMdA*dA(:,:,k) + dMdB*dB(:,:,k) + dMdG*dG(:,:,k);
@@ -393,27 +393,27 @@
                     M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
                 end
                 k = N-1;
-                v((k-1)*(nU*nw)+(1:nU*nw)) = vec(K(:,:,k)*M);
+                v((k-1)*(nU*nW)+(1:nU*nW)) = vec(K(:,:,k)*M);
                 
                 dvdK = kron(M', eye(nU));
-                dvdM = kron(eye(nw), K(:,:,k));
+                dvdM = kron(eye(nW), K(:,:,k));
                 
-                dv((k-1)*(nU*nw)+(1:nU*nw),:) = dvdK*dK(:,:,k) + dvdM*dM;
+                dv((k-1)*(nU*nW)+(1:nU*nW),:) = dvdK*dK(:,:,k) + dvdM*dM;
                 
             case DirtranTrajectoryOptimization.MIDPOINT
                 for k = 1:(N-2)
-                    v((k-1)*(nU*nw)+(1:nU*nw)) = vec(K(:,:,k)*M);
+                    v((k-1)*(nU*nW)+(1:nU*nW)) = vec(K(:,:,k)*M);
                     
                     dvdK = kron(M', eye(nU));
-                    dvdM = kron(eye(nw), K(:,:,k));
+                    dvdM = kron(eye(nW), K(:,:,k));
                     
-                    dv((k-1)*(nU*nw)+(1:nU*nw),:) = dvdK*dK(:,:,k) + dvdM*dM;
+                    dv((k-1)*(nU*nW)+(1:nU*nW),:) = dvdK*dK(:,:,k) + dvdM*dM;
                     
                     dMdA = kron(M', eye(nX));
                     dMdB = -kron((K(:,:,k)*M)', eye(nX));
                     dMdG = kron(obj.L', eye(nX));
                     dMdK = -kron(M', B(:,:,k));
-                    dMdM = kron(eye(nw), A(:,:,k)-B(:,:,k)*K(:,:,k));
+                    dMdM = kron(eye(nW), A(:,:,k)-B(:,:,k)*K(:,:,k));
                     
                     dM = dMdM*dM + dMdK*dK(:,:,k);
                     dM(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) = dM(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) + dMdA*dA(:,:,k) + dMdB*dB(:,:,k) + dMdG*dG(:,:,k);
@@ -421,54 +421,54 @@
                     M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
                 end
                 k = N-1;
-                v((k-1)*(nU*nw)+(1:nU*nw)) = vec(K(:,:,k)*M);
+                v((k-1)*(nU*nW)+(1:nU*nW)) = vec(K(:,:,k)*M);
                 
                 dvdK = kron(M', eye(nU));
-                dvdM = kron(eye(nw), K(:,:,k));
+                dvdM = kron(eye(nW), K(:,:,k));
                 
-                dv((k-1)*(nU*nw)+(1:nU*nw),:) = dvdK*dK(:,:,k) + dvdM*dM;
+                dv((k-1)*(nU*nW)+(1:nU*nW),:) = dvdK*dK(:,:,k) + dvdM*dM;
         end
         
-        uinds = 1+nX+(0:N-2)'*(1+nX+nU)+kron(ones(N-1,1), (1:nU)');
+        uinds = kron(1+nX+(0:N-2)*(1+nX+nU), ones(nU,1)) + kron(ones(1,N-1), (1:nU)');
         u = y(uinds);
-        uc = kron(ones(nw,1), u);
+        uc = vec(kron(ones(nW,1), u));
         c = [uc+v(:); uc-v(:)];
         
-        du = sparse(1:(N-1)*nU, uinds, ones((N-1)*nU,1),(N-1)*nU,(N-1)*(1+nX+nU)+nX);
+        du = sparse(1:((N-1)*nU*nW), vec(kron(ones(nW,1), uinds)), ones((N-1)*nU*nW,1),(N-1)*nU*nW,(N-1)*(1+nX+nU)+nX);
         dc = [du+dv; du-dv];
     end
     
     function [K,A,B,G,dK,dA,dB,dG] = lqrController(obj,y,xf)
         nX = obj.nX;
         nU = obj.nU;
-        nw = obj.nW;
+        nW = obj.nW;
         N = obj.N;
         
         if nargout < 5 %don't need derivatives
             %Get linearized dynamics along trajectory + derivatives
             A = zeros(nX,nX,N-1);
             B = zeros(nX,nU,N-1);
-            G = zeros(nX,nw,N-1);
+            G = zeros(nX,nW,N-1);
             switch obj.options.integration_method
                 case DirtranTrajectoryOptimization.FORWARD_EULER
                     for k = 1:(N-1)
-                        [~,dx1] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),y((k-1)*(1+nX+nU)+1+(1:nX)),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(1,nw));
+                        [~,dx1] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),y((k-1)*(1+nX+nU)+1+(1:nX)),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(nW,1));
                         A(:,:,k) = dx1(:,1+(1:nX));
                         B(:,:,k) = dx1(:,1+nX+(1:nU));
-                        G(:,:,k) = dx1(:,1+nX+nU+(1:nw));
+                        G(:,:,k) = dx1(:,1+nX+nU+(1:nW));
                     end
                 case DirtranTrajectoryOptimization.MIDPOINT
                     for k = 1:(N-2)
-                        [~,dx1] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),.5*(y((k-1)*(1+nX+nU)+1+(1:nX))+y((k)*(1+nX+nU)+1+(1:nX))),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(1,nw));
+                        [~,dx1] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),.5*(y((k-1)*(1+nX+nU)+1+(1:nX))+y((k)*(1+nX+nU)+1+(1:nX))),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(nW,1));
                         A(:,:,k) = dx1(:,1+(1:nX));
                         B(:,:,k) = dx1(:,1+nX+(1:nU));
-                        G(:,:,k) = dx1(:,1+nX+nU+(1:nw));
+                        G(:,:,k) = dx1(:,1+nX+nU+(1:nW));
                     end
                     k = N-1;
-                    [~,dx] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),.5*(y((k-1)*(1+nX+nU)+1+(1:nX))+xf),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(1,nw));
+                    [~,dx] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),.5*(y((k-1)*(1+nX+nU)+1+(1:nX))+xf),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(nW,1));
                     A(:,:,k) = dx(:,1+(1:nX));
                     B(:,:,k) = dx(:,1+nX+(1:nU));
-                    G(:,:,k) = dx(:,1+nX+nU+(1:nw));
+                    G(:,:,k) = dx(:,1+nX+nU+(1:nW));
             end
             
             %Solve Riccati Equation
@@ -483,21 +483,21 @@
             %Get dynamics derivatives along trajectory
             A = zeros(nX,nX,N-1);
             B = zeros(nX,nU,N-1);
-            G = zeros(nX,nw,N-1);
+            G = zeros(nX,nW,N-1);
             switch obj.options.integration_method
                 case DirtranTrajectoryOptimization.FORWARD_EULER
                     dA = zeros(nX*nX,1+nX+nU,N-1);
                     dB = zeros(nX*nU,1+nX+nU,N-1);
-                    dG = zeros(nX*nw,1+nX+nU,N-1);
+                    dG = zeros(nX*nW,1+nX+nU,N-1);
                     for k = 1:(N-1)
-                        [~,dx,d2x] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),y((k-1)*(1+nX+nU)+1+(1:nX)),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(1,nw));
+                        [~,dx,d2x] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),y((k-1)*(1+nX+nU)+1+(1:nX)),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(nW,1));
                         A(:,:,k) = dx(:,1+(1:nX));
                         B(:,:,k) = dx(:,1+nX+(1:nU));
-                        G(:,:,k) = dx(:,1+nX+nU+(1:nw));
-                        dvec = reshape(d2x,nX*(1+nX+nU+nw),1+nX+nU+nw);
+                        G(:,:,k) = dx(:,1+nX+nU+(1:nW));
+                        dvec = reshape(d2x,nX*(1+nX+nU+nW),1+nX+nU+nW);
                         dA(:,:,k) = dvec(nX+(1:nX*nX),1:(1+nX+nU));
                         dB(:,:,k) = dvec((1+nX)*nX+(1:nX*nU),1:(1+nX+nU));
-                        dG(:,:,k) = dvec((1+nX+nU)*nX+(1:nX*nw),1:(1+nX+nU));
+                        dG(:,:,k) = dvec((1+nX+nU)*nX+(1:nX*nW),1:(1+nX+nU));
                     end
                     
                     %Solve Riccati Equation
@@ -525,26 +525,26 @@
                 case DirtranTrajectoryOptimization.MIDPOINT
                     dA = zeros(nX*nX,2*(1+nX+nU),N-1);
                     dB = zeros(nX*nU,2*(1+nX+nU),N-1);
-                    dG = zeros(nX*nw,2*(1+nX+nU),N-1);
+                    dG = zeros(nX*nW,2*(1+nX+nU),N-1);
                     for k = 1:(N-2)
-                        [~,dx,d2x] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),.5*(y((k-1)*(1+nX+nU)+1+(1:nX))+y((k)*(1+nX+nU)+1+(1:nX))),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(1,nw));
+                        [~,dx,d2x] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),.5*(y((k-1)*(1+nX+nU)+1+(1:nX))+y((k)*(1+nX+nU)+1+(1:nX))),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(nW,1));
                         A(:,:,k) = dx(:,1+(1:nX));
                         B(:,:,k) = dx(:,1+nX+(1:nU));
-                        G(:,:,k) = dx(:,1+nX+nU+(1:nw));
-                        dvec = reshape(d2x,nX*(1+nX+nU+nw),1+nX+nU+nw);
+                        G(:,:,k) = dx(:,1+nX+nU+(1:nW));
+                        dvec = reshape(d2x,nX*(1+nX+nU+nW),1+nX+nU+nW);
                         dA(:,:,k) = [dvec(nX+(1:nX*nX),1), .5*dvec(nX+(1:nX*nX),1+(1:nX)), dvec(nX+(1:nX*nX),1+nX+(1:nU)), zeros(nX*nX,1), .5*dvec(nX+(1:nX*nX),1+(1:nX)), zeros(nX*nX,nU)];
                         dB(:,:,k) = [dvec((1+nX)*nX+(1:nX*nU),1), .5*dvec((1+nX)*nX+(1:nX*nU),1+(1:nX)), dvec((1+nX)*nX+(1:nX*nU),1+nX+(1:nU)), zeros(nX*nU,1), .5*dvec((1+nX)*nX+(1:nX*nU),1+(1:nX)), zeros(nX*nU,nU)];
-                        dG(:,:,k) = [dvec((1+nX+nU)*nX+(1:nX*nw),1), .5*dvec((1+nX+nU)*nX+(1:nX*nw),1+(1:nX)), dvec((1+nX+nU)*nX+(1:nX*nw),1+nX+(1:nU)), zeros(nX*nw,1), .5*dvec((1+nX+nU)*nX+(1:nX*nw),1+(1:nX)), zeros(nX*nw,nU)];
+                        dG(:,:,k) = [dvec((1+nX+nU)*nX+(1:nX*nW),1), .5*dvec((1+nX+nU)*nX+(1:nX*nW),1+(1:nX)), dvec((1+nX+nU)*nX+(1:nX*nW),1+nX+(1:nU)), zeros(nX*nW,1), .5*dvec((1+nX+nU)*nX+(1:nX*nW),1+(1:nX)), zeros(nX*nW,nU)];
                     end
                     k = N-1;
-                    [~,dx,d2x] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),.5*(y((k-1)*(1+nX+nU)+1+(1:nX))+xf),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(1,nw));
+                    [~,dx,d2x] = obj.robust_dynamics(y((k-1)*(1+nX+nU)+1),.5*(y((k-1)*(1+nX+nU)+1+(1:nX))+xf),y((k-1)*(1+nX+nU)+1+nX+(1:nU)),zeros(nW,1));
                     A(:,:,k) = dx(:,1+(1:nX));
                     B(:,:,k) = dx(:,1+nX+(1:nU));
-                    G(:,:,k) = dx(:,1+nX+nU+(1:nw));
-                    dvec = reshape(d2x,nX*(1+nX+nU+nw),1+nX+nU+nw);
+                    G(:,:,k) = dx(:,1+nX+nU+(1:nW));
+                    dvec = reshape(d2x,nX*(1+nX+nU+nW),1+nX+nU+nW);
                     dA(:,:,k) = [dvec(nX+(1:nX*nX),1), .5*dvec(nX+(1:nX*nX),1+(1:nX)), dvec(nX+(1:nX*nX),1+nX+(1:nU)), zeros(nX*nX,1), .5*dvec(nX+(1:nX*nX),1+(1:nX)), zeros(nX*nX,nU)];
                     dB(:,:,k) = [dvec((1+nX)*nX+(1:nX*nU),1), .5*dvec((1+nX)*nX+(1:nX*nU),1+(1:nX)), dvec((1+nX)*nX+(1:nX*nU),1+nX+(1:nU)), zeros(nX*nU,1), .5*dvec((1+nX)*nX+(1:nX*nU),1+(1:nX)), zeros(nX*nU,nU)];
-                    dG(:,:,k) = [dvec((1+nX+nU)*nX+(1:nX*nw),1), .5*dvec((1+nX+nU)*nX+(1:nX*nw),1+(1:nX)), dvec((1+nX+nU)*nX+(1:nX*nw),1+nX+(1:nU)), zeros(nX*nw,1), .5*dvec((1+nX+nU)*nX+(1:nX*nw),1+(1:nX)), zeros(nX*nw,nU)];
+                    dG(:,:,k) = [dvec((1+nX+nU)*nX+(1:nX*nW),1), .5*dvec((1+nX+nU)*nX+(1:nX*nW),1+(1:nX)), dvec((1+nX+nU)*nX+(1:nX*nW),1+nX+(1:nU)), zeros(nX*nW,1), .5*dvec((1+nX+nU)*nX+(1:nX*nW),1+(1:nX)), zeros(nX*nW,nU)];
                     
                     %Solve Riccati Equation
                     S = obj.Qf;
