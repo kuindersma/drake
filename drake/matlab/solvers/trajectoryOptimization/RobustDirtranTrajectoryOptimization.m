@@ -122,7 +122,7 @@
         
         nU = getNumInputs(obj.plant);
         if isfield(traj_init,'u')
-            z0(obj.u_inds) = traj_init.u.eval(t_init);
+            z0(obj.u_inds) = traj_init.u.eval(t_init(1:end-1));
         else
             z0(obj.u_inds) = 0.01*randn(nU,obj.N-1);
         end
