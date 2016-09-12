@@ -16,9 +16,8 @@
     nU
     nW
     
-    D % Disturbance ellipsoid matrix w'*D*w <= 1
-    Dinv
-    L
+    D % Disturbance ellipsoid matrix w'*D^-1*w <= 1
+    L % symmetric square root of D
     
     Q % LQR state cost matrix
     R % LQR input cost matrix
@@ -48,8 +47,7 @@
       obj.nU = plant.getNumInputs;
       obj.nW = plant.getNumDisturbances;
       obj.D = D;
-      obj.Dinv = inv(D);
-      obj.L = chol(obj.Dinv,'lower');
+      obj.L = D^(1/2);
       obj.Q = Q;
       obj.R = R;
       obj.Qf = Qf;
@@ -236,7 +234,7 @@
         obj.Qrf = Qrf;
         
         dim = N-1 + N*nX + (N-1)*nU;
-        cost = FunctionHandleObjective(dim,@obj.robust_cost_grad,1);
+        cost = FunctionHandleObjective(dim,@obj.robust_cost,1);
         cost.grad_method = 'user';
         obj = obj.addCost(cost, {reshape([obj.h_inds'; obj.x_inds(:,1:end-1); obj.u_inds],[],1); obj.x_inds(:,end)});
     end
@@ -249,7 +247,19 @@
         
         lb = repmat(obj.plant.umin,2*nw*(N-1),1);
         ub = repmat(obj.plant.umax,2*nw*(N-1),1);
-        constraint = FunctionHandleConstraint(lb,ub,N-1 + N*nX + (N-1)*nU,@obj.robust_constraint_grad,1);
+        constraint = FunctionHandleConstraint(lb,ub,N-1+N*nX+(N-1)*nU,@obj.robust_input_constraint,1);
+        constraint.grad_method = 'user';
+        obj = obj.addConstraint(constraint, {reshape([obj.h_inds'; obj.x_inds(:,1:end-1); obj.u_inds],[],1); obj.x_inds(:,end)});
+    end
+    
+    function obj = addRobustStateConstraint(obj,single_constraint,xinds)
+        nX = obj.nX;
+        nU = obj.nU;
+        nW = obj.nW;
+        N = obj.N;
+        nC = (N-1)*2*nW;
+        
+        constraint = FunctionHandleConstraint(zeros(nC,1),zeros(nC,1),N-1+N*nX+(N-1)*nU,@(y,xf)obj.robust_state_constraint(y,xf,single_constraint,xinds),1);
         constraint.grad_method = 'user';
         obj = obj.addConstraint(constraint, {reshape([obj.h_inds'; obj.x_inds(:,1:end-1); obj.u_inds],[],1); obj.x_inds(:,end)});
     end
@@ -276,90 +286,116 @@
       df = [-xdot (-eye(nX) - .5*h*dxdot(:,2:1+nX)) (eye(nX)- .5*h*dxdot(:,2:1+nX)) -h*dxdot(:,nX+2:end)];
     end
     
-    function [c, dc] = robust_cost_grad(obj,y,xf)
+    function [c, dc] = robust_cost(obj,y,xf)
         nX = obj.nX;
         nU = obj.nU;
-        nw = obj.nW;
+        nW = obj.nW;
         N = obj.N;
         
         [K,A,B,G,dK,dA,dB,dG] = lqrController(obj,y,xf);
         
         c = 0;
         dc = zeros(1,(N-1)*(1+nX+nU)+nX);
-        P = zeros(nX,nX);
-        dP = zeros(nX*nX,(N-1)*(1+nX+nU)+nX);
+        E = zeros(nX,nX);
+        dE = zeros(nX*nX,(N-1)*(1+nX+nU)+nX);
+        H = zeros(nX,nW);
+        dH = zeros(nX*nW,(N-1)*(1+nX+nU)+nX);
         switch obj.options.integration_method
             case DirtranTrajectoryOptimization.FORWARD_EULER
                 for k = 1:(N-1)
-                    c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
+                    c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*E);
                     
-                    dcdP = vec((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k)))';
-                    dcdK = 2*vec(obj.Rr*K(:,:,k)*P)';
+                    dcdE = vec((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k)))';
+                    dcdK = 2*vec(obj.Rr*K(:,:,k)*E)';
                     
-                    dc = dc + dcdP*dP + dcdK*dK(:,:,k);
+                    dc = dc + dcdE*dE + dcdK*dK(:,:,k);
                     
-                    dPdA = kron(eye(nX), A(:,:,k)*P)*comm(nX,nX) + kron(A(:,:,k)*P, eye(nX)) - kron(B(:,:,k)*K(:,:,k)*P, eye(nX)) - kron(eye(nX), B(:,:,k)*K(:,:,k)*P)*comm(nX,nX);
-                    dPdB = -kron(eye(nX), A(:,:,k)*P*K(:,:,k)')*comm(nX,nU) - kron(A(:,:,k)*P*K(:,:,k)', eye(nX)) + kron(eye(nX), B(:,:,k)*K(:,:,k)*P*K(:,:,k)')*comm(nX,nU) + kron(B(:,:,k)*K(:,:,k)*P*K(:,:,k)', eye(nX));
-                    dPdG = kron(eye(nX), G(:,:,k)*obj.Dinv)*comm(nX,nw) + kron(G(:,:,k)*obj.Dinv, eye(nX));
-                    dPdK = -kron(B(:,:,k), A(:,:,k)*P)*comm(nU,nX) - kron(A(:,:,k)*P, B(:,:,k)) + kron(B(:,:,k)*K(:,:,k)*P, B(:,:,k)) + kron(B(:,:,k),B(:,:,k)*K(:,:,k)*P)*comm(nU,nX);
-                    dPdP = kron(A(:,:,k)-B(:,:,k)*K(:,:,k), A(:,:,k)-B(:,:,k)*K(:,:,k));
+                    dEdA = kron(eye(nX), A(:,:,k)*E)*comm(nX,nX) + kron(A(:,:,k)*E, eye(nX)) - kron(B(:,:,k)*K(:,:,k)*E, eye(nX)) - kron(eye(nX), B(:,:,k)*K(:,:,k)*E)*comm(nX,nX) + kron(G(:,:,k)*H',eye(nX)) + kron(eye(nX),G(:,:,k)*H')*comm(nX,nX);
+                    dEdB = -kron(eye(nX), A(:,:,k)*E*K(:,:,k)')*comm(nX,nU) - kron(A(:,:,k)*E*K(:,:,k)', eye(nX)) + kron(eye(nX), B(:,:,k)*K(:,:,k)*E*K(:,:,k)')*comm(nX,nU) + kron(B(:,:,k)*K(:,:,k)*E*K(:,:,k)', eye(nX)) - kron(G(:,:,k)*H'*K(:,:,k)',eye(nX)) - kron(eye(nX),G(:,:,k)*H'*K(:,:,k)')*comm(nX,nU);
+                    dEdG = kron(eye(nX),(A(:,:,k)-B(:,:,k)*K(:,:,k))*H)*comm(nX,nW) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))*H,eye(nX)) + kron(eye(nX), G(:,:,k)*obj.D)*comm(nX,nW) + kron(G(:,:,k)*obj.D, eye(nX));
+                    dEdK = -kron(B(:,:,k), A(:,:,k)*E)*comm(nU,nX) - kron(A(:,:,k)*E, B(:,:,k)) + kron(B(:,:,k)*K(:,:,k)*E, B(:,:,k)) + kron(B(:,:,k),B(:,:,k)*K(:,:,k)*E)*comm(nU,nX) - kron(G(:,:,k)*H',B(:,:,k)) - kron(B(:,:,k),G(:,:,k)*H')*comm(nU,nX);
+                    dEdH = kron(G(:,:,k), A(:,:,k)-B(:,:,k)*K(:,:,k)) + kron(A(:,:,k)-B(:,:,k)*K(:,:,k), G(:,:,k))*comm(nW,nX);
+                    dEdE = kron(A(:,:,k)-B(:,:,k)*K(:,:,k), A(:,:,k)-B(:,:,k)*K(:,:,k));
                     
-                    P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
+                    dHdA = kron(H', eye(nX));
+                    dHdB = -kron((K*H)', eye(nX));
+                    dHdG = kron(obj.D, eye(nX));
+                    dHdK = -kron(H', B(:,:,k));
+                    dHdH = kron(eye(nW), (A(:,:,k)-B(:,:,k)*K(:,:,k)));
                     
-                    dP = dPdP*dP + dPdK*dK(:,:,k);
-                    dP(:,(k-1)*(1+nX+nU)+(1:1+nX+nU)) = dP(:,(k-1)*(1+nX+nU)+(1:1+nX+nU)) + dPdA*dA(:,:,k) + dPdB*dB(:,:,k) + dPdG*dG(:,:,k);
+                    E = (A(:,:,k)-B(:,:,k)*K(:,:,k))*E*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + (A(:,:,k)-B(:,:,k)*K(:,:,k))*H*G(:,:,k)' + G(:,:,k)*H'*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.D*G(:,:,k)';
+                    H = (A(:,:,k)-B(:,:,k)*K(:,:,k))*H + G(:,:,k)*obj.D;   
+                    
+                    dE = dEdE*dE + dEdH*dH + dEdK*dK(:,:,k);
+                    dE(:,(k-1)*(1+nX+nU)+(1:1+nX+nU)) = dE(:,(k-1)*(1+nX+nU)+(1:1+nX+nU)) + dEdA*dA(:,:,k) + dEdB*dB(:,:,k) + dEdG*dG(:,:,k);
+                    
+                    dH = dHdH*dH + dHdK*dK;
+                    dH(:,(k-1)*(1+nX+nU)+(1:1+nX+nU)) = dH(:,(k-1)*(1+nX+nU)+(1:1+nX+nU)) + dHdA*dA(:,:,k) + dHdB*dB(:,:,k) + dHdG*dG(:,:,k);
                 end
-                c = c + trace(obj.Qrf*P);
-                dcdP = vec(obj.Qrf)';
-                dc = dc + dcdP*dP;
+                c = c + trace(obj.Qrf*E);
+                dcdE = vec(obj.Qrf)';
+                dc = dc + dcdE*dE;
             case DirtranTrajectoryOptimization.MIDPOINT
                 for k = 1:(N-2)
-                    c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
+                    c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*E);
                     
-                    dcdP = vec((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k)))';
-                    dcdK = 2*vec(obj.Rr*K(:,:,k)*P)';
+                    dcdE = vec((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k)))';
+                    dcdK = 2*vec(obj.Rr*K(:,:,k)*E)';
                     
-                    dc = dc + dcdP*dP + dcdK*dK(:,:,k);
+                    dc = dc + dcdE*dE + dcdK*dK(:,:,k);
                     
-                    dPdA = kron(eye(nX), A(:,:,k)*P)*comm(nX,nX) + kron(A(:,:,k)*P, eye(nX)) - kron(B(:,:,k)*K(:,:,k)*P, eye(nX)) - kron(eye(nX), B(:,:,k)*K(:,:,k)*P)*comm(nX,nX);
-                    dPdB = -kron(eye(nX), A(:,:,k)*P*K(:,:,k)')*comm(nX,nU) - kron(A(:,:,k)*P*K(:,:,k)', eye(nX)) + kron(eye(nX), B(:,:,k)*K(:,:,k)*P*K(:,:,k)')*comm(nX,nU) + kron(B(:,:,k)*K(:,:,k)*P*K(:,:,k)', eye(nX));
-                    dPdG = kron(eye(nX), G(:,:,k)*obj.Dinv)*comm(nX,nw) + kron(G(:,:,k)*obj.Dinv, eye(nX));
-                    dPdK = -kron(B(:,:,k), A(:,:,k)*P)*comm(nU,nX) - kron(A(:,:,k)*P, B(:,:,k)) + kron(B(:,:,k)*K(:,:,k)*P, B(:,:,k)) + kron(B(:,:,k),B(:,:,k)*K(:,:,k)*P)*comm(nU,nX);
-                    dPdP = kron(A(:,:,k)-B(:,:,k)*K(:,:,k), A(:,:,k)-B(:,:,k)*K(:,:,k));
+                    dEdA = kron(eye(nX), A(:,:,k)*E)*comm(nX,nX) + kron(A(:,:,k)*E, eye(nX)) - kron(B(:,:,k)*K(:,:,k)*E, eye(nX)) - kron(eye(nX), B(:,:,k)*K(:,:,k)*E)*comm(nX,nX) + kron(G(:,:,k)*H',eye(nX)) + kron(eye(nX),G(:,:,k)*H')*comm(nX,nX);
+                    dEdB = -kron(eye(nX), A(:,:,k)*E*K(:,:,k)')*comm(nX,nU) - kron(A(:,:,k)*E*K(:,:,k)', eye(nX)) + kron(eye(nX), B(:,:,k)*K(:,:,k)*E*K(:,:,k)')*comm(nX,nU) + kron(B(:,:,k)*K(:,:,k)*E*K(:,:,k)', eye(nX)) - kron(G(:,:,k)*H'*K(:,:,k)',eye(nX)) - kron(eye(nX),G(:,:,k)*H'*K(:,:,k)')*comm(nX,nU);
+                    dEdG = kron(eye(nX),(A(:,:,k)-B(:,:,k)*K(:,:,k))*H)*comm(nX,nW) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))*H,eye(nX)) + kron(eye(nX), G(:,:,k)*obj.D)*comm(nX,nW) + kron(G(:,:,k)*obj.D, eye(nX));
+                    dEdK = -kron(B(:,:,k), A(:,:,k)*E)*comm(nU,nX) - kron(A(:,:,k)*E, B(:,:,k)) + kron(B(:,:,k)*K(:,:,k)*E, B(:,:,k)) + kron(B(:,:,k),B(:,:,k)*K(:,:,k)*E)*comm(nU,nX) - kron(G(:,:,k)*H',B(:,:,k)) - kron(B(:,:,k),G(:,:,k)*H')*comm(nU,nX);
+                    dEdH = kron(G(:,:,k), A(:,:,k)-B(:,:,k)*K(:,:,k)) + kron(A(:,:,k)-B(:,:,k)*K(:,:,k), G(:,:,k))*comm(nW,nX);
+                    dEdE = kron(A(:,:,k)-B(:,:,k)*K(:,:,k), A(:,:,k)-B(:,:,k)*K(:,:,k));
                     
-                    P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
+                    dHdA = kron(H', eye(nX));
+                    dHdB = -kron(H'*K(:,:,k)', eye(nX));
+                    dHdG = kron(obj.D, eye(nX));
+                    dHdK = -kron(H', B(:,:,k));
+                    dHdH = kron(eye(nW), (A(:,:,k)-B(:,:,k)*K(:,:,k)));
                     
-                    dP = dPdP*dP + dPdK*dK(:,:,k);
-                    dP(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) = dP(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) + dPdA*dA(:,:,k) + dPdB*dB(:,:,k) + dPdG*dG(:,:,k);
+                    E = (A(:,:,k)-B(:,:,k)*K(:,:,k))*E*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + (A(:,:,k)-B(:,:,k)*K(:,:,k))*H*G(:,:,k)' + G(:,:,k)*H'*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.D*G(:,:,k)';
+                    H = (A(:,:,k)-B(:,:,k)*K(:,:,k))*H + G(:,:,k)*obj.D;   
+                    
+                    dE = dEdE*dE + dEdH*dH + dEdK*dK(:,:,k);
+                    dE(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) = dE(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) + dEdA*dA(:,:,k) + dEdB*dB(:,:,k) + dEdG*dG(:,:,k);
+                    
+                    dH = dHdH*dH + dHdK*dK(:,:,k);
+                    dH(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) = dH(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) + dHdA*dA(:,:,k) + dHdB*dB(:,:,k) + dHdG*dG(:,:,k);
                 end
                 k = N-1;
                 
-                c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
+                c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*E);
                 
-                dcdP = vec((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k)))';
-                dcdK = 2*vec(obj.Rr*K(:,:,k)*P)';
+                dcdE = vec((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k)))';
+                dcdK = 2*vec(obj.Rr*K(:,:,k)*E)';
                 
-                dc = dc + dcdP*dP + dcdK*dK(:,:,k);
+                dc = dc + dcdE*dE + dcdK*dK(:,:,k);
                 
-                dPdA = kron(eye(nX), A(:,:,k)*P)*comm(nX,nX) + kron(A(:,:,k)*P, eye(nX)) - kron(B(:,:,k)*K(:,:,k)*P, eye(nX)) - kron(eye(nX), B(:,:,k)*K(:,:,k)*P)*comm(nX,nX);
-                dPdB = -kron(eye(nX), A(:,:,k)*P*K(:,:,k)')*comm(nX,nU) - kron(A(:,:,k)*P*K(:,:,k)', eye(nX)) + kron(eye(nX), B(:,:,k)*K(:,:,k)*P*K(:,:,k)')*comm(nX,nU) + kron(B(:,:,k)*K(:,:,k)*P*K(:,:,k)', eye(nX));
-                dPdG = kron(eye(nX), G(:,:,k)*obj.Dinv)*comm(nX,nw) + kron(G(:,:,k)*obj.Dinv, eye(nX));
-                dPdK = -kron(B(:,:,k), A(:,:,k)*P)*comm(nU,nX) - kron(A(:,:,k)*P, B(:,:,k)) + kron(B(:,:,k)*K(:,:,k)*P, B(:,:,k)) + kron(B(:,:,k),B(:,:,k)*K(:,:,k)*P)*comm(nU,nX);
-                dPdP = kron(A(:,:,k)-B(:,:,k)*K(:,:,k), A(:,:,k)-B(:,:,k)*K(:,:,k));
+                dEdA = kron(eye(nX), A(:,:,k)*E)*comm(nX,nX) + kron(A(:,:,k)*E, eye(nX)) - kron(B(:,:,k)*K(:,:,k)*E, eye(nX)) - kron(eye(nX), B(:,:,k)*K(:,:,k)*E)*comm(nX,nX) + kron(G(:,:,k)*H',eye(nX)) + kron(eye(nX),G(:,:,k)*H')*comm(nX,nX);
+                dEdB = -kron(eye(nX), A(:,:,k)*E*K(:,:,k)')*comm(nX,nU) - kron(A(:,:,k)*E*K(:,:,k)', eye(nX)) + kron(eye(nX), B(:,:,k)*K(:,:,k)*E*K(:,:,k)')*comm(nX,nU) + kron(B(:,:,k)*K(:,:,k)*E*K(:,:,k)', eye(nX)) - kron(G(:,:,k)*H'*K(:,:,k)',eye(nX)) - kron(eye(nX),G(:,:,k)*H'*K(:,:,k)')*comm(nX,nU);
+                dEdG = kron(eye(nX),(A(:,:,k)-B(:,:,k)*K(:,:,k))*H)*comm(nX,nW) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))*H,eye(nX)) + kron(eye(nX), G(:,:,k)*obj.D)*comm(nX,nW) + kron(G(:,:,k)*obj.D, eye(nX));
+                dEdK = -kron(B(:,:,k), A(:,:,k)*E)*comm(nU,nX) - kron(A(:,:,k)*E, B(:,:,k)) + kron(B(:,:,k)*K(:,:,k)*E, B(:,:,k)) + kron(B(:,:,k),B(:,:,k)*K(:,:,k)*E)*comm(nU,nX) - kron(G(:,:,k)*H',B(:,:,k)) - kron(B(:,:,k),G(:,:,k)*H')*comm(nU,nX);
+                dEdH = kron(G(:,:,k), A(:,:,k)-B(:,:,k)*K(:,:,k)) + kron(A(:,:,k)-B(:,:,k)*K(:,:,k), G(:,:,k))*comm(nW,nX);
+                dEdE = kron(A(:,:,k)-B(:,:,k)*K(:,:,k), A(:,:,k)-B(:,:,k)*K(:,:,k));
                 
-                P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
+                E = (A(:,:,k)-B(:,:,k)*K(:,:,k))*E*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + (A(:,:,k)-B(:,:,k)*K(:,:,k))*H*G(:,:,k)' + G(:,:,k)*H'*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.D*G(:,:,k)';
                 
-                dP = dPdP*dP + dPdK*dK(:,:,k);
-                dP(:,(k-1)*(1+nX+nU)+(1:1+nX+nU)) = dP(:,(k-1)*(1+nX+nU)+(1:1+nX+nU)) + dPdA*dA(:,1:(1+nX+nU),k) + dPdB*dB(:,1:(1+nX+nU),k) + dPdG*dG(:,1:(1+nX+nU),k);
-                dP(:,k*(1+nX+nU)+(1:nX)) = dP(:,k*(1+nX+nU)+(1:nX)) + dPdA*dA(:,(1+nX+nU+1)+(1:nX),k) + dPdB*dB(:,(1+nX+nU+1)+(1:nX),k) + dPdG*dG(:,(1+nX+nU+1)+(1:nX),k);
+                dE = dEdE*dE + dEdH*dH + dEdK*dK(:,:,k);
+                dE(:,(k-1)*(1+nX+nU)+(1:1+nX+nU)) = dE(:,(k-1)*(1+nX+nU)+(1:1+nX+nU)) + dEdA*dA(:,1:(1+nX+nU),k) + dEdB*dB(:,1:(1+nX+nU),k) + dEdG*dG(:,1:(1+nX+nU),k);
+                dE(:,k*(1+nX+nU)+(1:nX)) = dE(:,k*(1+nX+nU)+(1:nX)) + dEdA*dA(:,(1+nX+nU+1)+(1:nX),k) + dEdB*dB(:,(1+nX+nU+1)+(1:nX),k) + dEdG*dG(:,(1+nX+nU+1)+(1:nX),k);
                 
-                c = c + trace(obj.Qrf*P);
-                dcdP = vec(obj.Qrf)';
-                dc = dc + dcdP*dP;
+                c = c + trace(obj.Qrf*E);
+                dcdE = vec(obj.Qrf)';
+                dc = dc + dcdE*dE;
         end
     end
 
-    function [c, dc] = robust_constraint_grad(obj,y,xf)
+    %TODO: Fix propagation of M through dynamcis
+    function [c, dc] = robust_input_constraint(obj,y,xf)
         nX = obj.nX;
         nU = obj.nU;
         nW = obj.nW;
@@ -438,6 +474,83 @@
         dc = [du+dv; du-dv];
     end
     
+    %TODO: Fix propagation of M through dynamcis and check w/finite diff
+    function [c, dc] = robust_state_constraint(obj,y,xf,constr_fun,x_ind)
+        nX = obj.nX;
+        nU = obj.nU;
+        nW = obj.nW;
+        N = obj.N;
+        nC = (N-1)*2*nW;
+        nXc = length(x_ind);
+        
+        [K,A,B,G,dK,dA,dB,dG] = lqrController(obj,y,xf);
+        
+        v = zeros(nXc,(N-1)*nW);
+        dv = zeros((N-1)*nXc*nW,(N-1)*(1+nX+nU)+nX);
+        M = zeros(nX,nW);
+        dM = zeros(nX*nW,(N-1)*(1+nX+nU)+nX);
+        dvdM = kron(speye(nW), [eye(nXc) zeros(nXc,nX-nXc)]);
+        switch obj.options.integration_method
+            case DirtranTrajectoryOptimization.FORWARD_EULER
+                for k = 1:(N-2)
+                    v(:,(k-1)*nW+(1:nW)) = M(1:nXc,:);
+                    dv((k-1)*(nXc*nW)+(1:nXc*nW),:) = dvdM*dM;
+                    
+                    dMdA = kron(M', eye(nX));
+                    dMdB = -kron((K(:,:,k)*M)', eye(nX));
+                    dMdG = kron(obj.L', eye(nX));
+                    dMdK = -kron(M', B(:,:,k));
+                    dMdM = kron(eye(nW), A(:,:,k)-B(:,:,k)*K(:,:,k));
+                    
+                    dM = dMdM*dM + dMdK*dK(:,:,k);
+                    dM(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) = dM(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) + dMdA*dA(:,:,k) + dMdB*dB(:,:,k) + dMdG*dG(:,:,k);
+                    
+                    M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
+                end
+                k = N-1;
+                v(:,(k-1)*nW+(1:nW)) = M(1:nXc,:);
+                dv((k-1)*(nXc*nW)+(1:nXc*nW),:) = dvdM*dM;
+                
+            case DirtranTrajectoryOptimization.MIDPOINT
+                for k = 1:(N-2)
+                    v(:,(k-1)*nW+(1:nW)) = M(1:nXc,:);
+                    dv((k-1)*(nXc*nW)+(1:nXc*nW),:) = dvdM*dM;
+                    
+                    dMdA = kron(M', eye(nX));
+                    dMdB = -kron((K(:,:,k)*M)', eye(nX));
+                    dMdG = kron(obj.L', eye(nX));
+                    dMdK = -kron(M', B(:,:,k));
+                    dMdM = kron(eye(nW), A(:,:,k)-B(:,:,k)*K(:,:,k));
+                    
+                    dM = dMdM*dM + dMdK*dK(:,:,k);
+                    dM(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) = dM(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) + dMdA*dA(:,:,k) + dMdB*dB(:,:,k) + dMdG*dG(:,:,k);
+                    
+                    M = (A(:,:,k)-B(:,:,k)*K(:,:,k))*M + G(:,:,k)*obj.L;
+                end
+                k = N-1;
+                v(:,(k-1)*nW+(1:nW)) = M(1:nXc,:);
+                dv((k-1)*(nXc*nW)+(1:nXc*nW),:) = dvdM*dM;
+        end
+        
+        xinds = kron(1+(0:N-2)*(1+nX+nU), ones(length(x_ind),1)) + kron(ones(1,N-1), x_ind(:));
+        x = kron(y(xinds), ones(1,nW));
+        xc = [x+v x-v];
+        xcinds = [kron(xinds, ones(1,nW)), kron(xinds, ones(1,nW))];
+        
+        %Evaluate constraint function
+        c = zeros(nC,1);
+        dcdxc = sparse([],[],[],nC,nC*nXc,nC*nXc);
+        for k = 1:nC
+            [c(k), dcdxc(k,(k-1)*nXc+(1:nXc))] = constr_fun.eval(xc(:,k));
+        end
+        
+        %TODO: Clean this up - these only need to be computed once
+        dxcdv = sparse(1:(nC*nXc), [1:(nC*nXc/2) 1:(nC*nXc/2)], [ones(nC*nXc/2,1); -ones(nC*nXc/2,1)], nC*nXc, nC*nXc/2);
+        dxc = sparse(1:(nC*nXc), xcinds(:), ones(length(xcinds(:)),1), nC*nXc, N-1+N*nX+(N-1)*nU);
+        
+        dc = dcdxc*dxc + dcdxc*dxcdv*dv;
+    end
+    
     function [K,A,B,G,dK,dA,dB,dG] = lqrController(obj,y,xf)
         nX = obj.nX;
         nU = obj.nU;
@@ -472,11 +585,11 @@
             end
             
             %Solve Riccati Equation
-            S = obj.Qf;
+            P = obj.Qf;
             K = zeros(nU,nX,N-1);
             for k = (N-1):-1:1
-                K(:,:,k) = (B(:,:,k).'*S*B(:,:,k)+obj.R)\(B(:,:,k).'*S*A(:,:,k));
-                S = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*S*(A(:,:,k) - B(:,:,k)*K(:,:,k));
+                K(:,:,k) = (B(:,:,k).'*P*B(:,:,k)+obj.R)\(B(:,:,k).'*P*A(:,:,k));
+                P = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*P*(A(:,:,k) - B(:,:,k)*K(:,:,k));
             end
             
         else %need derivatives
@@ -501,26 +614,26 @@
                     end
                     
                     %Solve Riccati Equation
-                    S = obj.Qf;
-                    dS = zeros(nX*nX,(N-1)*(1+nX+nU)+nX);
+                    P = obj.Qf;
+                    dP = zeros(nX*nX,(N-1)*(1+nX+nU)+nX);
                     K = zeros(nU,nX,N-1);
                     dK = zeros(nU*nX,(N-1)*(1+nX+nU)+nX,N-1);
                     for k = (N-1):-1:1
-                        K(:,:,k) = (B(:,:,k).'*S*B(:,:,k)+obj.R)\(B(:,:,k).'*S*A(:,:,k));
-                        dKdA = kron(eye(nX),(B(:,:,k)'*S*B(:,:,k)+obj.R)\B(:,:,k)'*S);
-                        dKdB = kron(A(:,:,k)'*S, inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*comm(nX,nU) - kron(A(:,:,k)'*S*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*S*B(:,:,k)+obj.R)', inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*(kron(eye(nU), B(:,:,k)'*S) + kron(B(:,:,k)'*S, eye(nU))*comm(nX,nU));
-                        dKdS = kron(A(:,:,k)', (B(:,:,k)'*S*B(:,:,k)+obj.R)\B(:,:,k)') - kron(A(:,:,k)'*S*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*S*B(:,:,k)+obj.R)', inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*kron(B(:,:,k)', B(:,:,k)');
-                        dK(:,:,k) = dKdS*dS;
+                        K(:,:,k) = (B(:,:,k).'*P*B(:,:,k)+obj.R)\(B(:,:,k).'*P*A(:,:,k));
+                        dKdA = kron(eye(nX),(B(:,:,k)'*P*B(:,:,k)+obj.R)\B(:,:,k)'*P);
+                        dKdB = kron(A(:,:,k)'*P, inv(B(:,:,k)'*P*B(:,:,k)+obj.R))*comm(nX,nU) - kron(A(:,:,k)'*P*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*P*B(:,:,k)+obj.R)', inv(B(:,:,k)'*P*B(:,:,k)+obj.R))*(kron(eye(nU), B(:,:,k)'*P) + kron(B(:,:,k)'*P, eye(nU))*comm(nX,nU));
+                        dKdP = kron(A(:,:,k)', (B(:,:,k)'*P*B(:,:,k)+obj.R)\B(:,:,k)') - kron(A(:,:,k)'*P*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*P*B(:,:,k)+obj.R)', inv(B(:,:,k)'*P*B(:,:,k)+obj.R))*kron(B(:,:,k)', B(:,:,k)');
+                        dK(:,:,k) = dKdP*dP;
                         dK(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU)),k) = dK(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU)),k) + dKdA*dA(:,:,k) + dKdB*dB(:,:,k);
                         
-                        dSdA = kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nX))*comm(nX,nX);
-                        dSdB = -kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S)*kron(K(:,:,k)', eye(nX)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nX))*kron(eye(nX), K(:,:,k)')*comm(nX,nU);
-                        dSdK = kron(eye(nX), K(:,:,k)'*obj.R) + kron(K(:,:,k)'*obj.R, eye(nX))*comm(nU,nX) - kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S)*kron(eye(nX), B(:,:,k)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nX))*kron(B(:,:,k), eye(nX))*comm(nU,nX);
-                        dSdS = kron((A(:,:,k)-B(:,:,k)*K(:,:,k))', (A(:,:,k)-B(:,:,k)*K(:,:,k))');
+                        dPdA = kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*P) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*P, eye(nX))*comm(nX,nX);
+                        dPdB = -kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*P)*kron(K(:,:,k)', eye(nX)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*P, eye(nX))*kron(eye(nX), K(:,:,k)')*comm(nX,nU);
+                        dPdK = kron(eye(nX), K(:,:,k)'*obj.R) + kron(K(:,:,k)'*obj.R, eye(nX))*comm(nU,nX) - kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*P)*kron(eye(nX), B(:,:,k)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*P, eye(nX))*kron(B(:,:,k), eye(nX))*comm(nU,nX);
+                        dPdP = kron((A(:,:,k)-B(:,:,k)*K(:,:,k))', (A(:,:,k)-B(:,:,k)*K(:,:,k))');
                         
-                        S = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*S*(A(:,:,k) - B(:,:,k)*K(:,:,k));
-                        dS = dSdS*dS + dSdK*dK(:,:,k);
-                        dS(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) = dS(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) + dSdA*dA(:,:,k) + dSdB*dB(:,:,k);
+                        P = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*P*(A(:,:,k) - B(:,:,k)*K(:,:,k));
+                        dP = dPdP*dP + dPdK*dK(:,:,k);
+                        dP(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) = dP(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) + dPdA*dA(:,:,k) + dPdB*dB(:,:,k);
                     end
                 case DirtranTrajectoryOptimization.MIDPOINT
                     dA = zeros(nX*nX,2*(1+nX+nU),N-1);
@@ -547,43 +660,43 @@
                     dG(:,:,k) = [dvec((1+nX+nU)*nX+(1:nX*nW),1), .5*dvec((1+nX+nU)*nX+(1:nX*nW),1+(1:nX)), dvec((1+nX+nU)*nX+(1:nX*nW),1+nX+(1:nU)), zeros(nX*nW,1), .5*dvec((1+nX+nU)*nX+(1:nX*nW),1+(1:nX)), zeros(nX*nW,nU)];
                     
                     %Solve Riccati Equation
-                    S = obj.Qf;
-                    dS = zeros(nX*nX,(N-1)*(1+nX+nU)+nX);
+                    P = obj.Qf;
+                    dP = zeros(nX*nX,(N-1)*(1+nX+nU)+nX);
                     K = zeros(nU,nX,N-1);
                     dK = zeros(nU*nX,(N-1)*(1+nX+nU)+nX,N-1);
                     
                     k = N-1;
-                    K(:,:,k) = (B(:,:,k).'*S*B(:,:,k)+obj.R)\(B(:,:,k).'*S*A(:,:,k));
-                    dKdA = kron(eye(nX),(B(:,:,k)'*S*B(:,:,k)+obj.R)\B(:,:,k)'*S);
-                    dKdB = kron(A(:,:,k)'*S, inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*comm(nX,nU) - kron(A(:,:,k)'*S*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*S*B(:,:,k)+obj.R)', inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*(kron(eye(nU), B(:,:,k)'*S) + kron(B(:,:,k)'*S, eye(nU))*comm(nX,nU));
-                    dKdS = kron(A(:,:,k)', (B(:,:,k)'*S*B(:,:,k)+obj.R)\B(:,:,k)') - kron(A(:,:,k)'*S*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*S*B(:,:,k)+obj.R)', inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*kron(B(:,:,k)', B(:,:,k)');
-                    dK(:,:,k) = dKdS*dS;
+                    K(:,:,k) = (B(:,:,k).'*P*B(:,:,k)+obj.R)\(B(:,:,k).'*P*A(:,:,k));
+                    dKdA = kron(eye(nX),(B(:,:,k)'*P*B(:,:,k)+obj.R)\B(:,:,k)'*P);
+                    dKdB = kron(A(:,:,k)'*P, inv(B(:,:,k)'*P*B(:,:,k)+obj.R))*comm(nX,nU) - kron(A(:,:,k)'*P*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*P*B(:,:,k)+obj.R)', inv(B(:,:,k)'*P*B(:,:,k)+obj.R))*(kron(eye(nU), B(:,:,k)'*P) + kron(B(:,:,k)'*P, eye(nU))*comm(nX,nU));
+                    dKdP = kron(A(:,:,k)', (B(:,:,k)'*P*B(:,:,k)+obj.R)\B(:,:,k)') - kron(A(:,:,k)'*P*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*P*B(:,:,k)+obj.R)', inv(B(:,:,k)'*P*B(:,:,k)+obj.R))*kron(B(:,:,k)', B(:,:,k)');
+                    dK(:,:,k) = dKdP*dP;
                     dK(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU)),k) = dKdA*dA(:,1:(1+nX+nU),k) + dKdB*dB(:,1:(1+nX+nU),k);
                     dK(:,k*(1+nX+nU)+(1:nX),k) = dKdA*dA(:,(1+nX+nU+1)+(1:nX),k) + dKdB*dB(:,(1+nX+nU+1)+(1:nX),k);
-                    dSdA = kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nX))*comm(nX,nX);
-                    dSdB = -kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S)*kron(K(:,:,k)', eye(nX)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nX))*kron(eye(nX), K(:,:,k)')*comm(nX,nU);
-                    dSdK = kron(eye(nX), K(:,:,k)'*obj.R) + kron(K(:,:,k)'*obj.R, eye(nX))*comm(nU,nX) - kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S)*kron(eye(nX), B(:,:,k)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nX))*kron(B(:,:,k), eye(nX))*comm(nU,nX);
-                    dSdS = kron((A(:,:,k)-B(:,:,k)*K(:,:,k))', (A(:,:,k)-B(:,:,k)*K(:,:,k))');
-                    S = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*S*(A(:,:,k) - B(:,:,k)*K(:,:,k));
-                    dS = dSdS*dS + dSdK*dK(:,:,k);
-                    dS(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) = dS(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) + dSdA*dA(:,1:(1+nX+nU),k) + dSdB*dB(:,1:(1+nX+nU),k);
-                    dS(:,k*(1+nX+nU)+(1:nX)) = dS(:,k*(1+nX+nU)+(1:nX))+ dSdA*dA(:,(1+nX+nU+1)+(1:nX),k) + dSdB*dB(:,(1+nX+nU+1)+(1:nX),k);
+                    dPdA = kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*P) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*P, eye(nX))*comm(nX,nX);
+                    dPdB = -kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*P)*kron(K(:,:,k)', eye(nX)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*P, eye(nX))*kron(eye(nX), K(:,:,k)')*comm(nX,nU);
+                    dPdK = kron(eye(nX), K(:,:,k)'*obj.R) + kron(K(:,:,k)'*obj.R, eye(nX))*comm(nU,nX) - kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*P)*kron(eye(nX), B(:,:,k)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*P, eye(nX))*kron(B(:,:,k), eye(nX))*comm(nU,nX);
+                    dPdP = kron((A(:,:,k)-B(:,:,k)*K(:,:,k))', (A(:,:,k)-B(:,:,k)*K(:,:,k))');
+                    P = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*P*(A(:,:,k) - B(:,:,k)*K(:,:,k));
+                    dP = dPdP*dP + dPdK*dK(:,:,k);
+                    dP(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) = dP(:,(k-1)*(1+nX+nU)+(1:(1+nX+nU))) + dPdA*dA(:,1:(1+nX+nU),k) + dPdB*dB(:,1:(1+nX+nU),k);
+                    dP(:,k*(1+nX+nU)+(1:nX)) = dP(:,k*(1+nX+nU)+(1:nX))+ dPdA*dA(:,(1+nX+nU+1)+(1:nX),k) + dPdB*dB(:,(1+nX+nU+1)+(1:nX),k);
                     for k = (N-2):-1:1
-                        K(:,:,k) = (B(:,:,k).'*S*B(:,:,k)+obj.R)\(B(:,:,k).'*S*A(:,:,k));
-                        dKdA = kron(eye(nX),(B(:,:,k)'*S*B(:,:,k)+obj.R)\B(:,:,k)'*S);
-                        dKdB = kron(A(:,:,k)'*S, inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*comm(nX,nU) - kron(A(:,:,k)'*S*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*S*B(:,:,k)+obj.R)', inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*(kron(eye(nU), B(:,:,k)'*S) + kron(B(:,:,k)'*S, eye(nU))*comm(nX,nU));
-                        dKdS = kron(A(:,:,k)', (B(:,:,k)'*S*B(:,:,k)+obj.R)\B(:,:,k)') - kron(A(:,:,k)'*S*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*S*B(:,:,k)+obj.R)', inv(B(:,:,k)'*S*B(:,:,k)+obj.R))*kron(B(:,:,k)', B(:,:,k)');
-                        dK(:,:,k) = dKdS*dS;
+                        K(:,:,k) = (B(:,:,k).'*P*B(:,:,k)+obj.R)\(B(:,:,k).'*P*A(:,:,k));
+                        dKdA = kron(eye(nX),(B(:,:,k)'*P*B(:,:,k)+obj.R)\B(:,:,k)'*P);
+                        dKdB = kron(A(:,:,k)'*P, inv(B(:,:,k)'*P*B(:,:,k)+obj.R))*comm(nX,nU) - kron(A(:,:,k)'*P*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*P*B(:,:,k)+obj.R)', inv(B(:,:,k)'*P*B(:,:,k)+obj.R))*(kron(eye(nU), B(:,:,k)'*P) + kron(B(:,:,k)'*P, eye(nU))*comm(nX,nU));
+                        dKdP = kron(A(:,:,k)', (B(:,:,k)'*P*B(:,:,k)+obj.R)\B(:,:,k)') - kron(A(:,:,k)'*P*B(:,:,k), eye(nU))*kron(inv(B(:,:,k)'*P*B(:,:,k)+obj.R)', inv(B(:,:,k)'*P*B(:,:,k)+obj.R))*kron(B(:,:,k)', B(:,:,k)');
+                        dK(:,:,k) = dKdP*dP;
                         dK(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU)),k) = dK(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU)),k) + dKdA*dA(:,:,k) + dKdB*dB(:,:,k);
                         
-                        dSdA = kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nX))*comm(nX,nX);
-                        dSdB = -kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S)*kron(K(:,:,k)', eye(nX)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nX))*kron(eye(nX), K(:,:,k)')*comm(nX,nU);
-                        dSdK = kron(eye(nX), K(:,:,k)'*obj.R) + kron(K(:,:,k)'*obj.R, eye(nX))*comm(nU,nX) - kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*S)*kron(eye(nX), B(:,:,k)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*S, eye(nX))*kron(B(:,:,k), eye(nX))*comm(nU,nX);
-                        dSdS = kron((A(:,:,k)-B(:,:,k)*K(:,:,k))', (A(:,:,k)-B(:,:,k)*K(:,:,k))');
+                        dPdA = kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*P) + kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*P, eye(nX))*comm(nX,nX);
+                        dPdB = -kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*P)*kron(K(:,:,k)', eye(nX)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*P, eye(nX))*kron(eye(nX), K(:,:,k)')*comm(nX,nU);
+                        dPdK = kron(eye(nX), K(:,:,k)'*obj.R) + kron(K(:,:,k)'*obj.R, eye(nX))*comm(nU,nX) - kron(eye(nX), (A(:,:,k)-B(:,:,k)*K(:,:,k))'*P)*kron(eye(nX), B(:,:,k)) - kron((A(:,:,k)-B(:,:,k)*K(:,:,k))'*P, eye(nX))*kron(B(:,:,k), eye(nX))*comm(nU,nX);
+                        dPdP = kron((A(:,:,k)-B(:,:,k)*K(:,:,k))', (A(:,:,k)-B(:,:,k)*K(:,:,k))');
                         
-                        S = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*S*(A(:,:,k) - B(:,:,k)*K(:,:,k));
-                        dS = dSdS*dS + dSdK*dK(:,:,k);
-                        dS(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) = dS(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) + dSdA*dA(:,:,k) + dSdB*dB(:,:,k);
+                        P = obj.Q + K(:,:,k).'*obj.R*K(:,:,k) + (A(:,:,k) - B(:,:,k)*K(:,:,k)).'*P*(A(:,:,k) - B(:,:,k)*K(:,:,k));
+                        dP = dPdP*dP + dPdK*dK(:,:,k);
+                        dP(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) = dP(:,(k-1)*(1+nX+nU)+(1:2*(1+nX+nU))) + dPdA*dA(:,:,k) + dPdB*dB(:,:,k);
                     end
             end
         end
@@ -645,7 +758,7 @@
 %         P = zeros(nX,nX);
 %         for k = 1:(N-1)
 %             c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
-%             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
+%             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.D*G(:,:,k)';
 %         end
 %         c = c + trace(obj.Qrf*P);
 %     end
@@ -661,7 +774,7 @@
 %         P = zeros(nX,nX);
 %         for k = 1:(N-1)
 %             c = c + trace((obj.Qr + K(:,:,k)'*obj.Rr*K(:,:,k))*P);
-%             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.Dinv*G(:,:,k)';
+%             P = (A(:,:,k)-B(:,:,k)*K(:,:,k))*P*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.D*G(:,:,k)';
 %         end
 %         c = c + trace(obj.Qrf*P);
 %         

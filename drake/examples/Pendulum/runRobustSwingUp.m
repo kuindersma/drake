@@ -7,19 +7,14 @@ N = 51;
 
 [utraj1,xtraj1,z1,prog1] = p.swingUpDirtran(N);
 
-%Playback
-olsys1 = cascade(utraj1,p);
-xol1 = olsys1.simulateODE(utraj1.tspan,[0 0]');
-v.playback(xol1);
-
-D = (1/.2^2); %This corresponds to +/-.1 uncertainty in mass (10%)
+D = .2^2; % w'*D*w <=1. This corresponds to +/-.2 uncertainty in mass (20%)
 [utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D);
 
 %Playback
-olsys2 = cascade(utraj2,p);
-xol2 = olsys2.simulateODE(utraj2.tspan,[0 0]');
-v.playback(xol2);
-
+v.playback(xtraj1);
+keyboard
+v.playback(xtraj2);
+keyboard
 
 %Closed-loop simulation
 Q = [100 0; 0 10];
@@ -30,14 +25,15 @@ Qf = 1000*eye(2);
 c1 = tvlqr(p,xtraj1,utraj1,Q,R,Qf);
 p = p.setMass(1.2);
 clsys1 = feedback(p,c1);
-xcl1 = clsys1.simulate([utraj1.tspan(1) utraj1.tspan(2)+.5], [0 0]');
+xcl1 = clsys1.simulate([utraj1.tspan(1) utraj2.tspan(2)], [0 0]');
 v.playback(xcl1);
+keyboard
 
 p = p.setMass(1);
 c2 = tvlqr(p,xtraj2,utraj2,Q,R,Qf);
 p = p.setMass(1.2);
 clsys2 = feedback(p,c2);
-xcl2 = clsys2.simulate([utraj2.tspan(1) utraj2.tspan(2)+.5], [0 0]');
+xcl2 = clsys2.simulate(utraj2.tspan, [0 0]');
 v.playback(xcl2);
 
 
