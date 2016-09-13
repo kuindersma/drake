@@ -7,8 +7,9 @@ N = 51;
 
 [utraj1,xtraj1,z1,prog1] = p.swingUpDirtran(N);
 
+options.integration_method = RobustDirtranTrajectoryOptimization.MIDPOINT;
 D = .2^2; % w'*D*w <=1. This corresponds to +/-.2 uncertainty in mass (20%)
-[utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D);
+[utraj2,xtraj2,z2,prog2] = p.robustSwingUpTrajectory(N,D,options);
 
 %Playback
 v.playback(xtraj1);
@@ -17,9 +18,9 @@ v.playback(xtraj2);
 keyboard
 
 %Closed-loop simulation
-Q = [100 0; 0 10];
-R = 1;
-Qf = 1000*eye(2);
+Q = [10 0; 0 1];
+R = .1;
+Qf = 100*eye(2);
 
 %p = p.setMass(1);
 c1 = tvlqr(p,xtraj1,utraj1,Q,R,Qf);
