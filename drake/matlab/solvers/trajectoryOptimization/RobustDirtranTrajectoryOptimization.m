@@ -436,10 +436,12 @@
                 
                 for k = 2:(N-2)
                     U = K(:,:,k)*E*K(:,:,k)';
-                    Us = fastsqrt(U);
+                    %Us = fastsqrt(U);
+                    Us = chol(U,'lower');
                     v((k-2)*(nU*nU)+(1:nU*nU)) = vec(Us);
                     
-                    dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
+                    %dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
+                    dvdU = inv(kron(eye(nU),Us)*comm(nU,nU) + kron(Us,eye(nU)));
                     dUdK = kron(K(:,:,k)*E, eye(nU)) + kron(eye(nU), K(:,:,k)*E)*comm(nU,nX);
                     dUdE = kron(K(:,:,k), K(:,:,k));
                     dvdK = dvdU*dUdK;
@@ -472,10 +474,12 @@
                 k = N-1;
      
                 U = K(:,:,k)*E*K(:,:,k)';
-                Us = fastsqrt(U);
+                %Us = fastsqrt(U);
+                Us = chol(U,'lower');
                 v((k-2)*(nU*nU)+(1:nU*nU)) = vec(Us);
                 
-                dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
+                %dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
+                dvdU = inv(kron(eye(nU),Us)*comm(nU,nU) + kron(Us,eye(nU)));
                 dUdK = kron(K(:,:,k)*E, eye(nU)) + kron(eye(nU), K(:,:,k)*E)*comm(nU,nX);
                 dUdE = kron(K(:,:,k), K(:,:,k));
                 dvdK = dvdU*dUdK;
@@ -510,10 +514,12 @@
                 
                 for k = 2:(N-2)
                     U = K(:,:,k)*E*K(:,:,k)';
-                    Us = fastsqrt(U);
+                    %Us = fastsqrt(U);
+                    Us = chol(U,'lower');
                     v((k-2)*(nU*nU)+(1:nU*nU)) = vec(Us);
                     
-                    dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
+                    %dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
+                    dvdU = inv(kron(eye(nU),Us)*comm(nU,nU) + kron(Us,eye(nU)));
                     dUdK = kron(K(:,:,k)*E, eye(nU)) + kron(eye(nU), K(:,:,k)*E)*comm(nU,nX);
                     dUdE = kron(K(:,:,k), K(:,:,k));
                     dvdK = dvdU*dUdK;
@@ -546,10 +552,12 @@
                 k = N-1;
                 
                 U = K(:,:,k)*E*K(:,:,k)';
-                Us = fastsqrt(U);
+                %Us = fastsqrt(U);
+                Us = chol(U,'lower');
                 v((k-2)*(nU*nU)+(1:nU*nU)) = vec(Us);
                 
-                dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
+                %dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
+                dvdU = inv(kron(eye(nU),Us)*comm(nU,nU) + kron(Us,eye(nU)));
                 dUdK = kron(K(:,:,k)*E, eye(nU)) + kron(eye(nU), K(:,:,k)*E)*comm(nU,nX);
                 dUdE = kron(K(:,:,k), K(:,:,k));
                 dvdK = dvdU*dUdK;
@@ -848,9 +856,10 @@
         T = I;
         
         for k = 1:4
-            Snew = .5*(S + inv(T));
-            T = .5*(T + inv(S));
-            S = Snew;
+            R = chol(S);
+            Q = chol(T);
+            S = .5*(S + Q\(Q'\I));
+            T = .5*(T + R\(R'\I));
         end
         
     end
