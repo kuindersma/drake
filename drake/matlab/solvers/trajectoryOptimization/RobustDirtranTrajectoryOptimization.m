@@ -47,7 +47,7 @@
       obj.nU = plant.getNumInputs;
       obj.nW = plant.getNumDisturbances;
       obj.D = D;
-      obj.L = D^(1/2);
+      obj.L = sqrtm(D);
       obj.Q = Q;
       obj.R = R;
       obj.Qf = Qf;
@@ -436,7 +436,7 @@
                 
                 for k = 2:(N-2)
                     U = K(:,:,k)*E*K(:,:,k)';
-                    Us = U^(1/2);
+                    Us = fastsqrt(U);
                     v((k-2)*(nU*nU)+(1:nU*nU)) = vec(Us);
                     
                     dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
@@ -472,7 +472,7 @@
                 k = N-1;
      
                 U = K(:,:,k)*E*K(:,:,k)';
-                Us = U^(1/2);
+                Us = fastsqrt(U);
                 v((k-2)*(nU*nU)+(1:nU*nU)) = vec(Us);
                 
                 dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
@@ -510,7 +510,7 @@
                 
                 for k = 2:(N-2)
                     U = K(:,:,k)*E*K(:,:,k)';
-                    Us = U^(1/2);
+                    Us = fastsqrt(U);
                     v((k-2)*(nU*nU)+(1:nU*nU)) = vec(Us);
                     
                     dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
@@ -546,7 +546,7 @@
                 k = N-1;
                 
                 U = K(:,:,k)*E*K(:,:,k)';
-                Us = U^(1/2);
+                Us = fastsqrt(U);
                 v((k-2)*(nU*nU)+(1:nU*nU)) = vec(Us);
                 
                 dvdU = inv(kron(eye(nU),Us) + kron(Us,eye(nU)));
@@ -839,7 +839,21 @@
       xtraj = PPTrajectory(foh(t,x));
       xtraj = xtraj.setOutputFrame(obj.plant.getStateFrame);
     end
-
+    
+    function [S, T] = fastsqrt(A)
+        %FASTSQRT computes the square root of a matrix A with Denman?Beavers iteration
+        
+        I = eye(size(A,1));
+        S = A;
+        T = I;
+        
+        for k = 1:4
+            Snew = .5*(S + inv(T));
+            T = .5*(T + inv(S));
+            S = Snew;
+        end
+        
+    end
 %     function c = robust_cost_1(obj,y,xf)
 %         nX = obj.nX;
 %         nU = obj.nU;
@@ -894,53 +908,53 @@
 %             dxf(k) = 0;
 %         end
 %     end
-
-    function [c, dc] = robust_constraint_fd(obj,y,xf)
-        nX = obj.nX;
-        nU = obj.nU;
-        N = obj.N;
-        delta = 1e-5;
-        
-        c = robust_constraint_1(obj,y,xf);
-        
-        dc = zeros(2*(N-2)*nU,length(y)+length(xf));
-        dy = zeros(size(y));
-        for k = 1:length(y)
-            dy(k) = delta;
-            dc(:,k) = (robust_constraint_1(obj,y+dy,xf) - robust_constraint_1(obj,y-dy,xf))./(2*delta);
-            dy(k) = 0;
-        end
-        dxf = zeros(size(xf));
-        for k = 1:length(xf)
-            dxf(k) = delta;
-            dc(:,length(y)+k) = (robust_constraint_1(obj,y,xf+dxf) - robust_constraint_1(obj,y,xf-dxf))./(2*delta);
-            dxf(k) = 0;
-        end
-    end
-    
-    function c = robust_constraint_1(obj,y,xf)
-        nX = obj.nX;
-        nU = obj.nU;
-        nW = obj.nW;
-        N = obj.N;
-        
-        [K,A,B,G] = lqrController(obj,y,xf);
-        
-        v = zeros((N-2)*nU,nW);
-        E = G(:,:,1)*obj.D*G(:,:,1)';
-        H = G(:,:,1)*obj.D;
-        for k = 2:(obj.N-1)
-            U = K(:,:,k)*E*K(:,:,k)';
-            v((k-2)*(nU*nU)+(1:nU*nU)) = vec(U^(1/2));
-            
-            E = (A(:,:,k)-B(:,:,k)*K(:,:,k))*E*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + (A(:,:,k)-B(:,:,k)*K(:,:,k))*H*G(:,:,k)' + G(:,:,k)*H'*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.D*G(:,:,k)';
-            H = (A(:,:,k)-B(:,:,k)*K(:,:,k))*H + G(:,:,k)*obj.D;
-        end
-        
-        u = y(1+nX+(1:N-2)'*(1+nX+nU)+kron(ones(N-2,1), (1:nU)'));
-        uc = kron(ones(nU,1), u);
-        c = [uc+v(:); uc-v(:)];
-    end
+% 
+%     function [c, dc] = robust_constraint_fd(obj,y,xf)
+%         nX = obj.nX;
+%         nU = obj.nU;
+%         N = obj.N;
+%         delta = 1e-5;
+%         
+%         c = robust_constraint_1(obj,y,xf);
+%         
+%         dc = zeros(2*(N-2)*nU,length(y)+length(xf));
+%         dy = zeros(size(y));
+%         for k = 1:length(y)
+%             dy(k) = delta;
+%             dc(:,k) = (robust_constraint_1(obj,y+dy,xf) - robust_constraint_1(obj,y-dy,xf))./(2*delta);
+%             dy(k) = 0;
+%         end
+%         dxf = zeros(size(xf));
+%         for k = 1:length(xf)
+%             dxf(k) = delta;
+%             dc(:,length(y)+k) = (robust_constraint_1(obj,y,xf+dxf) - robust_constraint_1(obj,y,xf-dxf))./(2*delta);
+%             dxf(k) = 0;
+%         end
+%     end
+%     
+%     function c = robust_constraint_1(obj,y,xf)
+%         nX = obj.nX;
+%         nU = obj.nU;
+%         nW = obj.nW;
+%         N = obj.N;
+%         
+%         [K,A,B,G] = lqrController(obj,y,xf);
+%         
+%         v = zeros((N-2)*nU,nW);
+%         E = G(:,:,1)*obj.D*G(:,:,1)';
+%         H = G(:,:,1)*obj.D;
+%         for k = 2:(obj.N-1)
+%             U = K(:,:,k)*E*K(:,:,k)';
+%             v((k-2)*(nU*nU)+(1:nU*nU)) = vec(U^(1/2));
+%             
+%             E = (A(:,:,k)-B(:,:,k)*K(:,:,k))*E*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + (A(:,:,k)-B(:,:,k)*K(:,:,k))*H*G(:,:,k)' + G(:,:,k)*H'*(A(:,:,k)-B(:,:,k)*K(:,:,k))' + G(:,:,k)*obj.D*G(:,:,k)';
+%             H = (A(:,:,k)-B(:,:,k)*K(:,:,k))*H + G(:,:,k)*obj.D;
+%         end
+%         
+%         u = y(1+nX+(1:N-2)'*(1+nX+nU)+kron(ones(N-2,1), (1:nU)'));
+%         uc = kron(ones(nU,1), u);
+%         c = [uc+v(:); uc-v(:)];
+%     end
     
   end
 end
