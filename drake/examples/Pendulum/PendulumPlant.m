@@ -255,7 +255,9 @@ classdef PendulumPlant < SecondOrderSystem
         R = 1;
         Qf = 1000*eye(2);
         
-        prog = RobustDirtranTrajectoryOptimization(obj,N,D,Q,R,Qf,[1 4],options);
+        E0 = zeros(2,2);
+        
+        prog = RobustDirtranTrajectoryOptimization(obj,N,D,E0,Q,R,Qf,[1 4],options);
         prog = prog.addStateConstraint(ConstantConstraint(x0),1);
         prog = prog.addStateConstraint(ConstantConstraint(xf),N);
         prog = prog.addFinalCost(@finalCost);
