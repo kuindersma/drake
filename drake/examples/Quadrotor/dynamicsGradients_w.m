@@ -4,7 +4,7 @@ function [df, d2f] = dynamicsGradients_w(a1, a2, a3, a4, a5, order)
 % See <a href="matlab: help generateGradients">generateGradients</a>. 
 
 % Check inputs:
-%typecheck(a1,'QuadPlantPenn');
+typecheck(a1,'Quadrotor');
 if (nargin<5) order=1; end
 if (order<1) error(' order must be >= 1'); end
 sizecheck(a1,[1  1]);

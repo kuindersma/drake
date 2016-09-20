@@ -40,8 +40,8 @@ classdef Quadrotor < RigidBodyManipulator
       I = obj.body(2).inertia;
     end
     
-    function Nw = getNumDisturbances(obj)
-        Nw = 3;
+    function nW = getNumDisturbances(obj)
+        nW = 3;
     end
     
     function u0 = nominalThrust(obj)
