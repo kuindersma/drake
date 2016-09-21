@@ -5,7 +5,7 @@ classdef CartPolePlant < Manipulator
     mp = .2;    % mass of the pole (point mass at the end) in kg
     l = 0.5;   % length of the pole in m
     g = 9.81;  % gravity m/s^2
-    mu = 1; %Coulomb friction for cart
+    mu = 0.1; %Coulomb friction for cart
     friction_on = 0; %turn on Coulomb friction
     
     xG;
@@ -193,9 +193,9 @@ classdef CartPolePlant < Manipulator
         prog = prog.addRunningCost(@cost);
         %prog = prog.addFinalCost(@finalCost);
         
-        prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-5);
-        prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-5);
-        prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-5);
+        prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-3);
+        prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-4);
+        prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-4);
         
         prog = prog.addRobustCost(Q,1,Qf);
         prog = prog.addRobustInputConstraint();

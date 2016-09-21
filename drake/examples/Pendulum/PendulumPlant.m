@@ -265,9 +265,9 @@ classdef PendulumPlant < SecondOrderSystem
         prog = prog.addRobustCost(Q,R,Qf);
         prog = prog.addRobustInputConstraint();
         
-        prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-3);
-        prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-4);
-        prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-4);
+        prog = prog.setSolverOptions('snopt','majoroptimalitytolerance', 1e-2);
+        prog = prog.setSolverOptions('snopt','majorfeaasibilitytolerance', 1e-3);
+        prog = prog.setSolverOptions('snopt','minorfeaasibilitytolerance', 1e-3);
         
         % add a display function to draw the trajectory on every iteration
         function displayTrajectory(t,x,u)

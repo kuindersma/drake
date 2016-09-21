@@ -56,16 +56,16 @@ ylabel('$u$','Interpreter','latex');
 xlabel('Time (s)');
 box off
 
-addpath('/Users/Zac/Documents/MATLAB/TikZ/');
-cleanfigure();
-matlab2tikz('CartPoleTraj.tikz', 'height', '\figureheight', 'width', '\figurewidth');
+% addpath('/Users/Zac/Documents/MATLAB/TikZ/');
+% cleanfigure();
+% matlab2tikz('CartPoleTraj.tikz', 'height', '\figureheight', 'width', '\figurewidth');
 
 %Closed-loop simulation
 c1 = tvlqr(p,xtraj1,utraj1,Q,R,Qf);
 c2 = tvlqr(p,xtraj2,utraj2,Q,R,Qf);
 
 p.friction_on = 1;
-p.F_c = 2;
+p.mu = 0.2;
 
 clsys1 = feedback(p,c1);
 xcl1 = clsys1.simulate([utraj1.tspan(1) utraj1.tspan(2)], [0 0 0 0]');

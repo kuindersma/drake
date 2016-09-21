@@ -57,8 +57,9 @@ collision_constraint.grad_method = 'user';
 collision_constraint.grad_level = 1;
 prog1 = prog1.addStateConstraint(collision_constraint,2:N-1,1:2);
 
-prog1 = prog1.setSolverOptions('snopt','majoroptimalitytolerance',1e-2);
+prog1 = prog1.setSolverOptions('snopt','majoroptimalitytolerance',1e-3);
 prog1 = prog1.setSolverOptions('snopt','majorfeasibilitytolerance',1e-3);
+prog1 = prog1.setSolverOptions('snopt','minorfeasibilitytolerance',1e-3);
 
 prog1 = addPlanVisualizer(p,prog1);
 tic
@@ -110,6 +111,7 @@ prog2 = prog2.addRunningCost(@cost);
 
 prog2 = prog2.setSolverOptions('snopt','majoroptimalitytolerance',1e-2);
 prog2 = prog2.setSolverOptions('snopt','majorfeasibilitytolerance',1e-3);
+prog2 = prog2.setSolverOptions('snopt','minorfeasibilitytolerance',1e-3);
 
 tic
 [xtraj2,utraj2,z2,F2,info2] = prog2.solveTraj(tf0,traj_init);
