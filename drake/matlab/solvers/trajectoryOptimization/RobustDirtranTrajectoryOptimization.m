@@ -41,6 +41,13 @@
     dG_handle
     E_handle
     dE_handle
+    
+    %Stuff for robustifying state constraints
+    constr_xinds
+    dUdE
+    dxcdv
+    dxc
+    
   end
   
   methods
@@ -275,17 +282,18 @@
         obj = obj.addConstraint(constraint, {reshape([obj.h_inds'; obj.x_inds(:,1:end-1); obj.u_inds],[],1); obj.x_inds(:,end)});
     end
     
-    function obj = addRobustStateConstraint(obj,single_constr,times,xinds)
+    function obj = addRobustStateConstraint(obj,single_constr,times,x_ind)
         nX = obj.nX;
         nU = obj.nU;
         nW = obj.nW;
         N = obj.N;
-        nXc = length(xinds);
+        nXc = length(x_ind);
         nCout = single_constr.num_cnstr;
         nC = 2*length(times)*nXc;
         
         %Projection matrix onto constrained subspace
-        obj.Pc = sparse((1:nXc)', xinds, ones(nXc,1), nXc, nX, nXc);
+        obj.Pc = sparse((1:nXc)', x_ind, ones(nXc,1), nXc, nX, nXc);
+        obj.dUdE = kron(obj.Pc, obj.Pc);
         
         lb = zeros(nC*nCout, 1);
         ub = zeros(nC*nCout, 1);
@@ -294,7 +302,13 @@
             ub((k-1)*nCout + (1:nCout)) = single_constr.ub;
         end
         
-        constraint = FunctionHandleConstraint(lb,ub,N-1+N*nX+(N-1)*nU,@(y,xf)obj.robust_state_constraint(y,xf,single_constr,times,xinds),1);
+        %these only need to be computed once
+        obj.constr_xinds = kron(1+(1:N-2)*(1+nX+nU), ones(length(x_ind),1)) + kron(ones(1,N-2), x_ind(:));
+        xcinds = [kron(obj.constr_xinds, ones(1,nXc)), kron(obj.constr_xinds, ones(1,nXc))];
+        obj.dxc = sparse((1:(nC*nXc))', xcinds(:), ones(length(xcinds(:)),1), nC*nXc, N-1+N*nX+(N-1)*nU);
+        obj.dxcdv = sparse(1:(nC*nXc), [1:(nC*nXc/2) 1:(nC*nXc/2)], [ones(nC*nXc/2,1); -ones(nC*nXc/2,1)], nC*nXc, nC*nXc/2);
+        
+        constraint = FunctionHandleConstraint(lb,ub,N-1+N*nX+(N-1)*nU,@(y,xf)obj.robust_state_constraint(y,xf,single_constr,times,x_ind),1);
         constraint.grad_method = 'user';
         constraint.grad_level = 1;
         obj = obj.addConstraint(constraint, {reshape([obj.h_inds'; obj.x_inds(:,1:end-1); obj.u_inds],[],1); obj.x_inds(:,end)});
@@ -391,12 +405,12 @@
         nCout = constr_fun.num_cnstr; %number of components in each constraint vector
         
         Pc = obj.Pc; %projection onto constrained subspace
+        dUdE = obj.dUdE;
         
         [~,~,~,~,E,~,~,~,~,dE] = deltaLQR(obj,y,xf);
         
         v = zeros(nXc,(N-2)*nXc);
         dv = zeros((N-2)*nXc*nXc,(N-1)*(1+nX+nU)+nX);
-        dUdE = kron(Pc, Pc);
         for k = 2:(N-1)
             U = Pc*E(:,:,k)*Pc';
             Us = obj.fastsqrt(U);
@@ -407,11 +421,9 @@
             
             dv((k-2)*(nXc*nXc)+(1:(nXc*nXc))',:) = dvdE*dE(:,:,k);
         end
-        
-        xinds = kron(1+(1:N-2)*(1+nX+nU), ones(length(x_ind),1)) + kron(ones(1,N-2), x_ind(:));
-        x = kron(y(xinds), ones(1,nXc));
+
+        x = kron(y(obj.constr_xinds), ones(1,nXc));
         xc = [x+v x-v];
-        xcinds = [kron(xinds, ones(1,nXc)), kron(xinds, ones(1,nXc))];
         
         %Evaluate constraint function
         c = zeros(nC,1);
@@ -420,11 +432,7 @@
             [c((k-1)*nCout+(1:nCout)), dcdxc((k-1)*nCout+(1:nCout),(k-1)*nXc+(1:nXc))] = constr_fun.eval(xc(:,k));
         end
         
-        %TODO: these only need to be computed once
-        dxcdv = sparse(1:(nC*nXc), [1:(nC*nXc/2) 1:(nC*nXc/2)], [ones(nC*nXc/2,1); -ones(nC*nXc/2,1)], nC*nXc, nC*nXc/2);
-        dxc = sparse((1:(nC*nXc))', xcinds(:), ones(length(xcinds(:)),1), nC*nXc, N-1+N*nX+(N-1)*nU);
-        
-        dc = dcdxc*dxc + dcdxc*dxcdv*dv;
+        dc = dcdxc*obj.dxc + dcdxc*obj.dxcdv*dv;
     end
     
     function [K,A,B,G,E,dK,dA,dB,dG,dE] = deltaLQR(obj,y,xf)
