@@ -287,11 +287,14 @@
         %Projection matrix onto constrained subspace
         obj.Pc = sparse((1:nXc)', xinds, ones(nXc,1), nXc, nX, nXc);
         
-        %TODO: Fix this
-        ub = single_constr.ub(1)*ones(nC*nCout,1);
-        lb = single_constr.lb(1)*ones(nC*nCout,1);
+        lb = zeros(nC*nCout, 1);
+        ub = zeros(nC*nCout, 1);
+        for k = 1:nC
+            lb((k-1)*nCout + (1:nCout)) = single_constr.lb;
+            ub((k-1)*nCout + (1:nCout)) = single_constr.ub;
+        end
         
-        constraint = FunctionHandleConstraint(lb,ub,N-1+N*nX+(N-1)*nU,@(y,xf)obj.robust_state_constraint(y,xf,single_constr,[],xinds),1);
+        constraint = FunctionHandleConstraint(lb,ub,N-1+N*nX+(N-1)*nU,@(y,xf)obj.robust_state_constraint(y,xf,single_constr,times,xinds),1);
         constraint.grad_method = 'user';
         constraint.grad_level = 1;
         obj = obj.addConstraint(constraint, {reshape([obj.h_inds'; obj.x_inds(:,1:end-1); obj.u_inds],[],1); obj.x_inds(:,end)});
@@ -383,9 +386,10 @@
         nW = obj.nW;
         N = obj.N;
         
-        nCout = constr_fun.num_cnstr;
         nXc = length(x_ind); %number of constrained components
-        nC = 2*nCout*(N-2)*nXc; %number of constraints
+        nC = 2*length(times)*nXc; %number of constraint vectors
+        nCout = constr_fun.num_cnstr; %number of components in each constraint vector
+        
         Pc = obj.Pc; %projection onto constrained subspace
         
         [~,~,~,~,E,~,~,~,~,dE] = deltaLQR(obj,y,xf);
@@ -413,7 +417,7 @@
         c = zeros(nC,1);
         dcdxc = sparse([],[],[],nC,nC*nXc,nC*nXc);
         for k = 1:nC
-            [c(k), dcdxc(k,(k-1)*nXc+(1:nXc))] = constr_fun.eval(xc(:,k));
+            [c((k-1)*nCout+(1:nCout)), dcdxc((k-1)*nCout+(1:nCout),(k-1)*nXc+(1:nXc))] = constr_fun.eval(xc(:,k));
         end
         
         %TODO: these only need to be computed once
