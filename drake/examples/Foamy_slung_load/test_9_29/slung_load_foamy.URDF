@@ -1,0 +1,202 @@
+<robot
+  name="slung_load_foamy">
+  <link
+    name="airplane_body">
+    <inertial>
+      <origin
+        xyz="-0.6 0 0"
+        rpy="0 0 0" />
+      <mass
+        value=".484" />
+      <inertia
+        ixx="0.003922"
+        ixy="0.000303"
+        ixz="0.000441"
+        iyy="0.015940"
+        iyz="-0.000030"
+        izz="0.019340" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="-0.6 0.436 0"
+        rpy="0 0 0 "/>
+      <geometry>
+        <mesh
+          filename="./flat-plate.stl"
+          scale = "0.001"
+        />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+  </link>
+
+  <link
+    name="pendulum_length">
+    <inertial>
+      <origin
+        xyz="0 0 0.35"
+        rpy="0 0 0" />
+      <mass
+        value="0.00001" />
+      <inertia
+        ixx="0.00001"
+        ixy="0.0"
+        ixz="0.0"
+        iyy="0.00001"
+        iyz="0.0"
+        izz="0.00001" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 -0.35"
+        rpy="0 0 0" />
+      <geometry>
+        <cylinder length="0.7" radius="0.01"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+  </link>
+
+    <link
+    name="pendulum_mass">
+    <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value=".0000001" />
+      <inertia
+        ixx="0.00196"
+        ixy="0.00"
+        ixz="0.00"
+        iyy="0.00196"
+        iyz="0.00"
+        izz="0.00196" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.1"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+  </link>
+
+
+    <link
+    name="dummy">
+    <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value="0.0001" />
+      <inertia
+        ixx="0.00001"
+        ixy="0.0"
+        ixz="0.0"
+        iyy="0.0001"
+        iyz="0.0"
+        izz="0.0001" />
+    </inertial>
+  </link>
+
+ 
+
+  <joint
+    name="pendulum_plane"
+    type="revolute">
+    <origin
+      xyz="0 0 0"
+      rpy="0 pi 0" />
+    <parent
+      link="airplane_body" />
+    <child
+      link="pendulum_length" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+	  lower="-3.14"
+      upper="3.14"/>
+  </joint>
+
+  <joint
+    name="plane_dummy"
+    type="revolute">
+    <origin
+      xyz="0 0 0"
+      rpy="0 pi 0" />
+    <parent
+      link="airplane_body" />
+    <child
+      link="dummy" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+	  lower="-3.14"
+      upper="3.14"/>
+  </joint>
+
+<joint
+    name="dummy_length"
+    type="continuous">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0" />
+    <parent
+      link="dummy" />
+    <child
+      link="pendulum_length" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+    lower="-3.14"
+      upper="3.14"/>
+  </joint>
+
+
+  <joint
+    name="mass_length"
+    type="fixed">
+    <origin
+      xyz="0 0 -.7"
+      rpy="0 1.57 0" />
+    <parent
+      link="pendulum_length" />
+    <child
+      link="pendulum_mass" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+    lower="-3.14"
+      upper="3.14"/>
+  </joint>
+
+
+  
+ 
+<!--  <transmission type="SimpleTransmission" name="joint_L_trans">
+    <actuator name="control_torque" />
+    <joint name="left_inner_knuckle_joint" />
+    <mechanicalReduction>1</mechanicalReduction>
+  </transmission>
+<transmission type="SimpleTransmission" name="joint_R_trans">
+    <actuator name="control_torque" />
+    <joint name="right_inner_knuckle_joint" />
+    <mechanicalReduction>1</mechanicalReduction>
+  </transmission>  -->
+</robot>

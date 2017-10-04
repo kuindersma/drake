@@ -1,0 +1,37 @@
+<robot
+  name="foamy_brick">
+  <link
+    name="airplane_body">
+    <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value=".484" />
+      <inertia
+        ixx="0.003922"
+        ixy="0.000303"
+        ixz="0.000441"
+        iyy="0.015940"
+        iyz="-0.000030"
+        izz="0.019340" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0 "/>
+      <geometry>
+        <box
+        size="1 1 1"
+        />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+  </link>
+
+
+</robot>
