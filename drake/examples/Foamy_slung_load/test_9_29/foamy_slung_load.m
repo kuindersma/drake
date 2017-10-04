@@ -14,7 +14,7 @@ classdef foamy_slung_load < DrakeSystem
 
       obj = obj.setStateFrame(CoordinateFrame('FoamyState',17,'x',{'x1','x2','x3','q0','q1','q2','q3','theta','phi','v1','v2','v3','w1','w2','w3','theta_dot','phi_dot'}));
       obj = obj.setInputFrame(CoordinateFrame('FoamyInput',4,'u',{'thr','ail','elev','rud'}));
-      obj = obj.setOutputFrame(obj.getStateFrame); %full state feedback      
+      obj = obj.setOutputFrame(obj.getStateFrame);       
 
       options.floating = 'quat';
       urdf = 'slung_load_foamy.URDF';
@@ -23,8 +23,11 @@ classdef foamy_slung_load < DrakeSystem
       warning('off','Drake:RigidBodyManipulator:UnsupportedContactPoints');
       warning('off','Drake:RigidBodyManipulator:WeldedLinkInd');
       warning('off','Drake:RigidBodyManipulator:UnsupportedJointLimits');
-      obj.plane_rbm = RigidBodyManipulator(urdf,options);
-     % obj = compile(obj);
+      rbm = RigidBodyManipulator(urdf,options);
+%       rbm = rbm.setStateFrame(obj.getStateFrame);
+%       rbm = rbm.setOutputFrame(obj.getStateFrame);  
+
+      obj.plane_rbm = rbm;
 
     end
     
@@ -42,43 +45,31 @@ classdef foamy_slung_load < DrakeSystem
     end
     
     function [f,df] = dynamics(obj,t,x,u)
-        q = x(4:7); %Quaternion rotation from body to lab frame
-        v = x(10:12); %Lab-frame velocity vector
-        w = x(13:15); %Body-frame angular velocity
+        quat = x(4:7); %Quaternion rotation from body to lab frame
+        float_v = x(10:12); %Lab-frame velocity vector
+        float_w = x(13:15); %Body-frame angular velocity
 
-        %q = x(1:9);
-        %v = x(10:end);
-        [H,C,B] = obj.plane_rbm.manipulatorDynamics(x(1:9),x(10:end));
-        [xdot,F,T] = foamy_dynamics(t,x,u);
-        kinsol = doKinematics(obj.plane_rbm,x(1:obj.plane_rbm.getNumPositions) , [], struct('compute_gradients', true));
-        %[x, J, dJ] = obj.forwardKin(kinsol, body_idx, contactPoint, options);
-        jac_options = struct();
-        jac_options.rotation_type = 2;
-        jac_options.in_terms_of_qdot = false;
-        [~, J, ~] = obj.plane_rbm.forwardKin(kinsol, obj.plane_link_id, [0;0;0],jac_options);
-        %body = obj.extractFrameInfo(findLinkId(obj,'airplane_body'));
-        %base = obj.extractFrameInfo(findLinkId(obj,'airplane_body'));
-        %[J_geometric, v_or_qdot_indices, dJ_geometric] = geometricJacobian(obj, kinsol, base, body,findLinkId(obj,'airplane_body'),true)
-        %J = obj.geometricJacobian(kinsol, findLinkId(obj,'airplane_body'), [0;0;0])
-        quat = q;
-        G = obj.omega_to_qdot(q);
-        J_quat = J(4:7,:)'*G;
-        J = [J(1:3,:);J_quat'];
-        %F_quat = 2*[-1*dot(quat(2:4),T);quat(1)*T+cross(quat(2:4),T)];
-        F_quat = T;
-        F_gen = [F;F_quat];
-        temp = J'*F_gen;
-        qdd = H\(-C+temp); %[wx,wy,wz,vx,vy,vz,theta_dot,phi_dot]'
-        %f = [v;.5*[-q(2:4)'*w; q(1)*w + cross(q(2:4),w)];x(16:17);qdd];
-        f = [v;.5*[-q(2:4)'*w; q(1)*w + cross(q(2:4),w)];x(16:17);qdd(4:6);qdd(1:3);qdd(7:8)];
-        if max(abs(f)) > 1e5
-           indicator = 1;
-        else
-        end
-        disc = [f(1:7);f(10:15)]-xdot;
+        v_plant_to_manip = [4 5 6 1 2 3 7 8];
+        q_manip = x(1:9);
+        v_manip = x(9+v_plant_to_manip);
+        [H,C,~] = obj.plane_rbm.manipulatorDynamics(q_manip,v_manip);
+        [~,F,T] = foamy_dynamics(t,x,u);
+        kinsol = doKinematics(obj.plane_rbm, q_manip, [], struct('compute_gradients', true));
+  
+        body = obj.plane_rbm.findLinkId('airplane_body');
+        base = 1;
+        J = geometricJacobian(obj.plane_rbm, kinsol, base, body , base);
+        
+%         F_gen = J'*[F;T]; 
+        F_gen = J'*[0;0;0;0;0;10]; % TODO: haven't had a chance to debug this 
+        qdd = H\(-C+[F_gen;0;0]); %[wx,wy,wz,vx,vy,vz,theta_dot,phi_dot]'
+        f = [float_v;.5*[-quat(2:4)'*float_w; quat(1)*float_w + cross(quat(2:4),float_w)];v_manip(7:8);qdd(4:6);qdd(1:3);qdd(7:8)];
         df = 0;
     end
     
+    function y = output(obj,t,x,u)
+      y=x;
+    end
         
     function [xtraj,utraj] = runDircol(obj,display)
             % initial conditions:
@@ -200,6 +191,12 @@ classdef foamy_slung_load < DrakeSystem
                 q(4) q(1) -q(2);...
                 -q(3) q(2) q(1)];
             
+        end
+        
+        function v = constructVisualizer(obj)
+          
+          v = obj.plane_rbm.constructVisualizer;
+%           v = v.setInputFrame(obj.getStateFrame);
         end
   end
     
