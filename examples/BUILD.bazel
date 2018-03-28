@@ -39,6 +39,7 @@ drake_cc_binary(
 INSTALLED_MODEL_PACKAGES = [
     "//examples/acrobot",
     "//examples/atlas",
+    "//examples/cassie",
     "//examples/contact_model",
     "//examples/double_pendulum",
     "//examples/irb140",
@@ -61,6 +62,7 @@ filegroup(
 # TODO(jwnimmer-tri): Figure out which examples needs to be installed (see
 # issues #4224 and #1766).
 INSTALLED_EXAMPLES = [
+    "//examples/cassie",
     "//examples/kuka_iiwa_arm",
 ]
 

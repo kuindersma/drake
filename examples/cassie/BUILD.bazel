@@ -1,0 +1,92 @@
+# -*- python -*-
+
+load(
+    "//tools:drake.bzl",
+    "drake_cc_library",
+    "drake_cc_binary",
+    "drake_cc_googletest",
+    "drake_example_cc_binary",
+)
+load(
+    "//tools/skylark:drake_py.bzl",
+    "drake_py_unittest",
+)
+load("//tools/install:install_data.bzl", "install", "install_data")
+load("//tools/lint:lint.bzl", "add_lint_tests")
+load(
+    "//tools/skylark:drake_py.bzl",
+    "drake_py_test",
+)
+
+package(
+    default_visibility = [":__subpackages__"],
+)
+
+drake_cc_library(
+    name = "cassie_common",
+    srcs = [
+        "cassie_common.cc",
+    ],
+    hdrs = [
+        "cassie_common.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//common:find_resource",
+        "//common/trajectories:piecewise_polynomial",
+        "//multibody:inverse_kinematics",
+        "//multibody:rigid_body_tree",
+        "//multibody/parsers",
+        "@lcm",
+        "@lcmtypes_bot2_core",
+        "@lcmtypes_robotlocomotion",
+        "//lcm",
+        "//multibody:rigid_body_tree_construction",
+        "//multibody/rigid_body_plant",
+        "//multibody/rigid_body_plant:drake_visualizer",
+        "//systems/lcm",
+    ],
+)
+
+
+drake_example_cc_binary(
+    name = "cassie_simulation_test",
+    srcs = ["cassie_simulation_test.cc"],
+    data = [":models"],
+    deps = [
+        ":cassie_common",
+        "@gflags",
+        "@lcmtypes_bot2_core",
+        "@lcmtypes_robotlocomotion",
+    ],
+)
+
+#drake_example_cc_binary(
+#    name = "cassie_simulation_with_loops",
+#    srcs = ["cassie_simulation_with_loops.cc"],
+#    data = [":models"],
+#    deps = [
+#        ":cassie_common",
+#        "@gflags",
+#        "@lcmtypes_bot2_core",
+#        "@lcmtypes_robotlocomotion",
+#    ],
+#)
+
+# This examples needs to be install for external projects such as Spartan.
+install(
+    name = "install",
+    targets = [
+        ":cassie_simulation_test",
+    ],
+#    targets = [
+#        ":cassie_simulation_test",
+#        ":cassie_simulation_with_loops",
+#    ],
+    runtime_dest = "share/drake/examples/cassie",
+    visibility = ["//visibility:public"],
+)
+
+install_data()
+
+add_lint_tests()
