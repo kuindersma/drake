@@ -206,14 +206,19 @@ PYBIND11_MODULE(rigid_body_tree, m) {
            py::arg("model_instance_id_set") =
              RigidBodyTreeConstants::default_model_instance_id_set,
            py::arg("in_terms_of_qdot") = false)
-
       // centroidalMomentumMatrix
       // forwardKinPositionGradient
       // geometricJacobianDotTimesV
       // centroidalMomentumMatrixDotTimesV
-      // positionConstraints
-      // positionConstraintsJacobian
-      // positionConstraintsJacDotTimesV
+      .def("positionConstraints", &RigidBodyTree<double>::positionConstraints<T>,
+           py::arg("cache"))
+      .def("positionConstraintsJacobian",
+           &RigidBodyTree<double>::positionConstraintsJacobian<T>,
+           py::arg("cache"),
+           py::arg("in_terms_of_qdot") = false)
+      .def("positionConstraintsJacDotTimesV",
+           &RigidBodyTree<double>::positionConstraintsJacDotTimesV<T>,
+           py::arg("cache"))
       // jointLimitConstriants
       // relativeTwist
       // worldMomentumMatrix
