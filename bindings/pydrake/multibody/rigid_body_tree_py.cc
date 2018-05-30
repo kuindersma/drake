@@ -200,14 +200,31 @@ PYBIND11_MODULE(rigid_body_tree, m) {
            py::arg("model_instance_id_set") =
              RigidBodyTreeConstants::default_model_instance_id_set,
            py::arg("in_terms_of_qdot") = false)
+      .def("centerOfMassJacobianDotTimesV",
+           &RigidBodyTree<double>::centerOfMassJacobianDotTimesV<T>,
+           py::arg("cache"),
+           py::arg("model_instance_id_set") =
+             RigidBodyTreeConstants::default_model_instance_id_set)
       // centroidalMomentumMatrix
       // forwardKinPositionGradient
       // geometricJacobianDotTimesV
-      // centerOfMassJacobianDotTimesV
       // centroidalMomentumMatrixDotTimesV
-      // positionConstraints
-      // positionConstraintsJacobian
-      // positionConstraintsJacDotTimesV
+      .def("positionConstraints", &RigidBodyTree<double>::positionConstraints<T>,
+           py::arg("cache"))
+      .def("positionConstraintsJacobian",
+           &RigidBodyTree<double>::positionConstraintsJacobian<T>,
+           py::arg("cache"),
+           py::arg("in_terms_of_qdot") = false)
+      .def("positionConstraintsJacDotTimesV",
+           &RigidBodyTree<double>::positionConstraintsJacDotTimesV<T>,
+           py::arg("cache"))
+      .def("addDistanceConstraint", 
+           &RigidBodyTree<double>::addDistanceConstraint,
+           py::arg("from_body_or_frame_ind"),
+           py::arg("from_point"),
+           py::arg("to_body_or_frame_ind"),
+           py::arg("to_point"),
+           py::arg("distance"))
       // jointLimitConstriants
       // relativeTwist
       // worldMomentumMatrix
