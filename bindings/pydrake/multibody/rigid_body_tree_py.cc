@@ -218,6 +218,13 @@ PYBIND11_MODULE(rigid_body_tree, m) {
       .def("positionConstraintsJacDotTimesV",
            &RigidBodyTree<double>::positionConstraintsJacDotTimesV<T>,
            py::arg("cache"))
+      .def("addDistanceConstraint", 
+           &RigidBodyTree<double>::addDistanceConstraint,
+           py::arg("from_body_or_frame_ind"),
+           py::arg("from_point"),
+           py::arg("to_body_or_frame_ind"),
+           py::arg("to_point"),
+           py::arg("distance"))
       // jointLimitConstriants
       // relativeTwist
       // worldMomentumMatrix
