@@ -1647,9 +1647,9 @@ TwistMatrix<Scalar> RigidBodyTree<T>::centroidalMomentumMatrix(
 
   // transform from world frame to COM frame
   auto com = centerOfMass(cache, model_instance_id_set);
-  auto angular_momentum_matrix = ret.template topRows<kSpaceDimension>();
-  auto linear_momentum_matrix = ret.template bottomRows<kSpaceDimension>();
-  angular_momentum_matrix += linear_momentum_matrix.colwise().cross(com);
+  auto angular_momentum_matrix = ret.template topRows<kSpaceDimension>().eval();
+  auto linear_momentum_matrix = ret.template bottomRows<kSpaceDimension>().eval();
+  angular_momentum_matrix.noalias() += linear_momentum_matrix.colwise().cross(com);
 
   //  Valid for more general frame transformations but slower:
   //  Eigen::Transform<Scalar, kSpaceDimension, Eigen::Isometry>

@@ -332,20 +332,20 @@ drake::SquareTwistMatrix<typename DerivedI::Scalar> transformSpatialInertia(
 
     // TODO(tkoolen): SpatialInertiaMatrix class that keeps track of whether
     // matrix is regular or not
-    const auto& R = T_current_to_new.linear();
-    const auto& p = T_current_to_new.translation();
+    const Eigen::Matrix<Scalar,3,3>  R = T_current_to_new.linear();
+    const Eigen::Matrix<Scalar,3,1> p = T_current_to_new.translation();
 
-    auto J = I.template topLeftCorner<3, 3>();
+    Eigen::Matrix<Scalar,3,3> J = I.template topLeftCorner<3, 3>();
     Eigen::Matrix<Scalar, 3, 1> c;
     c << I(2, 4), I(0, 5), I(1, 3);
-    const auto& m = I(3, 3);
+    const Scalar m = I(3, 3);
 
     auto vectorToSkewSymmetricSquared =
         [](const Eigen::Matrix<Scalar, 3, 1>& a) {
           Eigen::Matrix<Scalar, 3, 3> ret;
-          auto a0_2 = a(0) * a(0);
-          auto a1_2 = a(1) * a(1);
-          auto a2_2 = a(2) * a(2);
+          Scalar a0_2 = a(0) * a(0);
+          Scalar a1_2 = a(1) * a(1);
+          Scalar a2_2 = a(2) * a(2);
 
           ret(0, 0) = -a1_2 - a2_2;
           ret(0, 1) = a(0) * a(1);
@@ -362,8 +362,9 @@ drake::SquareTwistMatrix<typename DerivedI::Scalar> transformSpatialInertia(
         };
 
     drake::SquareTwistMatrix<Scalar> I_new;
+    I_new.setZero();
     auto c_new = (R * c).eval();
-    auto J_new = I_new.template topLeftCorner<3, 3>();
+    Eigen::Matrix<Scalar,3,3> J_new = I_new.template topLeftCorner<3, 3>();
 
     if (m > Eigen::NumTraits<Scalar>::epsilon()) {
       J_new = vectorToSkewSymmetricSquared(c_new);
