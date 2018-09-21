@@ -129,6 +129,7 @@ PYBIND11_MODULE(rigid_body_tree, m) {
     .def("get_body", &RigidBodyTree<double>::get_body,
          py::return_value_policy::reference)
     .def("get_position_name", &RigidBodyTree<double>::get_position_name)
+    .def("get_velocity_name", &RigidBodyTree<double>::get_velocity_name)
     .def("add_rigid_body", &RigidBodyTree<double>::add_rigid_body)
     .def("addCollisionElement", &RigidBodyTree<double>::addCollisionElement)
     .def("AddCollisionFilterGroupMember",
